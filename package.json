@@ -1,0 +1,86 @@
+{
+  "name": "atproto-mcp",
+  "version": "0.1.0",
+  "description": "A comprehensive MCP server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "atproto-mcp": "dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x dist/cli.js",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "test:ui": "vitest --ui",
+    "lint": "eslint src --ext .ts,.tsx",
+    "lint:fix": "eslint src --ext .ts,.tsx --fix",
+    "format": "prettier --write src/**/*.{ts,tsx,json,md}",
+    "format:check": "prettier --check src/**/*.{ts,tsx,json,md}",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepare": "husky install",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "atproto",
+    "at-protocol",
+    "bluesky",
+    "social-networking",
+    "llm",
+    "ai",
+    "typescript"
+  ],
+  "author": "Cameron Rye <cameronrye@users.noreply.github.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cameronrye/atproto-mcp.git"
+  },
+  "bugs": {
+    "url": "https://github.com/cameronrye/atproto-mcp/issues"
+  },
+  "homepage": "https://github.com/cameronrye/atproto-mcp#readme",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@atproto/api": "^0.14.0",
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@types/ws": "^8.18.1",
+    "ws": "^8.18.3",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vitest/coverage-v8": "^1.1.0",
+    "@vitest/ui": "^1.1.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.0",
+    "husky": "^8.0.3",
+    "lint-staged": "^15.2.0",
+    "prettier": "^3.1.1",
+    "tsx": "^4.6.2",
+    "typescript": "^5.3.3",
+    "vitepress": "^1.0.0",
+    "vitest": "^1.1.0"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,md}": [
+      "prettier --write"
+    ]
+  }
+}
