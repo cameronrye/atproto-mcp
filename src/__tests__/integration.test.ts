@@ -35,7 +35,16 @@ const mockServer = {
         try {
           schema.parse(testData);
           // If it parses successfully, try common MCP methods
-          const mcpMethods = ['initialize', 'ping', 'tools/list', 'tools/call', 'resources/list', 'resources/read', 'prompts/list', 'prompts/get'];
+          const mcpMethods = [
+            'initialize',
+            'ping',
+            'tools/list',
+            'tools/call',
+            'resources/list',
+            'resources/read',
+            'prompts/list',
+            'prompts/get',
+          ];
           for (const mcpMethod of mcpMethods) {
             try {
               schema.parse({ method: mcpMethod });
@@ -267,9 +276,11 @@ describe('Phase 2 Integration Tests', () => {
       };
 
       const oauthClient = new AtpOAuthClient(config);
-      
+
       // Mock the OAuth client's authorize method
-      const mockAuthorize = vi.fn().mockResolvedValue('https://bsky.social/oauth/authorize?client_id=test&state=abc123');
+      const mockAuthorize = vi
+        .fn()
+        .mockResolvedValue('https://bsky.social/oauth/authorize?client_id=test&state=abc123');
       (oauthClient as any).oauthClient = { authorize: mockAuthorize };
 
       const authRequest = await oauthClient.startAuthorization('test.bsky.social');
@@ -293,7 +304,7 @@ describe('Phase 2 Integration Tests', () => {
       };
 
       const oauthClient = new AtpOAuthClient(config);
-      
+
       // Set up pending authorization
       const state = 'test-state-123';
       (oauthClient as any).pendingAuthorizations.set(state, {
@@ -364,7 +375,7 @@ describe('Phase 2 Integration Tests', () => {
     it('should create timeline resource', () => {
       const resources = createResources(mockAtpClient);
       const timelineResource = resources.find(r => r.uri === 'atproto://timeline');
-      
+
       expect(timelineResource).toBeDefined();
       expect(timelineResource?.name).toBe('User Timeline');
       expect(timelineResource?.mimeType).toBe('application/json');
@@ -373,7 +384,7 @@ describe('Phase 2 Integration Tests', () => {
     it('should create profile resource', () => {
       const resources = createResources(mockAtpClient);
       const profileResource = resources.find(r => r.uri === 'atproto://profile');
-      
+
       expect(profileResource).toBeDefined();
       expect(profileResource?.name).toBe('User Profile');
       expect(profileResource?.mimeType).toBe('application/json');
@@ -382,7 +393,7 @@ describe('Phase 2 Integration Tests', () => {
     it('should create notifications resource', () => {
       const resources = createResources(mockAtpClient);
       const notificationsResource = resources.find(r => r.uri === 'atproto://notifications');
-      
+
       expect(notificationsResource).toBeDefined();
       expect(notificationsResource?.name).toBe('User Notifications');
       expect(notificationsResource?.mimeType).toBe('application/json');
@@ -428,9 +439,7 @@ describe('Phase 2 Integration Tests', () => {
       const result = await handler!();
       const tools = result.tools;
 
-      const oauthTools = tools.filter((tool: any) =>
-        tool.name.includes('oauth')
-      );
+      const oauthTools = tools.filter((tool: any) => tool.name.includes('oauth'));
 
       expect(oauthTools.length).toBeGreaterThan(0);
     });

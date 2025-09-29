@@ -5,8 +5,7 @@
  */
 
 import { parseArgs } from 'node:util';
-import type { IMcpServerConfig } from './types/index.js';
-import { ConfigurationError } from './types/index.js';
+import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
 import { AtpMcpServer } from './index.js';
 import { LogLevel, Logger } from './utils/logger.js';
 
@@ -126,7 +125,7 @@ function showVersion(): void {
         require('path').join(__dirname, '..', 'package.json'),
         'utf8'
       )
-    );
+    ) as { name: string; version: string; description: string };
     console.log(`AT Protocol MCP Server v${packageJson.version}`);
   } catch (error) {
     console.log('AT Protocol MCP Server v0.1.0');
@@ -144,18 +143,18 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
     });
 
     // Handle help and version flags
-    if (values.help) {
+    if (values.help === true) {
       showHelp();
       process.exit(0);
     }
 
-    if (values.version) {
+    if (values.version === true) {
       showVersion();
       process.exit(0);
     }
 
     // Set log level if provided
-    if (values['log-level']) {
+    if (values['log-level'] != null && values['log-level'] !== '') {
       const logLevel = values['log-level'].toUpperCase();
       if (logLevel in LogLevel) {
         process.env['LOG_LEVEL'] = logLevel;
@@ -169,7 +168,7 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
     // Build configuration from CLI arguments
     const config: Partial<IMcpServerConfig> = {};
 
-    if (values.port) {
+    if (values.port != null && values.port !== '') {
       const port = parseInt(values.port, 10);
       if (isNaN(port) || port < 1 || port > 65535) {
         throw new ConfigurationError(`Invalid port: ${values.port}. Must be between 1 and 65535`);
@@ -177,17 +176,17 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
       config.port = port;
     }
 
-    if (values.host) {
+    if (values.host != null && values.host !== '') {
       config.host = values.host;
     }
 
-    if (values.service || values.auth) {
+    if ((values.service != null && values.service !== '') || (values.auth != null && values.auth !== '')) {
       config.atproto = {
         service: 'https://bsky.social',
         authMethod: 'app-password',
       };
 
-      if (values.service) {
+      if (values.service != null && values.service !== '') {
         try {
           new URL(values.service); // Validate URL
           config.atproto.service = values.service;
@@ -196,7 +195,7 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
         }
       }
 
-      if (values.auth) {
+      if (values.auth != null && values.auth !== '') {
         if (values.auth !== 'app-password' && values.auth !== 'oauth') {
           throw new ConfigurationError(
             `Invalid auth method: ${values.auth}. Must be 'app-password' or 'oauth'`

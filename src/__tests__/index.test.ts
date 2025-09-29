@@ -157,10 +157,7 @@ describe('AtpMcpServer', () => {
       const error = new Error('Connection failed');
       mockServer.connect.mockRejectedValue(error);
 
-      await expectToThrow(
-        () => server.start(),
-        McpError
-      );
+      await expectToThrow(() => server.start(), McpError);
 
       expect(mockAtpClient.cleanup).toHaveBeenCalled();
     });
@@ -193,18 +190,14 @@ describe('AtpMcpServer', () => {
 
       await server.start();
 
-      await expectToThrow(
-        () => server.stop(),
-        Error,
-        'Cleanup failed'
-      );
+      await expectToThrow(() => server.stop(), Error, 'Cleanup failed');
     });
   });
 
   describe('getStatus', () => {
     it('should return server status', async () => {
       const server = new AtpMcpServer();
-      
+
       const status = server.getStatus();
 
       expect(status).toEqual({
@@ -218,7 +211,7 @@ describe('AtpMcpServer', () => {
 
     it('should return running status after start', async () => {
       const server = new AtpMcpServer();
-      
+
       await server.start();
       const status = server.getStatus();
 

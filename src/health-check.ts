@@ -13,7 +13,7 @@ async function healthCheck(): Promise<void> {
     // Use default configuration which supports unauthenticated mode
     const server = new AtpMcpServer({
       // Only override service if explicitly set in environment
-      ...(process.env['ATPROTO_SERVICE'] && {
+      ...(process.env['ATPROTO_SERVICE'] != null && process.env['ATPROTO_SERVICE'] !== '' && {
         atproto: {
           service: process.env['ATPROTO_SERVICE'],
         },
@@ -24,7 +24,7 @@ async function healthCheck(): Promise<void> {
     const status = server.getStatus();
 
     // Check if server is properly configured
-    if (!status.config) {
+    if (status.config == null) {
       throw new Error('Server configuration not found');
     }
 

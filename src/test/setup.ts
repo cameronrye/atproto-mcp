@@ -3,7 +3,6 @@
  */
 
 import { afterEach, beforeEach, vi } from 'vitest';
-import type { MockedFunction } from 'vitest';
 
 // Mock environment variables for testing
 const originalEnv = process.env;
@@ -35,20 +34,37 @@ afterEach(() => {
 /**
  * Create a mock AT Protocol session
  */
-export function createMockSession() {
+export function createMockSession(): {
+  did: 'did:plc:test123';
+  handle: string;
+  accessJwt: string;
+  refreshJwt: string;
+  active: boolean;
+  status: string;
+  email?: string;
+  emailConfirmed?: boolean;
+  emailAuthFactor?: boolean;
+  didDoc?: unknown;
+} {
   return {
     did: 'did:plc:test123' as const,
     handle: 'test.bsky.social',
     accessJwt: 'mock-access-jwt',
     refreshJwt: 'mock-refresh-jwt',
     active: true,
+    status: 'valid',
   };
 }
 
 /**
  * Create a mock AT Protocol configuration
  */
-export function createMockAtpConfig() {
+export function createMockAtpConfig(): {
+  service: string;
+  identifier: string;
+  password: string;
+  authMethod: 'app-password';
+} {
   return {
     service: 'https://bsky.social',
     identifier: 'test.bsky.social',
@@ -60,7 +76,19 @@ export function createMockAtpConfig() {
 /**
  * Create a mock MCP server configuration
  */
-export function createMockServerConfig() {
+export function createMockServerConfig(): {
+  port: number;
+  host: string;
+  name: string;
+  version: string;
+  description: string;
+  atproto: {
+    service: string;
+    identifier: string;
+    password: string;
+    authMethod: 'app-password';
+  };
+} {
   return {
     port: 3000,
     host: 'localhost',
@@ -74,7 +102,7 @@ export function createMockServerConfig() {
 /**
  * Mock console methods to reduce test noise
  */
-export function mockConsole() {
+export function mockConsole(): Record<string, unknown> {
   return {
     log: vi.spyOn(console, 'log').mockImplementation(() => {}),
     error: vi.spyOn(console, 'error').mockImplementation(() => {}),

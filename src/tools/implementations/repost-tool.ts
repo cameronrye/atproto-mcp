@@ -46,8 +46,8 @@ export class RepostTool extends BaseTool {
       this.logger.info('Creating repost', {
         postUri: params.uri,
         postCid: params.cid,
-        hasQuoteText: !!params.text,
-        quoteTextLength: params.text?.length || 0,
+        hasQuoteText: params.text != null && params.text !== '',
+        quoteTextLength: params.text?.length ?? 0,
       });
 
       // Validate the post URI and CID
@@ -55,7 +55,7 @@ export class RepostTool extends BaseTool {
       this.validateCid(params.cid);
 
       // Check if this is a quote post or simple repost
-      const isQuotePost = !!params.text;
+      const isQuotePost = params.text != null && params.text !== '';
 
       let response;
 
@@ -67,8 +67,8 @@ export class RepostTool extends BaseTool {
         response = await this.createSimpleRepost(params);
       }
 
-      const responseUri = 'data' in response ? response.data.uri : response.uri;
-      const responseCid = 'data' in response ? response.data.cid : response.cid;
+      const responseUri = 'data' in (response as Record<string, unknown>) ? (response as { data: { uri: string } }).data.uri : (response as { uri: string }).uri;
+      const responseCid = 'data' in (response as Record<string, unknown>) ? (response as { data: { cid: string } }).data.cid : (response as { cid: string }).cid;
 
       this.logger.info('Repost created successfully', {
         repostUri: responseUri,
@@ -97,7 +97,7 @@ export class RepostTool extends BaseTool {
   /**
    * Create a simple repost record
    */
-  private async createSimpleRepost(params: IRepostParams) {
+  private async createSimpleRepost(params: IRepostParams): Promise<unknown> {
     const repostRecord = {
       $type: 'app.bsky.feed.repost',
       subject: {
@@ -127,10 +127,10 @@ export class RepostTool extends BaseTool {
   /**
    * Create a quote post (post with embedded repost)
    */
-  private async createQuotePost(params: IRepostParams) {
+  private async createQuotePost(params: IRepostParams): Promise<unknown> {
     const quotePostRecord = {
       $type: 'app.bsky.feed.post' as const,
-      text: params.text || '',
+      text: params.text ?? '',
       embed: {
         $type: 'app.bsky.embed.record',
         record: {

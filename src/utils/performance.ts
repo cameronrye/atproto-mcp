@@ -4,7 +4,7 @@
 
 import type { Logger } from './logger.js';
 
-export interface ConnectionPoolConfig {
+export interface IConnectionPoolConfig {
   maxConnections: number;
   minConnections: number;
   acquireTimeoutMs: number;
@@ -12,13 +12,13 @@ export interface ConnectionPoolConfig {
   maxRetries: number;
 }
 
-export interface CacheConfig {
+export interface ICacheConfig {
   maxSize: number;
   ttlMs: number;
   cleanupIntervalMs: number;
 }
 
-export interface PerformanceMetrics {
+export interface IPerformanceMetrics {
   connectionPoolSize: number;
   activeConnections: number;
   cacheHitRate: number;
@@ -33,10 +33,10 @@ export interface PerformanceMetrics {
 export class ConnectionPool {
   private connections: Map<string, any> = new Map();
   private activeConnections: Set<string> = new Set();
-  private config: ConnectionPoolConfig;
+  private config: IConnectionPoolConfig;
   private logger: Logger;
 
-  constructor(config: ConnectionPoolConfig, logger: Logger) {
+  constructor(config: IConnectionPoolConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
   }
@@ -99,12 +99,12 @@ export class ConnectionPool {
  */
 export class LRUCache<T> {
   private cache: Map<string, { value: T; timestamp: number; accessCount: number }> = new Map();
-  private config: CacheConfig;
+  private config: ICacheConfig;
   private logger: Logger;
   private hits = 0;
   private misses = 0;
 
-  constructor(config: CacheConfig, logger: Logger) {
+  constructor(config: ICacheConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
 
@@ -350,7 +350,7 @@ export class PerformanceMonitor {
     this.wsManager = wsManager;
   }
 
-  getMetrics(): PerformanceMetrics {
+  getMetrics(): IPerformanceMetrics {
     const memoryUsage = process.memoryUsage();
     const uptime = Date.now() - this.startTime;
 

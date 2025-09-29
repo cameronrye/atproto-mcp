@@ -4,8 +4,17 @@
  */
 
 import { AtpAgent, type AtpSessionData, type AtpSessionEvent } from '@atproto/api';
-import type { ATURI, DID, IAtpConfig, IAtpSession, Result } from '../types/index.js';
-import { AtpError, AuthenticationError, RateLimitError, ValidationError } from '../types/index.js';
+import {
+  AtpError,
+  AuthenticationError,
+  RateLimitError,
+  ValidationError,
+  type ATURI,
+  type DID,
+  type IAtpConfig,
+  type IAtpSession,
+  type Result,
+} from '../types/index.js';
 import { Logger } from './logger.js';
 
 /**
@@ -505,7 +514,7 @@ export class AtpClient {
   /**
    * Load stored OAuth session from secure storage
    */
-  private async loadStoredOAuthSession(): Promise<import('./oauth-client.js').OAuthSession | null> {
+  private async loadStoredOAuthSession(): Promise<import('./oauth-client.js').IOAuthSession | null> {
     try {
       // In a real implementation, this would load from secure storage
       // For now, we'll use environment variables or return null
@@ -528,7 +537,7 @@ export class AtpClient {
    * Store OAuth session to secure storage
    */
   private async storeOAuthSession(
-    session: import('./oauth-client.js').OAuthSession
+    session: import('./oauth-client.js').IOAuthSession
   ): Promise<void> {
     try {
       // In a real implementation, this would store to secure storage

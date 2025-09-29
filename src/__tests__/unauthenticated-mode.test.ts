@@ -66,10 +66,9 @@ describe('Unauthenticated Mode', () => {
       const configManager = new ConfigManager();
       const atpClient = new AtpClient(configManager.getAtpConfig());
 
-      const result = await atpClient.executePublicRequest(
-        async () => ({ test: 'data' }),
-        { operation: 'test' }
-      );
+      const result = await atpClient.executePublicRequest(async () => ({ test: 'data' }), {
+        operation: 'test',
+      });
 
       expect(result.success).toBe(true);
       expect(result.data).toEqual({ test: 'data' });
@@ -79,10 +78,9 @@ describe('Unauthenticated Mode', () => {
       const configManager = new ConfigManager();
       const atpClient = new AtpClient(configManager.getAtpConfig());
 
-      const result = await atpClient.executeAuthenticatedRequest(
-        async () => ({ test: 'data' }),
-        { operation: 'test' }
-      );
+      const result = await atpClient.executeAuthenticatedRequest(async () => ({ test: 'data' }), {
+        operation: 'test',
+      });
 
       expect(result.success).toBe(false);
       expect(result.error?.message).toContain('authentication');
@@ -92,9 +90,9 @@ describe('Unauthenticated Mode', () => {
   describe('Server Initialization', () => {
     it('should start server without authentication', async () => {
       server = new AtpMcpServer();
-      
+
       await expect(server.start()).resolves.not.toThrow();
-      
+
       const status = server.getStatus();
       expect(status.isRunning).toBe(true);
       expect(status.isAuthenticated).toBe(false);
@@ -120,7 +118,7 @@ describe('Unauthenticated Mode', () => {
 
     it('should make public tools available', () => {
       const atpClient = server.getAtpClient();
-      
+
       // Test that we can create tools and check their availability
       // This is a basic test - in a real scenario we'd test specific tools
       expect(atpClient.requiresAuthentication()).toBe(false);
@@ -153,7 +151,7 @@ describe('Mixed Authentication Mode', () => {
   it('should handle partial credentials gracefully', async () => {
     // Set only identifier but not password
     process.env['ATPROTO_IDENTIFIER'] = 'test.bsky.social';
-    
+
     const configManager = new ConfigManager();
     expect(configManager.hasAuthentication()).toBe(false);
     expect(configManager.getAuthMode()).toBe('unauthenticated');

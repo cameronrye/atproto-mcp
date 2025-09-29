@@ -49,7 +49,7 @@
         "format": ["UPPER_CASE"]
       }
     ],
-    "no-console": ["error", { "allow": ["warn", "error"] }],
+    "no-console": ["error", { "allow": ["log", "warn", "error"] }],
     "prefer-const": "error",
     "no-var": "error",
     "object-shorthand": "error",

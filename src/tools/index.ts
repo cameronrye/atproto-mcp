@@ -136,5 +136,3 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     return [];
   }
 }
-
-

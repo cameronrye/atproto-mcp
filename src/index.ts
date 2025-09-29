@@ -11,8 +11,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import type { IMcpServerConfig } from './types/index.js';
-import { ConfigurationError, McpError } from './types/index.js';
+import { ConfigurationError, McpError, type IMcpServerConfig } from './types/index.js';
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
@@ -20,15 +19,15 @@ import { type IMcpTool, createTools } from './tools/index.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
 import {
-  type CacheConfig,
+  type ICacheConfig,
   ConnectionPool,
-  type ConnectionPoolConfig,
+  type IConnectionPoolConfig,
   LRUCache,
-  type PerformanceMetrics,
+  type IPerformanceMetrics,
   PerformanceMonitor,
   WebSocketManager,
 } from './utils/performance.js';
-import { type SecurityConfig, SecurityManager } from './utils/security.js';
+import { type ISecurityConfig, SecurityManager } from './utils/security.js';
 
 /**
  * Main server class for AT Protocol MCP Server
@@ -39,7 +38,7 @@ export class AtpMcpServer {
   private logger: Logger;
   private configManager: ConfigManager;
   private connectionPool: ConnectionPool;
-  private cache: LRUCache<any>;
+  private cache: LRUCache<unknown>;
   private wsManager: WebSocketManager;
   private performanceMonitor: PerformanceMonitor;
   private securityManager: SecurityManager;
@@ -74,7 +73,7 @@ export class AtpMcpServer {
       this.atpClient = new AtpClient(this.configManager.getAtpConfig());
 
       // Initialize performance components
-      const connectionPoolConfig: ConnectionPoolConfig = {
+      const connectionPoolConfig: IConnectionPoolConfig = {
         maxConnections: 10,
         minConnections: 2,
         acquireTimeoutMs: 5000,
@@ -82,7 +81,7 @@ export class AtpMcpServer {
         maxRetries: 3,
       };
 
-      const cacheConfig: CacheConfig = {
+      const cacheConfig: ICacheConfig = {
         maxSize: 1000,
         ttlMs: 300000, // 5 minutes
         cleanupIntervalMs: 60000, // 1 minute
@@ -94,7 +93,7 @@ export class AtpMcpServer {
       this.performanceMonitor = new PerformanceMonitor(this.logger);
 
       // Initialize security manager
-      const securityConfig: SecurityConfig = {
+      const securityConfig: ISecurityConfig = {
         enableInputSanitization: true,
         enableRateLimit: true,
         enableErrorSanitization: true,
@@ -313,7 +312,7 @@ export class AtpMcpServer {
               {
                 uri: content.uri,
                 mimeType: content.mimeType,
-                text: content.text || '',
+                text: content.text ?? '',
               },
             ],
           };
@@ -343,7 +342,7 @@ export class AtpMcpServer {
       prompts: prompts.map(prompt => ({
         name: prompt.name,
         description: prompt.description,
-        arguments: prompt.arguments || [],
+        arguments: prompt.arguments ?? [],
       })),
     }));
 
@@ -374,7 +373,7 @@ export class AtpMcpServer {
             });
           }
 
-          const messages = await prompt.get(request.params.arguments || {});
+          const messages = await prompt.get(request.params.arguments ?? {});
           return { messages };
         } catch (error) {
           this.logger.error(`Prompt generation failed`, error);
@@ -396,16 +395,16 @@ export class AtpMcpServer {
   /**
    * Convert Zod schema to JSON Schema for MCP compatibility
    */
-  private zodToJsonSchema(schema: z.ZodSchema): any {
+  private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
     // Handle ZodOptional wrapper first
     if (schema instanceof z.ZodOptional) {
-      return this.zodToJsonSchema((schema as any)._def.innerType);
+      return this.zodToJsonSchema((schema as z.ZodOptional<z.ZodSchema>)._def.innerType);
     }
 
     // Handle ZodObject
     if (schema instanceof z.ZodObject) {
       const shape = schema.shape;
-      const properties: any = {};
+      const properties: Record<string, unknown> = {};
       const required: string[] = [];
 
       for (const [key, value] of Object.entries(shape)) {
@@ -545,7 +544,7 @@ export class AtpMcpServer {
         name: config.name,
         version: config.version,
         service: config.atproto.service,
-        authMethod: config.atproto.authMethod || 'unauthenticated',
+        authMethod: config.atproto.authMethod ?? 'unauthenticated',
         authMode: this.configManager.getAuthMode(),
         isAuthenticated: this.atpClient.isAuthenticated(),
       });
@@ -662,14 +661,14 @@ export class AtpMcpServer {
   /**
    * Get performance metrics
    */
-  public getPerformanceMetrics(): PerformanceMetrics {
+  public getPerformanceMetrics(): IPerformanceMetrics {
     return this.performanceMonitor.getMetrics();
   }
 
   /**
    * Get cache instance for external use
    */
-  public getCache(): LRUCache<any> {
+  public getCache(): LRUCache<unknown> {
     return this.cache;
   }
 
@@ -697,7 +696,17 @@ export class AtpMcpServer {
   /**
    * Get comprehensive system metrics including performance and security
    */
-  public getSystemMetrics() {
+  public getSystemMetrics(): {
+    performance: IPerformanceMetrics;
+    security: Record<string, unknown>;
+    server: {
+      isRunning: boolean;
+      isAuthenticated: boolean;
+      authMode: 'unauthenticated' | 'app-password' | 'oauth';
+      hasAuthentication: boolean;
+      config: IMcpServerConfig;
+    };
+  } {
     return {
       performance: this.getPerformanceMetrics(),
       security: this.securityManager.getMetrics(),

@@ -48,7 +48,7 @@ describe('Zod to JSON Schema Conversion', () => {
 
       expect(result).toEqual({
         type: 'array',
-        items: { type: 'string' }
+        items: { type: 'string' },
       });
     });
   });
@@ -98,9 +98,11 @@ describe('Zod to JSON Schema Conversion', () => {
           name: z.string(),
           email: z.string(),
         }),
-        settings: z.object({
-          theme: z.string(),
-        }).optional(),
+        settings: z
+          .object({
+            theme: z.string(),
+          })
+          .optional(),
       });
 
       const result = zodToJsonSchema(schema);
@@ -198,10 +200,12 @@ describe('Zod to JSON Schema Conversion', () => {
     });
 
     it('should handle array of objects', () => {
-      const schema = z.array(z.object({
-        id: z.number(),
-        name: z.string(),
-      }));
+      const schema = z.array(
+        z.object({
+          id: z.number(),
+          name: z.string(),
+        })
+      );
 
       const result = zodToJsonSchema(schema);
 
@@ -225,10 +229,7 @@ describe('Zod to JSON Schema Conversion', () => {
       const result = zodToJsonSchema(schema);
 
       expect(result).toEqual({
-        anyOf: [
-          { type: 'string' },
-          { type: 'number' },
-        ],
+        anyOf: [{ type: 'string' }, { type: 'number' }],
       });
     });
   });
@@ -238,22 +239,26 @@ describe('Zod to JSON Schema Conversion', () => {
       const schema = z.object({
         text: z.string().min(1).max(300),
         images: z.array(z.any()).optional(),
-        external: z.object({
-          uri: z.string(),
-          title: z.string(),
-          description: z.string().optional(),
-        }).optional(),
+        external: z
+          .object({
+            uri: z.string(),
+            title: z.string(),
+            description: z.string().optional(),
+          })
+          .optional(),
         languages: z.array(z.string().length(2)).optional(),
-        reply: z.object({
-          root: z.object({
-            uri: z.string(),
-            cid: z.string(),
-          }),
-          parent: z.object({
-            uri: z.string(),
-            cid: z.string(),
-          }),
-        }).optional(),
+        reply: z
+          .object({
+            root: z.object({
+              uri: z.string(),
+              cid: z.string(),
+            }),
+            parent: z.object({
+              uri: z.string(),
+              cid: z.string(),
+            }),
+          })
+          .optional(),
       });
 
       const result = zodToJsonSchema(schema);

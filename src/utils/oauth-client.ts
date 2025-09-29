@@ -4,13 +4,12 @@
 
 // Note: @atproto/oauth-client-node doesn't exist yet, this is a mock implementation
 // In production, use the actual AT Protocol OAuth client when available
-import type { IAtpConfig } from '../types/index.js';
-import { AuthenticationError } from '../types/index.js';
+import { AuthenticationError, type IAtpConfig } from '../types/index.js';
 import { Logger } from './logger.js';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
 
-export interface OAuthSession {
+export interface IOAuthSession {
   accessToken: string;
   refreshToken: string;
   did: string;
@@ -18,7 +17,7 @@ export interface OAuthSession {
   expiresAt: Date;
 }
 
-export interface OAuthAuthorizationRequest {
+export interface IOAuthAuthorizationRequest {
   authUrl: string;
   state: string;
   codeVerifier: string;
@@ -54,7 +53,7 @@ export class AtpOAuthClient extends EventEmitter {
   /**
    * Start OAuth authorization flow
    */
-  async startAuthorization(identifier: string): Promise<OAuthAuthorizationRequest> {
+  async startAuthorization(identifier: string): Promise<IOAuthAuthorizationRequest> {
     try {
       this.logger.info('Starting OAuth authorization flow', { identifier });
 
@@ -74,7 +73,7 @@ export class AtpOAuthClient extends EventEmitter {
       const authUrl =
         `https://${baseUrl}/oauth/authorize?` +
         `client_id=${encodeURIComponent(this.config.clientId!)}&` +
-        `redirect_uri=${encodeURIComponent(this.config.redirectUri || 'http://localhost:3000/oauth/callback')}&` +
+        `redirect_uri=${encodeURIComponent(this.config.redirectUri ?? 'http://localhost:3000/oauth/callback')}&` +
         `response_type=code&` +
         `scope=atproto&` +
         `state=${encodeURIComponent(state)}&` +
@@ -103,7 +102,7 @@ export class AtpOAuthClient extends EventEmitter {
   /**
    * Handle OAuth callback and exchange code for tokens
    */
-  async handleCallback(code: string, state: string): Promise<OAuthSession> {
+  async handleCallback(code: string, state: string): Promise<IOAuthSession> {
     try {
       this.logger.info('Handling OAuth callback', {
         state: `${state.substring(0, 8)}...`,
@@ -131,12 +130,12 @@ export class AtpOAuthClient extends EventEmitter {
         expiresIn: 3600,
       };
 
-      const session: OAuthSession = {
+      const session: IOAuthSession = {
         accessToken: tokenResponse.accessJwt,
         refreshToken: tokenResponse.refreshJwt,
         did: tokenResponse.did,
         handle: tokenResponse.handle,
-        expiresAt: new Date(Date.now() + (tokenResponse.expiresIn || 3600) * 1000),
+        expiresAt: new Date(Date.now() + (tokenResponse.expiresIn ?? 3600) * 1000),
       };
 
       this.logger.info('OAuth authentication successful', {
@@ -161,7 +160,7 @@ export class AtpOAuthClient extends EventEmitter {
   /**
    * Refresh OAuth tokens
    */
-  async refreshTokens(refreshToken: string): Promise<OAuthSession> {
+  async refreshTokens(refreshToken: string): Promise<IOAuthSession> {
     try {
       this.logger.info('Refreshing OAuth tokens');
 
@@ -174,12 +173,12 @@ export class AtpOAuthClient extends EventEmitter {
         expiresIn: 3600,
       };
 
-      const session: OAuthSession = {
+      const session: IOAuthSession = {
         accessToken: tokenResponse.accessJwt,
-        refreshToken: tokenResponse.refreshJwt || refreshToken, // Keep old refresh token if new one not provided
+        refreshToken: tokenResponse.refreshJwt ?? refreshToken, // Keep old refresh token if new one not provided
         did: tokenResponse.did,
         handle: tokenResponse.handle,
-        expiresAt: new Date(Date.now() + (tokenResponse.expiresIn || 3600) * 1000),
+        expiresAt: new Date(Date.now() + (tokenResponse.expiresIn ?? 3600) * 1000),
       };
 
       this.logger.info('OAuth tokens refreshed successfully', {

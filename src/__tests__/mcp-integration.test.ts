@@ -62,7 +62,16 @@ const mockServer = {
           schema.parse(testData);
           // If it parses successfully, it might be expecting a method field
           // Let's try common MCP methods
-          const mcpMethods = ['initialize', 'ping', 'tools/list', 'tools/call', 'resources/list', 'resources/read', 'prompts/list', 'prompts/get'];
+          const mcpMethods = [
+            'initialize',
+            'ping',
+            'tools/list',
+            'tools/call',
+            'resources/list',
+            'resources/read',
+            'prompts/list',
+            'prompts/get',
+          ];
           for (const mcpMethod of mcpMethods) {
             try {
               schema.parse({ method: mcpMethod });

@@ -7,7 +7,7 @@ import { EventEmitter } from 'events';
 import { Logger } from './logger.js';
 import type { IAtpConfig } from '../types/index.js';
 
-export interface FirehoseEvent {
+export interface IFirehoseEvent {
   type: 'commit' | 'handle' | 'migrate' | 'tombstone';
   seq: number;
   time: string;
@@ -22,10 +22,10 @@ export interface FirehoseEvent {
   };
 }
 
-export interface FirehoseSubscription {
+export interface IFirehoseSubscription {
   id: string;
   collections?: string[];
-  onEvent: (event: FirehoseEvent) => void;
+  onEvent: (event: IFirehoseEvent) => void;
   onError?: (error: Error) => void;
 }
 
@@ -33,7 +33,7 @@ export class FirehoseClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private logger: Logger;
   private config: IAtpConfig;
-  private subscriptions = new Map<string, FirehoseSubscription>();
+  private subscriptions = new Map<string, IFirehoseSubscription>();
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 10;
   private reconnectDelay = 1000; // Start with 1 second
@@ -133,7 +133,7 @@ export class FirehoseClient extends EventEmitter {
   /**
    * Subscribe to firehose events
    */
-  subscribe(subscription: FirehoseSubscription): void {
+  subscribe(subscription: IFirehoseSubscription): void {
     this.subscriptions.set(subscription.id, subscription);
     this.logger.info('Added firehose subscription', {
       id: subscription.id,
@@ -192,13 +192,13 @@ export class FirehoseClient extends EventEmitter {
   /**
    * Parse firehose message (simplified implementation)
    */
-  private parseFirehoseMessage(data: Buffer): FirehoseEvent | null {
+  private parseFirehoseMessage(data: Buffer): IFirehoseEvent | null {
     try {
       // This is a simplified parser for demonstration
       // In production, use @atproto/lexicon and proper CAR parsing
 
       // For now, create a mock event structure
-      const mockEvent: FirehoseEvent = {
+      const mockEvent: IFirehoseEvent = {
         type: 'commit',
         seq: Date.now(),
         time: new Date().toISOString(),
@@ -225,7 +225,7 @@ export class FirehoseClient extends EventEmitter {
   /**
    * Process firehose event and notify subscribers
    */
-  private processEvent(event: FirehoseEvent): void {
+  private processEvent(event: IFirehoseEvent): void {
     this.emit('event', event);
 
     // Notify matching subscriptions
@@ -247,7 +247,7 @@ export class FirehoseClient extends EventEmitter {
   /**
    * Check if event matches subscription criteria
    */
-  private matchesSubscription(event: FirehoseEvent, subscription: FirehoseSubscription): boolean {
+  private matchesSubscription(event: IFirehoseEvent, subscription: IFirehoseSubscription): boolean {
     // If no collections specified, match all events
     if (!subscription.collections || subscription.collections.length === 0) {
       return true;

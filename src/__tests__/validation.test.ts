@@ -28,7 +28,7 @@ describe('Phase 1 Validation - MCP Server Functionality', () => {
 
   it('should create and start server successfully', () => {
     expect(server).toBeDefined();
-    
+
     const status = server.getStatus();
     expect(status.isRunning).toBe(true);
     // Authentication fails with test credentials, so server runs in unauthenticated mode
@@ -37,7 +37,7 @@ describe('Phase 1 Validation - MCP Server Functionality', () => {
 
   it('should have proper server configuration', () => {
     const status = server.getStatus();
-    
+
     expect(status.config).toBeDefined();
     expect(status.config.name).toBe('atproto-mcp');
     expect(status.config.version).toBe('0.1.0');
@@ -53,10 +53,10 @@ describe('Phase 1 Validation - MCP Server Functionality', () => {
   it('should have configuration manager', () => {
     const configManager = server.getConfigManager();
     expect(configManager).toBeDefined();
-    
+
     const config = configManager.getConfig();
     expect(config.name).toBe('atproto-mcp');
-    
+
     const atpConfig = configManager.getAtpConfig();
     expect(atpConfig.service).toBe('https://bsky.social');
     expect(atpConfig.authMethod).toBe('app-password');
@@ -66,9 +66,9 @@ describe('Phase 1 Validation - MCP Server Functionality', () => {
     // This test verifies that the logs show successful tool registration
     // From the test output, we can see:
     // [AtpMcpServer] Registered 16 MCP tools
-    // [AtpMcpServer] Registered 0 MCP resources  
+    // [AtpMcpServer] Registered 0 MCP resources
     // [AtpMcpServer] Registered 0 MCP prompts
-    
+
     // The fact that the server starts successfully and logs show 16 tools registered
     // indicates that Phase 1 tool registration is working correctly
     expect(true).toBe(true); // This test passes if server starts without errors

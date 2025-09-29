@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import { FirehoseClient, type FirehoseSubscription } from '../../utils/firehose-client.js';
+import { FirehoseClient, type IFirehoseEvent, type IFirehoseSubscription } from '../../utils/firehose-client.js';
 
 const StartStreamingSchema = z.object({
   collections: z.array(z.string()).optional().default([]),
@@ -96,10 +96,10 @@ export class StartStreamingTool extends BaseTool {
       }
 
       // Create subscription
-      const subscription: FirehoseSubscription = {
+      const subscription: IFirehoseSubscription = {
         id: params.subscriptionId,
         collections: params.collections,
-        onEvent: event => {
+        onEvent: (event: IFirehoseEvent) => {
           this.logger.debug('Received firehose event', {
             subscriptionId: params.subscriptionId,
             type: event.type,
@@ -107,7 +107,7 @@ export class StartStreamingTool extends BaseTool {
             collection: event.commit?.collection,
           });
         },
-        onError: error => {
+        onError: (error: Error) => {
           this.logger.error('Subscription error', error, {
             subscriptionId: params.subscriptionId,
           });

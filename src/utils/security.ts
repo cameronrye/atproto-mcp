@@ -4,14 +4,14 @@
 
 import type { Logger } from './logger.js';
 
-export interface RateLimitConfig {
+export interface IRateLimitConfig {
   windowMs: number;
   maxRequests: number;
   skipSuccessfulRequests?: boolean;
   skipFailedRequests?: boolean;
 }
 
-export interface SecurityConfig {
+export interface ISecurityConfig {
   enableInputSanitization: boolean;
   enableRateLimit: boolean;
   enableErrorSanitization: boolean;
@@ -132,10 +132,10 @@ export class InputSanitizer {
  */
 export class RateLimiter {
   private requests: Map<string, number[]> = new Map();
-  private config: RateLimitConfig;
+  private config: IRateLimitConfig;
   private logger: Logger;
 
-  constructor(config: RateLimitConfig, logger: Logger) {
+  constructor(config: IRateLimitConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
 
@@ -389,10 +389,10 @@ export class SecurityManager {
   private rateLimiter: RateLimiter;
   private errorSanitizer: ErrorSanitizer;
   private credentialManager: CredentialManager;
-  private config: SecurityConfig;
+  private config: ISecurityConfig;
   private logger: Logger;
 
-  constructor(config: SecurityConfig, logger: Logger) {
+  constructor(config: ISecurityConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
 
