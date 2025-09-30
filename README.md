@@ -235,7 +235,58 @@ LOG_LEVEL=info
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
+## 🔒 Security
 
+Security is a top priority for this project. Please review our security practices and policies:
+
+### Security Best Practices
+
+**Before deploying to production:**
+
+1. **Change Default Passwords**
+   - Set `GRAFANA_ADMIN_PASSWORD` environment variable (don't use default)
+   - Configure Redis password if using Redis
+   - Generate strong random keys for `SECURITY_SECRET_KEY`
+
+2. **Configure CORS Properly**
+   - Replace wildcard `*` origins with specific domains
+   - Set `CORS_ORIGINS` in your environment configuration
+   - Example: `CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com`
+
+3. **Secure Your Credentials**
+   - Never commit `.env` files to version control
+   - Use app passwords instead of main account passwords
+   - Rotate credentials regularly
+   - Use secret management systems in production (AWS Secrets Manager, HashiCorp Vault, etc.)
+
+4. **Network Security**
+   - Use HTTPS in production
+   - Configure `TRUSTED_PROXIES` if behind a reverse proxy
+   - Enable rate limiting
+   - Restrict access to internal services (Redis, Prometheus, Grafana)
+
+5. **Keep Dependencies Updated**
+   ```bash
+   pnpm audit
+   pnpm update
+   ```
+
+### Reporting Security Vulnerabilities
+
+If you discover a security vulnerability, please review our [Security Policy](SECURITY.md) for responsible disclosure guidelines.
+
+**Do not open public issues for security vulnerabilities.** Instead, email: c@meron.io
+
+### Security Features
+
+- ✅ Input validation and sanitization
+- ✅ Rate limiting and abuse prevention
+- ✅ Credential redaction in logs
+- ✅ Non-root Docker containers
+- ✅ HTTPS support for AT Protocol
+- ✅ Error sanitization to prevent information leakage
+
+For more details, see [SECURITY.md](SECURITY.md).
 
 ---
 
