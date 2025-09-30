@@ -235,9 +235,8 @@ vulnerability-reports/
 *.tmp
 *.temp
 
-# Lock files (keep package-lock.json but ignore others)
+# Lock files (keep package-lock.json and pnpm-lock.yaml for reproducible builds)
 yarn.lock
-pnpm-lock.yaml
 
-# Keep package-lock.json for reproducible builds
+# Keep package-lock.json and pnpm-lock.yaml for reproducible builds
 # !package-lock.json
