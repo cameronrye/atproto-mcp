@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { IAtpPost, IPaginatedResponse, ISearchPostsParams } from '../../types/index.js';
+import type { IAtpPost, ISearchPostsParams } from '../../types/index.js';
 
 /**
  * Zod schema for search posts parameters

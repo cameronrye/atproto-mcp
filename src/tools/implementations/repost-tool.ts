@@ -67,8 +67,14 @@ export class RepostTool extends BaseTool {
         response = await this.createSimpleRepost(params);
       }
 
-      const responseUri = 'data' in (response as Record<string, unknown>) ? (response as { data: { uri: string } }).data.uri : (response as { uri: string }).uri;
-      const responseCid = 'data' in (response as Record<string, unknown>) ? (response as { data: { cid: string } }).data.cid : (response as { cid: string }).cid;
+      const responseUri =
+        'data' in (response as Record<string, unknown>)
+          ? (response as { data: { uri: string } }).data.uri
+          : (response as { uri: string }).uri;
+      const responseCid =
+        'data' in (response as Record<string, unknown>)
+          ? (response as { data: { cid: string } }).data.cid
+          : (response as { cid: string }).cid;
 
       this.logger.info('Repost created successfully', {
         repostUri: responseUri,

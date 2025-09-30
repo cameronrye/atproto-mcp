@@ -11,7 +11,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { ConfigurationError, McpError, type IMcpServerConfig } from './types/index.js';
+import { ConfigurationError, type IMcpServerConfig, McpError } from './types/index.js';
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
@@ -19,11 +19,11 @@ import { type IMcpTool, createTools } from './tools/index.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
 import {
-  type ICacheConfig,
   ConnectionPool,
+  type ICacheConfig,
   type IConnectionPoolConfig,
-  LRUCache,
   type IPerformanceMetrics,
+  LRUCache,
   PerformanceMonitor,
   WebSocketManager,
 } from './utils/performance.js';
@@ -366,7 +366,7 @@ export class AtpMcpServer {
           }
 
           // Check if prompt is available
-          const isAvailable = await prompt.isAvailable();
+          const isAvailable = prompt.isAvailable();
           if (!isAvailable) {
             throw new McpError(`Prompt not available: ${request.params.name}`, -32603, {
               name: request.params.name,
@@ -722,16 +722,18 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   const server = new AtpMcpServer();
 
   // Handle graceful shutdown
-  process.on('SIGINT', async () => {
+  process.on('SIGINT', () => {
     console.log('\nReceived SIGINT, shutting down gracefully...');
-    await server.stop();
-    process.exit(0);
+    void server.stop().then(() => {
+      process.exit(0);
+    });
   });
 
-  process.on('SIGTERM', async () => {
+  process.on('SIGTERM', () => {
     console.log('\nReceived SIGTERM, shutting down gracefully...');
-    await server.stop();
-    process.exit(0);
+    void server.stop().then(() => {
+      process.exit(0);
+    });
   });
 
   // Start the server

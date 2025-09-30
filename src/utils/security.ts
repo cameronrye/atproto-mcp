@@ -302,7 +302,7 @@ export class ErrorSanitizer {
 
     // Remove sensitive file paths and replace with generic indicators
     return error.stack
-      .replace(/\/[^\/\s]+\/[^\/\s]+\/[^\/\s]+/g, '/***/***/***') // Replace deep paths
+      .replace(/\/[^/\s]+\/[^/\s]+\/[^/\s]+/g, '/***/***/***') // Replace deep paths
       .replace(/at\s+[^(]+\([^)]+\)/g, 'at *** (***:***:***)') // Replace function locations
       .split('\n')
       .slice(0, 10) // Limit stack trace depth

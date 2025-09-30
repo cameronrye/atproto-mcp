@@ -7,17 +7,18 @@
 
 import { AtpMcpServer } from './index.js';
 
-async function healthCheck(): Promise<void> {
+function healthCheck(): void {
   try {
     // Create a minimal server instance for health checking
     // Use default configuration which supports unauthenticated mode
     const server = new AtpMcpServer({
       // Only override service if explicitly set in environment
-      ...(process.env['ATPROTO_SERVICE'] != null && process.env['ATPROTO_SERVICE'] !== '' && {
-        atproto: {
-          service: process.env['ATPROTO_SERVICE'],
-        },
-      }),
+      ...(process.env['ATPROTO_SERVICE'] != null &&
+        process.env['ATPROTO_SERVICE'] !== '' && {
+          atproto: {
+            service: process.env['ATPROTO_SERVICE'],
+          },
+        }),
     });
 
     // Get server status without starting the full server
@@ -62,5 +63,5 @@ async function healthCheck(): Promise<void> {
 
 // Run health check if this script is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  healthCheck();
+  void healthCheck();
 }

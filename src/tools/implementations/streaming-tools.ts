@@ -5,7 +5,11 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import { FirehoseClient, type IFirehoseEvent, type IFirehoseSubscription } from '../../utils/firehose-client.js';
+import {
+  FirehoseClient,
+  type IFirehoseEvent,
+  type IFirehoseSubscription,
+} from '../../utils/firehose-client.js';
 
 const StartStreamingSchema = z.object({
   collections: z.array(z.string()).optional().default([]),

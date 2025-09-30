@@ -263,7 +263,7 @@ export class WebSocketManager {
 
         ws.onclose = () => {
           this.connections.delete(key);
-          this.handleReconnect(url, key);
+          void this.handleReconnect(url, key);
         };
 
         // Simulate connection
@@ -288,12 +288,14 @@ export class WebSocketManager {
     this.reconnectAttempts.set(key, attempts + 1);
 
     setTimeout(
-      async () => {
-        try {
-          await this.connect(url, key);
-        } catch (error) {
-          this.logger.error('Reconnect failed', error as Error, { key, attempt: attempts + 1 });
-        }
+      () => {
+        void (async () => {
+          try {
+            await this.connect(url, key);
+          } catch (error) {
+            this.logger.error('Reconnect failed', error as Error, { key, attempt: attempts + 1 });
+          }
+        })();
       },
       this.reconnectDelay * Math.pow(2, attempts)
     ); // Exponential backoff
@@ -308,7 +310,7 @@ export class WebSocketManager {
   }
 
   disconnectAll(): void {
-    for (const [key, ws] of this.connections.entries()) {
+    for (const ws of this.connections.values()) {
       ws.close();
     }
     this.connections.clear();

@@ -45,20 +45,20 @@ export abstract class BasePrompt implements IMcpPrompt {
   }
 
   /**
-   * Generate the prompt content
-   */
-  abstract get(args?: Record<string, any>): Promise<IPromptContent[]>;
-
-  /**
    * Check if the prompt is available
    */
-  async isAvailable(): Promise<boolean> {
+  isAvailable(): boolean {
     try {
       return this.atpClient.isAuthenticated();
     } catch {
       return false;
     }
   }
+
+  /**
+   * Generate the prompt content
+   */
+  abstract get(args?: Record<string, unknown>): Promise<IPromptContent[]>;
 }
 
 /**
@@ -95,11 +95,11 @@ export class ContentCompositionPrompt extends BasePrompt {
     super(atpClient, 'ContentCompositionPrompt');
   }
 
-  async get(args?: Record<string, any>): Promise<IPromptContent[]> {
-    const topic = args?.['topic'] || 'general topic';
-    const tone = args?.['tone'] || 'casual';
-    const length = args?.['length'] || 'medium';
-    const includeHashtags = args?.['include_hashtags'] !== false;
+  async get(args?: Record<string, unknown>): Promise<IPromptContent[]> {
+    const topic = (args?.['topic'] as string | undefined) ?? 'general topic';
+    const tone = (args?.['tone'] as string | undefined) ?? 'casual';
+    const length = (args?.['length'] as string | undefined) ?? 'medium';
+    const includeHashtags = (args?.['include_hashtags'] as boolean | undefined) !== false;
 
     const lengthGuidance = {
       short: 'Keep it under 100 characters, punchy and direct.',
@@ -171,10 +171,10 @@ export class ReplyTemplatePrompt extends BasePrompt {
     super(atpClient, 'ReplyTemplatePrompt');
   }
 
-  async get(args?: Record<string, any>): Promise<IPromptContent[]> {
-    const originalPost = args?.['original_post'] || 'the original post';
-    const replyType = args?.['reply_type'] || 'supportive';
-    const relationship = args?.['relationship'] || 'stranger';
+  async get(args?: Record<string, unknown>): Promise<IPromptContent[]> {
+    const originalPost = (args?.['original_post'] as string | undefined) ?? 'the original post';
+    const replyType = (args?.['reply_type'] as string | undefined) ?? 'supportive';
+    const relationship = (args?.['relationship'] as string | undefined) ?? 'stranger';
 
     const replyTypeGuidance = {
       supportive: 'Show encouragement, agreement, or positive reinforcement.',

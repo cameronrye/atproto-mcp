@@ -192,7 +192,7 @@ export class FirehoseClient extends EventEmitter {
   /**
    * Parse firehose message (simplified implementation)
    */
-  private parseFirehoseMessage(data: Buffer): IFirehoseEvent | null {
+  private parseFirehoseMessage(_data: Buffer): IFirehoseEvent | null {
     try {
       // This is a simplified parser for demonstration
       // In production, use @atproto/lexicon and proper CAR parsing

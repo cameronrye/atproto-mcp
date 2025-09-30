@@ -7,15 +7,15 @@ import { AtpAgent, type AtpSessionData, type AtpSessionEvent } from '@atproto/ap
 import {
   AtpError,
   AuthenticationError,
-  RateLimitError,
-  ValidationError,
-  type ATURI,
   type DID,
   type IAtpConfig,
   type IAtpSession,
+  RateLimitError,
   type Result,
+  ValidationError,
 } from '../types/index.js';
 import { Logger } from './logger.js';
+import type { IOAuthSession } from './oauth-client.js';
 
 /**
  * AT Protocol client wrapper with comprehensive authentication and session management
@@ -514,9 +514,7 @@ export class AtpClient {
   /**
    * Load stored OAuth session from secure storage
    */
-  private async loadStoredOAuthSession(): Promise<
-    import('./oauth-client.js').IOAuthSession | null
-  > {
+  private async loadStoredOAuthSession(): Promise<IOAuthSession | null> {
     try {
       // In a real implementation, this would load from secure storage
       // For now, we'll use environment variables or return null
@@ -538,9 +536,7 @@ export class AtpClient {
   /**
    * Store OAuth session to secure storage
    */
-  private async storeOAuthSession(
-    session: import('./oauth-client.js').IOAuthSession
-  ): Promise<void> {
+  private async storeOAuthSession(session: IOAuthSession): Promise<void> {
     try {
       // In a real implementation, this would store to secure storage
       // For now, we'll log the session (without sensitive data)
