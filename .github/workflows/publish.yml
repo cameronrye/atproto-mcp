@@ -1,0 +1,109 @@
+name: Manual Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g., 1.0.0, 1.0.0-beta.1)'
+        required: true
+        type: string
+      tag:
+        description: 'npm tag (latest, beta, alpha, next)'
+        required: true
+        default: 'latest'
+        type: choice
+        options:
+          - latest
+          - beta
+          - alpha
+          - next
+      dry_run:
+        description: 'Dry run (do not actually publish)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  publish:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write # Required for npm provenance
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'pnpm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Type check
+        run: pnpm run type-check
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Run tests with coverage
+        run: pnpm run test:coverage
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Update package.json version
+        run: |
+          npm version ${{ inputs.version }} --no-git-tag-version
+          echo "Updated package.json to version ${{ inputs.version }}"
+
+      - name: Verify package contents
+        run: |
+          echo "Package contents:"
+          pnpm pack --dry-run
+
+      - name: Dry run publish
+        if: inputs.dry_run
+        run: |
+          echo "🔍 DRY RUN: Would publish version ${{ inputs.version }} with tag ${{ inputs.tag }}"
+          pnpm publish --dry-run --tag ${{ inputs.tag }} --no-git-checks --provenance
+          echo "✅ Dry run completed successfully"
+
+      - name: Publish to npm
+        if: '!inputs.dry_run'
+        run: |
+          echo "📦 Publishing version ${{ inputs.version }} with tag ${{ inputs.tag }}"
+          pnpm publish --tag ${{ inputs.tag }} --no-git-checks --provenance
+          echo "✅ Published successfully"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create git tag
+        if: '!inputs.dry_run && inputs.tag == ''latest'''
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
+          git push origin "v${{ inputs.version }}"
+
+      - name: Summary
+        run: |
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            echo "🔍 **Dry Run Completed**" >> $GITHUB_STEP_SUMMARY
+            echo "Would have published version ${{ inputs.version }} with tag ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ **Published Successfully**" >> $GITHUB_STEP_SUMMARY
+            echo "Published version ${{ inputs.version }} with tag ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "Package: https://www.npmjs.com/package/atproto-mcp/v/${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          fi
