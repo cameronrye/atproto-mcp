@@ -514,7 +514,9 @@ export class AtpClient {
   /**
    * Load stored OAuth session from secure storage
    */
-  private async loadStoredOAuthSession(): Promise<import('./oauth-client.js').IOAuthSession | null> {
+  private async loadStoredOAuthSession(): Promise<
+    import('./oauth-client.js').IOAuthSession | null
+  > {
     try {
       // In a real implementation, this would load from secure storage
       // For now, we'll use environment variables or return null

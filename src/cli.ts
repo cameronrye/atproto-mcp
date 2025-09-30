@@ -5,9 +5,15 @@
  */
 
 import { parseArgs } from 'node:util';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
 import { AtpMcpServer } from './index.js';
 import { LogLevel, Logger } from './utils/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const logger = new Logger('CLI');
 
@@ -120,12 +126,11 @@ For more information, visit: https://github.com/cameronrye/atproto-mcp
 function showVersion(): void {
   try {
     // Read version from package.json
-    const packageJson = JSON.parse(
-      require('fs').readFileSync(
-        require('path').join(__dirname, '..', 'package.json'),
-        'utf8'
-      )
-    ) as { name: string; version: string; description: string };
+    const packageJson = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf8')) as {
+      name: string;
+      version: string;
+      description: string;
+    };
     console.log(`AT Protocol MCP Server v${packageJson.version}`);
   } catch (error) {
     console.log('AT Protocol MCP Server v0.1.0');
@@ -180,7 +185,10 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
       config.host = values.host;
     }
 
-    if ((values.service != null && values.service !== '') || (values.auth != null && values.auth !== '')) {
+    if (
+      (values.service != null && values.service !== '') ||
+      (values.auth != null && values.auth !== '')
+    ) {
       config.atproto = {
         service: 'https://bsky.social',
         authMethod: 'app-password',
@@ -243,8 +251,12 @@ async function main(): Promise<void> {
       }
     };
 
-    process.on('SIGINT', () => shutdown('SIGINT'));
-    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => {
+      void shutdown('SIGINT');
+    });
+    process.on('SIGTERM', () => {
+      void shutdown('SIGTERM');
+    });
 
     // Handle uncaught exceptions
     process.on('uncaughtException', error => {

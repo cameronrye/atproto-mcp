@@ -41,12 +41,16 @@ const McpServerConfigSchema = z.object({
 function createDefaultConfig(): IMcpServerConfig {
   // Determine if we have authentication credentials
   const hasAppPasswordCreds = !!(
-    process.env['ATPROTO_IDENTIFIER'] != null && process.env['ATPROTO_IDENTIFIER'] !== '' &&
-    process.env['ATPROTO_PASSWORD'] != null && process.env['ATPROTO_PASSWORD'] !== ''
+    process.env['ATPROTO_IDENTIFIER'] != null &&
+    process.env['ATPROTO_IDENTIFIER'] !== '' &&
+    process.env['ATPROTO_PASSWORD'] != null &&
+    process.env['ATPROTO_PASSWORD'] !== ''
   );
   const hasOAuthCreds = !!(
-    process.env['ATPROTO_CLIENT_ID'] != null && process.env['ATPROTO_CLIENT_ID'] !== '' &&
-    process.env['ATPROTO_CLIENT_SECRET'] != null && process.env['ATPROTO_CLIENT_SECRET'] !== ''
+    process.env['ATPROTO_CLIENT_ID'] != null &&
+    process.env['ATPROTO_CLIENT_ID'] !== '' &&
+    process.env['ATPROTO_CLIENT_SECRET'] != null &&
+    process.env['ATPROTO_CLIENT_SECRET'] !== ''
   );
 
   // Default to app-password if we have those credentials, otherwise no auth method
@@ -69,12 +73,18 @@ function createDefaultConfig(): IMcpServerConfig {
       // Only set auth method if we have credentials
       ...(defaultAuthMethod != null && { authMethod: defaultAuthMethod }),
       // Include credentials if available
-      ...(process.env['ATPROTO_IDENTIFIER'] != null && process.env['ATPROTO_IDENTIFIER'] !== '' && { identifier: process.env['ATPROTO_IDENTIFIER'] }),
-      ...(process.env['ATPROTO_PASSWORD'] != null && process.env['ATPROTO_PASSWORD'] !== '' && { password: process.env['ATPROTO_PASSWORD'] }),
-      ...(process.env['ATPROTO_CLIENT_ID'] != null && process.env['ATPROTO_CLIENT_ID'] !== '' && { clientId: process.env['ATPROTO_CLIENT_ID'] }),
-      ...(process.env['ATPROTO_CLIENT_SECRET'] != null && process.env['ATPROTO_CLIENT_SECRET'] !== '' && {
-        clientSecret: process.env['ATPROTO_CLIENT_SECRET'],
-      }),
+      ...(process.env['ATPROTO_IDENTIFIER'] != null &&
+        process.env['ATPROTO_IDENTIFIER'] !== '' && {
+          identifier: process.env['ATPROTO_IDENTIFIER'],
+        }),
+      ...(process.env['ATPROTO_PASSWORD'] != null &&
+        process.env['ATPROTO_PASSWORD'] !== '' && { password: process.env['ATPROTO_PASSWORD'] }),
+      ...(process.env['ATPROTO_CLIENT_ID'] != null &&
+        process.env['ATPROTO_CLIENT_ID'] !== '' && { clientId: process.env['ATPROTO_CLIENT_ID'] }),
+      ...(process.env['ATPROTO_CLIENT_SECRET'] != null &&
+        process.env['ATPROTO_CLIENT_SECRET'] !== '' && {
+          clientSecret: process.env['ATPROTO_CLIENT_SECRET'],
+        }),
     },
   };
 }
