@@ -19,14 +19,15 @@ export default defineConfig({
 
   themeConfig: {
     logo: '/logo.svg',
-    
+
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
-      { text: 'API Reference', link: '/api/tools' },
+      { text: 'API Reference', link: '/api/' },
       { text: 'Examples', link: '/examples/basic-usage' },
       {
-        text: 'v0.1.0',
+        text: 'Resources',
         items: [
+          { text: 'FAQ', link: '/FAQ' },
           { text: 'Changelog', link: '/changelog' },
           { text: 'Contributing', link: '/contributing' },
         ],
@@ -57,10 +58,16 @@ export default defineConfig({
         {
           text: 'Advanced',
           items: [
-            { text: 'Custom Tools', link: '/guide/custom-tools' },
-            { text: 'Rate Limiting', link: '/guide/rate-limiting' },
-            { text: 'Security', link: '/guide/security' },
-            { text: 'Performance', link: '/guide/performance' },
+            { text: 'Deployment', link: '/guide/deployment' },
+            { text: 'Troubleshooting', link: '/guide/troubleshooting' },
+          ],
+        },
+        {
+          text: 'Diagrams',
+          items: [
+            { text: 'Architecture', link: '/diagrams/architecture' },
+            { text: 'Flows', link: '/diagrams/flows' },
+            { text: 'Sequences', link: '/diagrams/sequences' },
           ],
         },
       ],
@@ -68,11 +75,115 @@ export default defineConfig({
         {
           text: 'API Reference',
           items: [
-            { text: 'Tools', link: '/api/tools' },
-            { text: 'Resources', link: '/api/resources' },
-            { text: 'Prompts', link: '/api/prompts' },
-            { text: 'Types', link: '/api/types' },
-            { text: 'Errors', link: '/api/errors' },
+            { text: 'Overview', link: '/api/' },
+          ],
+        },
+        {
+          text: 'Social Operations',
+          collapsed: true,
+          items: [
+            { text: 'Create Post', link: '/api/tools/create-post' },
+            { text: 'Create Rich Text Post', link: '/api/tools/create-rich-text-post' },
+            { text: 'Reply to Post', link: '/api/tools/reply-to-post' },
+            { text: 'Like Post', link: '/api/tools/like-post' },
+            { text: 'Unlike Post', link: '/api/tools/unlike-post' },
+            { text: 'Repost', link: '/api/tools/repost' },
+            { text: 'Unrepost', link: '/api/tools/unrepost' },
+          ],
+        },
+        {
+          text: 'User Management',
+          collapsed: true,
+          items: [
+            { text: 'Follow User', link: '/api/tools/follow-user' },
+            { text: 'Unfollow User', link: '/api/tools/unfollow-user' },
+            { text: 'Get User Profile', link: '/api/tools/get-user-profile' },
+            { text: 'Update Profile', link: '/api/tools/update-profile' },
+            { text: 'Block User', link: '/api/tools/block-user' },
+            { text: 'Unblock User', link: '/api/tools/unblock-user' },
+            { text: 'Mute User', link: '/api/tools/mute-user' },
+            { text: 'Unmute User', link: '/api/tools/unmute-user' },
+          ],
+        },
+        {
+          text: 'Data Retrieval',
+          collapsed: true,
+          items: [
+            { text: 'Search Posts', link: '/api/tools/search-posts' },
+            { text: 'Get Timeline', link: '/api/tools/get-timeline' },
+            { text: 'Get Followers', link: '/api/tools/get-followers' },
+            { text: 'Get Follows', link: '/api/tools/get-follows' },
+            { text: 'Get Notifications', link: '/api/tools/get-notifications' },
+            { text: 'Get Thread', link: '/api/tools/get-thread' },
+            { text: 'Get Custom Feed', link: '/api/tools/get-custom-feed' },
+          ],
+        },
+        {
+          text: 'Content Management',
+          collapsed: true,
+          items: [
+            { text: 'Delete Post', link: '/api/tools/delete-post' },
+            { text: 'Upload Image', link: '/api/tools/upload-image' },
+            { text: 'Upload Video', link: '/api/tools/upload-video' },
+            { text: 'Generate Link Preview', link: '/api/tools/generate-link-preview' },
+          ],
+        },
+        {
+          text: 'OAuth Authentication',
+          collapsed: true,
+          items: [
+            { text: 'Start OAuth Flow', link: '/api/tools/start-oauth-flow' },
+            { text: 'Handle OAuth Callback', link: '/api/tools/handle-oauth-callback' },
+            { text: 'Refresh OAuth Tokens', link: '/api/tools/refresh-oauth-tokens' },
+            { text: 'Revoke OAuth Tokens', link: '/api/tools/revoke-oauth-tokens' },
+          ],
+        },
+        {
+          text: 'Moderation',
+          collapsed: true,
+          items: [
+            { text: 'Report Content', link: '/api/tools/report-content' },
+            { text: 'Report User', link: '/api/tools/report-user' },
+          ],
+        },
+        {
+          text: 'Real-time Streaming',
+          collapsed: true,
+          items: [
+            { text: 'Start Streaming', link: '/api/tools/start-streaming' },
+            { text: 'Stop Streaming', link: '/api/tools/stop-streaming' },
+            { text: 'Get Streaming Status', link: '/api/tools/get-streaming-status' },
+            { text: 'Get Recent Events', link: '/api/tools/get-recent-events' },
+          ],
+        },
+        {
+          text: 'Lists Management',
+          collapsed: true,
+          items: [
+            { text: 'Create List', link: '/api/tools/create-list' },
+            { text: 'Add to List', link: '/api/tools/add-to-list' },
+            { text: 'Remove from List', link: '/api/tools/remove-from-list' },
+            { text: 'Get List', link: '/api/tools/get-list' },
+          ],
+        },
+        {
+          text: 'Resources',
+          collapsed: true,
+          items: [
+            { text: 'Timeline', link: '/api/resources/timeline' },
+            { text: 'Profile', link: '/api/resources/profile' },
+            { text: 'Notifications', link: '/api/resources/notifications' },
+          ],
+        },
+        {
+          text: 'Types',
+          collapsed: true,
+          items: [
+            { text: 'Core Types', link: '/api/types/core' },
+            { text: 'Configuration Types', link: '/api/types/configuration' },
+            { text: 'Parameter Types', link: '/api/types/parameters' },
+            { text: 'Error Types', link: '/api/types/errors' },
+            { text: 'Utility Types', link: '/api/types/utilities' },
           ],
         },
       ],
