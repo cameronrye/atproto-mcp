@@ -1,0 +1,73 @@
+# Source files
+src/
+*.test.ts
+*.spec.ts
+__tests__/
+test/
+
+# Coverage and test results
+coverage/
+.nyc_output/
+
+# Documentation source
+docs/
+*.md.backup
+
+# Build configuration
+tsconfig.json
+tsconfig.eslint.json
+vitest.config.ts
+.eslintrc*
+.prettierrc*
+
+# Docker and deployment
+docker-compose.yml
+Dockerfile
+Makefile
+kubernetes/
+helm/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+.circleci/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment and secrets
+.env*
+!.env.example
+*.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Husky and git hooks
+.husky/
+
+# Misc
+.DS_Store
+Thumbs.db
+*.tgz
+
+# Keep these files
+!dist/
+!README.md
+!LICENSE
+!package.json
+

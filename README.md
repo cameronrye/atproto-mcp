@@ -294,4 +294,4 @@ For more details, see [SECURITY.md](SECURITY.md).
 
 ---
 
-Made with ❤️
+Made with ❤️ by [Cameron Rye](https://rye.dev/)
