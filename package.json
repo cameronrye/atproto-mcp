@@ -9,6 +9,11 @@
   "bin": {
     "atproto-mcp": "dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
     "dev": "tsx watch src/index.ts",
@@ -23,6 +28,7 @@
     "type-check": "tsc --noEmit",
     "clean": "rm -rf dist",
     "prepare": "husky install",
+    "prepublishOnly": "npm run clean && npm run build && vitest run",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"
