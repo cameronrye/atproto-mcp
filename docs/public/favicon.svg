@@ -1,0 +1,22 @@
+<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e40af;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="15" fill="url(#bgGradient)"/>
+  
+  <!-- @ symbol -->
+  <g fill="none" stroke="#ffffff" stroke-width="2.5">
+    <!-- Outer circle -->
+    <circle cx="16" cy="16" r="8"/>
+    <!-- Inner circle -->
+    <circle cx="16" cy="16" r="3.5"/>
+    <!-- Tail -->
+    <path d="M 24 16 L 24 20 Q 24 22 22 22 Q 20 22 20 20" stroke-linecap="round"/>
+  </g>
+</svg>
+

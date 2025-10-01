@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AT Protocol MCP Server - Logo Preview</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            padding: 40px 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            color: #ffffff;
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 1.2rem;
+            color: #94a3b8;
+            margin-bottom: 3rem;
+        }
+        
+        .preview-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 30px;
+            margin-bottom: 30px;
+            border: 1px solid rgba(96, 165, 250, 0.2);
+        }
+        
+        .preview-section h2 {
+            color: #60a5fa;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+        }
+        
+        .logo-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin-top: 20px;
+        }
+        
+        .logo-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid rgba(96, 165, 250, 0.1);
+        }
+        
+        .logo-item h3 {
+            color: #e2e8f0;
+            margin-bottom: 15px;
+            font-size: 1.1rem;
+        }
+        
+        .logo-item img {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 15px;
+        }
+        
+        .logo-item .size-info {
+            color: #64748b;
+            font-size: 0.9rem;
+        }
+        
+        .color-palette {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        
+        .color-swatch {
+            flex: 1;
+            min-width: 150px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(96, 165, 250, 0.1);
+        }
+        
+        .color-box {
+            width: 100%;
+            height: 80px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .color-name {
+            font-weight: 600;
+            color: #e2e8f0;
+            margin-bottom: 5px;
+        }
+        
+        .color-code {
+            font-family: monospace;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+        
+        .usage-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+        
+        .usage-list li {
+            padding: 10px 15px;
+            background: rgba(96, 165, 250, 0.1);
+            border-left: 3px solid #60a5fa;
+            margin-bottom: 10px;
+            border-radius: 4px;
+        }
+        
+        .usage-list li strong {
+            color: #60a5fa;
+        }
+        
+        .og-preview {
+            background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-top: 20px;
+        }
+        
+        .og-preview img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 AT Protocol MCP Server</h1>
+        <p class="subtitle">Logo Design & Brand Assets</p>
+        
+        <div class="preview-section">
+            <h2>📦 Logo Variations</h2>
+            <div class="logo-grid">
+                <div class="logo-item">
+                    <h3>Main Logo</h3>
+                    <img src="logo.svg" alt="Main Logo" style="width: 200px; height: 200px;">
+                    <p class="size-info">200x200px • SVG</p>
+                    <p class="size-info">Used in: Documentation header, README</p>
+                </div>
+                
+                <div class="logo-item">
+                    <h3>Favicon</h3>
+                    <img src="favicon.svg" alt="Favicon" style="width: 64px; height: 64px;">
+                    <p class="size-info">32x32px • SVG</p>
+                    <p class="size-info">Used in: Browser tab icon</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="preview-section">
+            <h2>🌐 Social Media Preview</h2>
+            <p style="color: #94a3b8; margin-bottom: 15px;">Open Graph image for social media sharing (1200x630px)</p>
+            <div class="og-preview">
+                <img src="og-image.svg" alt="Open Graph Image">
+            </div>
+        </div>
+        
+        <div class="preview-section">
+            <h2>🎨 Color Palette</h2>
+            <div class="color-palette">
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #1e40af;"></div>
+                    <div class="color-name">Primary Dark</div>
+                    <div class="color-code">#1e40af</div>
+                </div>
+                
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #1d4ed8;"></div>
+                    <div class="color-name">Primary</div>
+                    <div class="color-code">#1d4ed8</div>
+                </div>
+                
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #3b82f6;"></div>
+                    <div class="color-name">Primary Light</div>
+                    <div class="color-code">#3b82f6</div>
+                </div>
+                
+                <div class="color-swatch">
+                    <div class="color-box" style="background: #60a5fa;"></div>
+                    <div class="color-name">Accent</div>
+                    <div class="color-code">#60a5fa</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="preview-section">
+            <h2>📍 Logo Placement</h2>
+            <ul class="usage-list">
+                <li><strong>README.md:</strong> Centered at the top of the file with badges</li>
+                <li><strong>Documentation Site:</strong> Navigation bar logo (VitePress config)</li>
+                <li><strong>Homepage Hero:</strong> Large hero image on docs homepage</li>
+                <li><strong>Browser Tab:</strong> Favicon for all documentation pages</li>
+                <li><strong>Social Sharing:</strong> Open Graph image for Twitter, LinkedIn, etc.</li>
+            </ul>
+        </div>
+        
+        <div class="preview-section">
+            <h2>💡 Design Concept</h2>
+            <p style="color: #94a3b8; line-height: 1.6;">
+                The logo combines several key elements that represent the project's purpose:
+            </p>
+            <ul class="usage-list">
+                <li><strong>Hexagonal Shape:</strong> Represents structure, connectivity, and the decentralized nature of the AT Protocol</li>
+                <li><strong>@ Symbol:</strong> Central element representing the AT Protocol and its identity-focused architecture</li>
+                <li><strong>Network Nodes:</strong> Small circles connected to the center represent the Model Context Protocol's role in connecting LLMs</li>
+                <li><strong>Blue Gradient:</strong> Uses Bluesky's brand colors to maintain visual consistency with the AT Protocol ecosystem</li>
+                <li><strong>Modern & Clean:</strong> Professional design suitable for technical documentation and developer tools</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
+
