@@ -275,7 +275,7 @@ Security is a top priority for this project. Please review our security practice
 
 If you discover a security vulnerability, please review our [Security Policy](SECURITY.md) for responsible disclosure guidelines.
 
-**Do not open public issues for security vulnerabilities.** Instead, email: c@meron.io
+**Do not open public issues for security vulnerabilities.** Instead, send me a message privately.
 
 ### Security Features
 
@@ -290,4 +290,4 @@ For more details, see [SECURITY.md](SECURITY.md).
 
 ---
 
-Made with ❤️ for the AT Protocol and MCP communities
+Made with ❤️
