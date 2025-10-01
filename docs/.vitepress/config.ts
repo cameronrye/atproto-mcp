@@ -208,7 +208,7 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright © 2025 Cameron Rye',
+      copyright: 'Copyright © 2025 <a href="https://rye.dev/" target="_blank" rel="noopener noreferrer">Cameron Rye</a>',
     },
 
     editLink: {
