@@ -5,6 +5,9 @@ hero:
   name: AT Protocol MCP Server
   text: Comprehensive LLM Integration
   tagline: Enable LLMs to interact directly with the AT Protocol ecosystem through a powerful Model Context Protocol server
+  image:
+    src: /logo.svg
+    alt: AT Protocol MCP Server Logo
 
   actions:
     - theme: brand

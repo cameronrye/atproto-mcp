@@ -7,13 +7,14 @@ export default defineConfig({
   ignoreDeadLinks: true, // Ignore dead links during development
   
   head: [
-    ['link', { rel: 'icon', href: '/atproto-mcp/favicon.ico' }],
+    ['link', { rel: 'icon', type: 'image/svg+xml', href: '/atproto-mcp/favicon.svg' }],
+    ['link', { rel: 'icon', type: 'image/png', href: '/atproto-mcp/logo.svg' }],
     ['meta', { name: 'theme-color', content: '#1d4ed8' }],
     ['meta', { property: 'og:type', content: 'website' }],
     ['meta', { property: 'og:locale', content: 'en' }],
     ['meta', { property: 'og:title', content: 'AT Protocol MCP Server' }],
     ['meta', { property: 'og:site_name', content: 'AT Protocol MCP Server' }],
-    ['meta', { property: 'og:image', content: '/atproto-mcp/og-image.png' }],
+    ['meta', { property: 'og:image', content: '/atproto-mcp/og-image.svg' }],
     ['meta', { property: 'og:url', content: 'https://cameronrye.github.io/atproto-mcp/' }],
   ],
 

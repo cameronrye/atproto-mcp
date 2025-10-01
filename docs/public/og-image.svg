@@ -1,0 +1,114 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <!-- Background gradient -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f172a;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1e293b;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Hexagon gradient -->
+    <linearGradient id="hexGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e40af;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#1d4ed8;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- @ symbol gradient -->
+    <linearGradient id="atGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffffff;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#e0e7ff;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Glow effect -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="1200" height="630" fill="url(#bgGradient)"/>
+  
+  <!-- Decorative grid pattern -->
+  <g opacity="0.1">
+    <line x1="0" y1="157.5" x2="1200" y2="157.5" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="0" y1="315" x2="1200" y2="315" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="0" y1="472.5" x2="1200" y2="472.5" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="300" y1="0" x2="300" y2="630" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="600" y1="0" x2="600" y2="630" stroke="#60a5fa" stroke-width="1"/>
+    <line x1="900" y1="0" x2="900" y2="630" stroke="#60a5fa" stroke-width="1"/>
+  </g>
+  
+  <!-- Logo hexagon (left side) -->
+  <g transform="translate(200, 315)">
+    <!-- Hexagon background -->
+    <path d="M 0 -120 L 103.92 -60 L 103.92 60 L 0 120 L -103.92 60 L -103.92 -60 Z" 
+          fill="url(#hexGradient)" 
+          stroke="#60a5fa" 
+          stroke-width="3"/>
+    
+    <!-- Network nodes -->
+    <circle cx="-50" cy="-50" r="6" fill="#60a5fa" opacity="0.8"/>
+    <circle cx="50" cy="-50" r="6" fill="#60a5fa" opacity="0.8"/>
+    <circle cx="-50" cy="50" r="6" fill="#60a5fa" opacity="0.8"/>
+    <circle cx="50" cy="50" r="6" fill="#60a5fa" opacity="0.8"/>
+    
+    <!-- Connection lines -->
+    <line x1="-50" y1="-50" x2="0" y2="0" stroke="#60a5fa" stroke-width="2" opacity="0.4"/>
+    <line x1="50" y1="-50" x2="0" y2="0" stroke="#60a5fa" stroke-width="2" opacity="0.4"/>
+    <line x1="-50" y1="50" x2="0" y2="0" stroke="#60a5fa" stroke-width="2" opacity="0.4"/>
+    <line x1="50" y1="50" x2="0" y2="0" stroke="#60a5fa" stroke-width="2" opacity="0.4"/>
+    
+    <!-- @ symbol -->
+    <g filter="url(#glow)">
+      <circle cx="0" cy="0" r="45" fill="none" stroke="url(#atGradient)" stroke-width="10"/>
+      <circle cx="0" cy="0" r="20" fill="none" stroke="url(#atGradient)" stroke-width="8"/>
+      <path d="M 45 0 L 45 20 Q 45 30 35 30 Q 25 30 25 20" 
+            fill="none" 
+            stroke="url(#atGradient)" 
+            stroke-width="10" 
+            stroke-linecap="round"/>
+    </g>
+  </g>
+  
+  <!-- Text content (right side) -->
+  <g transform="translate(450, 315)">
+    <!-- Main title -->
+    <text x="0" y="-60" font-family="system-ui, -apple-system, sans-serif" font-size="56" font-weight="700" fill="#ffffff">
+      AT Protocol MCP Server
+    </text>
+    
+    <!-- Subtitle -->
+    <text x="0" y="10" font-family="system-ui, -apple-system, sans-serif" font-size="32" font-weight="400" fill="#94a3b8">
+      Comprehensive LLM Integration
+    </text>
+    
+    <!-- Description -->
+    <text x="0" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="20" font-weight="400" fill="#64748b">
+      Enable LLMs to interact with the AT Protocol ecosystem
+    </text>
+    
+    <!-- Features -->
+    <g transform="translate(0, 110)">
+      <text x="0" y="0" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#60a5fa">
+        ✓ Complete AT Protocol Integration
+      </text>
+      <text x="0" y="30" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#60a5fa">
+        ✓ MCP Server Compliance
+      </text>
+      <text x="0" y="60" font-family="system-ui, -apple-system, sans-serif" font-size="18" font-weight="500" fill="#60a5fa">
+        ✓ Type-Safe & Production Ready
+      </text>
+    </g>
+  </g>
+  
+  <!-- Decorative corner accents -->
+  <circle cx="100" cy="100" r="5" fill="#60a5fa" opacity="0.5"/>
+  <circle cx="1100" cy="100" r="5" fill="#60a5fa" opacity="0.5"/>
+  <circle cx="100" cy="530" r="5" fill="#60a5fa" opacity="0.5"/>
+  <circle cx="1100" cy="530" r="5" fill="#60a5fa" opacity="0.5"/>
+</svg>
+
