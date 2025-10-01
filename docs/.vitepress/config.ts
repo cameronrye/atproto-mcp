@@ -1,6 +1,7 @@
 import { defineConfig } from 'vitepress';
+import { withMermaid } from 'vitepress-plugin-mermaid';
 
-export default defineConfig({
+export default withMermaid(defineConfig({
   title: 'AT Protocol MCP Server',
   description: 'Comprehensive MCP server for AT Protocol integration',
   base: '/atproto-mcp/',
@@ -238,4 +239,15 @@ export default defineConfig({
       __VUE_OPTIONS_API__: false,
     },
   },
-});
+
+  // Mermaid configuration
+  mermaid: {
+    // Optional: Configure mermaid theme and other options
+    theme: 'default',
+  },
+
+  // Optional: Configure mermaid plugin options
+  mermaidPlugin: {
+    class: 'mermaid',
+  },
+}));
