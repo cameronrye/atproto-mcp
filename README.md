@@ -256,23 +256,63 @@ atproto-mcp --auth oauth
 
 ## 🧪 Development
 
+### Quick Start
+
 ```bash
 # Clone the repository
 git clone https://github.com/cameronrye/atproto-mcp.git
 cd atproto-mcp
 
-# Install dependencies
-npm install
+# Install dependencies (use pnpm, npm, or yarn)
+pnpm install  # or: npm install
 
 # Start development server
-npm run dev
+pnpm dev      # or: npm run dev
 
 # Run tests
-npm test
+pnpm test     # or: npm test
 
 # Build for production
-npm run build
+pnpm build    # or: npm run build
 ```
+
+### Available Commands
+
+This project provides cross-platform npm scripts that work on Windows, macOS, and Linux:
+
+```bash
+# Show all available commands
+npm run help
+
+# Development
+npm run dev              # Start development server with hot reload
+npm run build            # Build for production
+npm run start            # Start production server
+
+# Testing & Quality
+npm test                 # Run tests
+npm run test:coverage    # Run tests with coverage
+npm run lint             # Run ESLint
+npm run lint:fix         # Fix linting issues
+npm run format           # Format code with Prettier
+npm run type-check       # Run TypeScript type checking
+npm run check            # Run all quality checks
+
+# Utilities
+npm run clean            # Clean build artifacts
+npm run clean:all        # Clean everything including node_modules
+npm run status           # Show project status
+npm run ci               # Run full CI pipeline locally
+
+# Dependencies
+npm run deps:update      # Update dependencies
+npm run deps:audit       # Audit for security issues
+```
+
+### Cross-Platform Compatibility
+
+All build commands work on **Windows, macOS, and Linux** without requiring additional tools.
+Simply use npm scripts on any platform (e.g., `npm run dev`, `npm test`, `npm run build`).
 
 ## 🤝 Contributing
 

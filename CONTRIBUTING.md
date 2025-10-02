@@ -22,7 +22,7 @@ If you're looking to build applications with AT Protocol, consider using the off
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 20+ 
+- Node.js 20+
 - pnpm (recommended) or npm
 - Git
 - Basic knowledge of TypeScript, AT Protocol, and MCP
@@ -36,12 +36,93 @@ If you're looking to build applications with AT Protocol, consider using the off
    ```
 3. Install dependencies:
    ```bash
-   pnpm install
+   pnpm install  # or: npm install
    ```
 4. Start the development server:
    ```bash
-   pnpm run dev
+   pnpm dev      # or: npm run dev
    ```
+
+### Cross-Platform Development
+
+This project supports development on **Windows, macOS, and Linux**. All build commands are cross-platform compatible.
+
+#### Using npm Scripts
+
+All development tasks are available as npm scripts that work on any platform:
+
+```bash
+# Show all available commands
+npm run help
+
+# Common development tasks
+npm run dev              # Start development server
+npm run build            # Build for production
+npm test                 # Run tests
+npm run lint             # Run linter
+npm run format           # Format code
+npm run check            # Run all quality checks
+npm run clean            # Clean build artifacts
+npm run status           # Show project status
+```
+
+#### Cross-Platform Best Practices
+
+When contributing code, please follow these guidelines to ensure cross-platform compatibility:
+
+1. **Use npm scripts** for all build tasks instead of shell commands
+2. **Avoid Unix-specific commands** like `rm`, `chmod`, `grep`, `awk`, `sed`
+3. **Use Node.js APIs** for file operations (fs, path modules)
+4. **Use cross-platform packages**:
+   - `rimraf` for deleting files/directories
+   - `chalk` for colored terminal output
+   - `command-exists` for checking if commands are available
+5. **Test on multiple platforms** when possible (Windows, macOS, Linux)
+6. **Use forward slashes** in paths (Node.js normalizes them automatically)
+7. **Avoid hardcoded paths** - use `path.join()` or `path.resolve()`
+8. **Don't assume shell availability** - use Node.js scripts instead of shell scripts
+
+#### Example: Cross-Platform File Deletion
+
+❌ **Don't do this** (Unix-only):
+```json
+{
+  "scripts": {
+    "clean": "rm -rf dist"
+  }
+}
+```
+
+✅ **Do this instead** (cross-platform):
+```json
+{
+  "scripts": {
+    "clean": "rimraf dist"
+  }
+}
+```
+
+#### Example: Cross-Platform Executable
+
+❌ **Don't do this** (Unix-only):
+```json
+{
+  "scripts": {
+    "build": "tsc && chmod +x dist/cli.js"
+  }
+}
+```
+
+✅ **Do this instead** (cross-platform):
+```json
+{
+  "scripts": {
+    "build": "tsc && node scripts/make-executable.js"
+  }
+}
+```
+
+Where `scripts/make-executable.js` checks the platform and only runs chmod on Unix systems.
 
 ## 📋 Development Workflow
 
