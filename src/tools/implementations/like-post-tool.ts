@@ -22,7 +22,7 @@ export class LikePostTool extends BaseTool {
   public readonly schema = {
     method: 'like_post',
     description:
-      'Like a post on AT Protocol. Creates a like record that references the target post.',
+      'Like a post on AT Protocol. Creates a like record that references the target post. Requires authentication.',
     params: LikePostSchema,
   };
 

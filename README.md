@@ -12,19 +12,82 @@
 
 A comprehensive Model Context Protocol (MCP) server that provides LLMs with direct access to the AT Protocol ecosystem, enabling seamless interaction with Bluesky and other AT Protocol-based social networks.
 
-**🎯 Works out-of-the-box without authentication** - Perfect for LLM clients that need to access public AT Protocol data without requiring user accounts.
+**🎯 Supports both authenticated and unauthenticated modes** - Start immediately with public data access (search posts, view profiles), or add authentication for full functionality (write operations, private data, feeds).
+
+## 🏗️ Architecture
+
+This MCP server acts as a bridge between LLM clients and the AT Protocol ecosystem:
+
+```
+┌─────────────────┐
+│      User       │  "Search for posts about AI"
+└────────┬────────┘
+         │ Natural Language
+         ▼
+┌─────────────────┐
+│   LLM Client    │  (Claude Desktop, etc.)
+│  (MCP Client)   │
+└────────┬────────┘
+         │ MCP Protocol (JSON-RPC 2.0)
+         ▼
+┌─────────────────┐
+│   This Server   │  AT Protocol MCP Server
+│  (MCP Server)   │  - Tools, Resources, Prompts
+└────────┬────────┘
+         │ AT Protocol API
+         ▼
+┌─────────────────┐
+│  AT Protocol    │  Bluesky, Custom PDS, etc.
+│   Ecosystem     │
+└─────────────────┘
+```
+
+**Key Point**: Users don't interact with this server directly. Instead, they talk to their LLM client in natural language, and the LLM client uses this MCP server to access AT Protocol functionality.
 
 ## 🚀 Features
 
-- **🔓 Unauthenticated Mode**: Access public data without any setup - search posts, view profiles, browse feeds
-- **🔐 Optional Authentication**: Enable full functionality with app passwords or OAuth when needed
+- **🔓 Unauthenticated Mode**: Access public data without any setup - search posts and view basic profiles
+- **🔐 Optional Authentication**: Enable full functionality with app passwords or OAuth for write operations, feeds, and private data
 - **Complete AT Protocol Integration**: Full implementation using official `@atproto/api`
 - **MCP Server Compliance**: Built with `@modelcontextprotocol/sdk` following MCP specification
 - **Type-Safe**: Written in TypeScript with strict type checking
-- **Comprehensive Tools**: Rich set of MCP tools for social networking operations
+- **Comprehensive Tools**: 30+ MCP tools for social networking operations
 - **Real-time Support**: WebSocket connections for live data streams
 - **Rate Limiting**: Built-in respect for AT Protocol rate limits
 - **Extensible**: Modular architecture for easy customization
+
+## 🎯 Who Is This For?
+
+### Primary Audience: LLM Clients
+
+This is an **MCP (Model Context Protocol) server** designed to be consumed by **LLM clients** such as:
+- Claude Desktop
+- Other MCP-compatible AI assistants
+- Custom LLM applications using the MCP SDK
+
+**How it works:**
+```
+User → LLM Client (Claude Desktop) → MCP Protocol → This Server → AT Protocol → Bluesky
+```
+
+Users interact with their LLM client in natural language (e.g., "search for posts about AI"), and the LLM client uses this MCP server to fulfill those requests by calling the appropriate tools via the MCP protocol.
+
+### Secondary Audience: Developers
+
+This project is also for developers who want to:
+- **Deploy** the MCP server for their LLM clients to connect to
+- **Extend** the server with custom MCP tools and resources
+- **Contribute** to the open-source project
+
+### ⚠️ This Is NOT:
+
+- ❌ A direct-use REST API or SDK for application developers
+- ❌ A JavaScript/TypeScript library to import into your app
+- ❌ An end-user application
+
+If you're building an application that needs AT Protocol functionality, you should either:
+1. Use the official `@atproto/api` package directly, OR
+2. Build an LLM-powered application that uses this MCP server through an LLM client
 
 ## 📦 Installation
 
@@ -44,42 +107,62 @@ npx atproto-mcp
 
 **Perfect for LLM clients that need to access public AT Protocol data:**
 
-1. **Start the MCP server:**
-   ```bash
-   atproto-mcp
+1. **Configure your LLM client** (e.g., Claude Desktop) to launch the MCP server:
+
+   Add to your LLM client's MCP configuration:
+   ```json
+   {
+     "mcpServers": {
+       "atproto": {
+         "command": "npx",
+         "args": ["atproto-mcp"]
+       }
+     }
+   }
    ```
 
-2. **Configure your LLM client** to connect to the MCP server
+2. **Start your LLM client** - it will automatically launch the MCP server
 
-3. **Start using public tools immediately** - no authentication required!
+3. **Interact in natural language** - Ask your LLM to search posts, view profiles, etc.
 
-Available in unauthenticated mode:
-- ✅ Search posts and hashtags
-- ✅ View user profiles and follower lists
-- ✅ Browse public feeds and threads
-- ✅ Access public timelines
+**What your LLM can do in unauthenticated mode:**
+- ✅ Search posts and hashtags (`search_posts`)
+- ✅ View user profiles (`get_user_profile` - works without auth, provides additional viewer-specific data when authenticated)
+- ✅ Manage OAuth authentication flows (`start_oauth_flow`, `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`)
+
+**Note:** The following features require authentication:
+- ❌ Viewing follower/following lists (`get_followers`, `get_follows`)
+- ❌ Browsing feeds and threads (`get_thread`, `get_custom_feed`, `get_timeline`)
+- ❌ All write operations (create, like, repost, follow, etc.)
+- ❌ Resources (timeline, profile, notifications) - these are listed but will return an error when accessed without authentication
+- ❌ Prompts (content composition, reply templates) - these are listed but will return an error when accessed without authentication
+
+**Important:** All tools, resources, and prompts are listed by the MCP server regardless of authentication state. Tools and resources that require authentication will return a clear error message when called without proper credentials.
 
 ### Option 2: Authenticated Mode (For full functionality)
 
-**Enable write operations and private data access:**
+**Enable write operations and private data access for your LLM:**
 
-1. **Set up authentication** using environment variables:
-   ```bash
-   # App Password method (recommended)
-   export ATPROTO_IDENTIFIER="your-handle.bsky.social"
-   export ATPROTO_PASSWORD="your-app-password"
+1. **Configure your LLM client** with AT Protocol credentials:
 
-   # OR OAuth method
-   export ATPROTO_CLIENT_ID="your-client-id"
-   export ATPROTO_CLIENT_SECRET="your-client-secret"
+   ```json
+   {
+     "mcpServers": {
+       "atproto": {
+         "command": "npx",
+         "args": ["atproto-mcp"],
+         "env": {
+           "ATPROTO_IDENTIFIER": "your-handle.bsky.social",
+           "ATPROTO_PASSWORD": "your-app-password"
+         }
+       }
+     }
+   }
    ```
 
-2. **Start the server:**
-   ```bash
-   atproto-mcp
-   ```
+2. **Start your LLM client** - it will launch the authenticated MCP server
 
-Additional features in authenticated mode:
+**What your LLM can do in authenticated mode:**
 - ✅ Create, edit, and delete posts
 - ✅ Follow/unfollow users
 - ✅ Like and repost content
@@ -88,43 +171,60 @@ Additional features in authenticated mode:
 
 ## 🛠️ Available Tools
 
+The server provides **30+ MCP tools** across multiple categories. See the [complete API documentation](https://cameronrye.github.io/atproto-mcp/api/) for detailed information on each tool.
+
 ### 🔓 Public Tools (No Authentication Required)
 
 **Data Retrieval**
 - `search_posts` - Search for posts and content across the network
-- `get_user_profile` - Retrieve public user information and stats
-- `get_user_profiles` - Get multiple user profiles at once
-- `get_followers` - Get follower lists for public profiles
-- `get_follows` - Get following lists for public profiles
-- `get_thread` - View post threads and conversations
-- `get_custom_feed` - Access public custom feeds
+- `get_user_profile` - Retrieve basic user information (enhanced with authentication)
+
+**OAuth Management**
+- `start_oauth_flow` - Initiate OAuth authentication
+- `handle_oauth_callback` - Complete OAuth flow
+- `refresh_oauth_tokens` - Refresh authentication tokens
+- `revoke_oauth_tokens` - Revoke OAuth tokens
 
 ### 🔐 Private Tools (Authentication Required)
 
 **Social Operations**
 - `create_post` - Create new posts with rich text support
+- `create_rich_text_post` - Create posts with advanced formatting
 - `reply_to_post` - Reply to existing posts with threading
 - `like_post` / `unlike_post` - Like and unlike posts
 - `repost` / `unrepost` - Repost content with optional quotes
 - `follow_user` / `unfollow_user` - Follow and unfollow users
-- `get_timeline` - Retrieve personalized timelines and feeds
-- `get_notifications` - Access your notification feeds
+
+**Data Retrieval**
+- `get_user_profiles` - Get multiple user profiles at once
+- `get_followers` - Get follower lists
+- `get_follows` - Get following lists
+- `get_thread` - View post threads and conversations
+- `get_custom_feed` - Access custom feeds
+- `get_timeline` - Retrieve personalized timelines
+- `get_notifications` - Access notification feeds
 
 **Content Management**
 - `upload_image` / `upload_video` - Upload media content
-- `delete_post` - Remove your posts and content
-- `update_profile` - Modify your profile and settings
-- `create_list` - Create and manage user lists
+- `delete_post` - Remove posts
+- `update_profile` - Modify profile and settings
+- `generate_link_preview` - Generate link previews for posts
+
+**List Management**
+- `create_list` - Create user lists
+- `add_to_list` / `remove_from_list` - Manage list members
+- `get_list` - Retrieve list information
 
 **Moderation**
 - `mute_user` / `unmute_user` - Mute and unmute users
 - `block_user` / `unblock_user` - Block and unblock users
 - `report_content` / `report_user` - Report content and users
 
-**OAuth Management**
-- `start_oauth_flow` - Initiate OAuth authentication
-- `handle_oauth_callback` - Complete OAuth flow
-- `refresh_oauth_tokens` - Refresh authentication tokens
+**Real-time Streaming**
+- `start_streaming` - Start real-time event stream
+- `stop_streaming` - Stop event stream
+- `get_streaming_status` - Check streaming status
+- `get_recent_events` - Retrieve recent events
 
 ## 📚 Documentation
 

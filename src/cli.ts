@@ -64,7 +64,7 @@ function showHelp(): void {
   console.log(`
 AT Protocol MCP Server - Comprehensive interface for LLMs to interact with AT Protocol
 
-🎯 Works out-of-the-box without authentication for public data access!
+🎯 Supports both authenticated and unauthenticated modes!
 
 Usage: atproto-mcp [options]
 
@@ -79,13 +79,16 @@ Options:
 
 🔓 Unauthenticated Mode (Default):
   The server works immediately without any setup. Available features:
-  • Search posts and hashtags
-  • View user profiles and follower lists
-  • Browse public feeds and threads
-  • Access public timelines
+  • Search posts and hashtags (search_posts)
+  • View basic user profiles (get_user_profile)
+  • Manage OAuth authentication flows
 
 🔐 Authenticated Mode (Optional):
-  Set environment variables to enable write operations and private data:
+  Set environment variables to enable full functionality:
+  • All write operations (create, like, repost, follow, etc.)
+  • Access to feeds, timelines, and notifications
+  • View follower/following lists
+  • Resources and prompts
 
 Environment Variables:
   ATPROTO_SERVICE           AT Protocol service URL

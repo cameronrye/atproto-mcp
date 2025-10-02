@@ -23,7 +23,7 @@ export class RepostTool extends BaseTool {
   public readonly schema = {
     method: 'repost',
     description:
-      'Repost content on AT Protocol. Can be a simple repost or a quote post with additional text.',
+      'Repost content on AT Protocol. Can be a simple repost or a quote post with additional text. Requires authentication.',
     params: RepostSchema,
   };
 

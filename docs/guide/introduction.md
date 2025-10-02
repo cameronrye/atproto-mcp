@@ -81,28 +81,39 @@ The Authenticated Transfer Protocol (AT Protocol) is a decentralized social netw
 
 ## Why Use This Server?
 
-### For Developers
+### For LLM Clients
+
+This server is designed to be consumed by **LLM clients** (like Claude Desktop) via the MCP protocol:
+
+- **Seamless Integration**: Works with any MCP-compatible LLM client
+- **Rich Functionality**: Access to all major AT Protocol operations through natural language
+- **Real-Time Data**: Support for streaming and live updates
+- **Flexible Authentication**: Works with or without authentication
+- **Rate Limiting**: Built-in respect for API rate limits
+- **Natural Language Interface**: Users interact in plain language; LLMs handle the protocol
+
+### For Developers Extending the MCP Server
+
+If you want to **deploy, customize, or contribute** to this MCP server:
 
 - **Type-Safe**: Written in TypeScript with comprehensive type definitions
 - **Well-Tested**: Extensive test coverage with unit and integration tests
 - **Production-Ready**: Includes monitoring, logging, and error handling
-- **Extensible**: Easy to add custom tools and resources
+- **Extensible**: Easy to add custom MCP tools and resources
 - **Well-Documented**: Comprehensive documentation and examples
+- **Modular Architecture**: Clean separation of concerns for easy customization
 
-### For LLM Applications
-
-- **Seamless Integration**: Works with any MCP-compatible LLM client
-- **Rich Functionality**: Access to all major AT Protocol operations
-- **Real-Time Data**: Support for streaming and live updates
-- **Flexible Authentication**: Works with or without authentication
-- **Rate Limiting**: Built-in respect for API rate limits
+**Note**: This is for developers who want to extend the MCP server itself, not for developers building applications that directly call AT Protocol APIs. If you're building a traditional application, use the official `@atproto/api` package directly.
 
 ### For Researchers
 
+If you're using LLM clients for research:
+
 - **Public Data Access**: No authentication needed for public data
-- **Comprehensive Search**: Advanced search capabilities with filters
-- **Data Export**: Easy access to structured social media data
+- **Comprehensive Search**: Advanced search capabilities with filters via natural language
+- **Data Export**: Easy access to structured social media data through LLM queries
 - **Ethical**: Respects user privacy and platform guidelines
+- **Conversational Interface**: Query data using natural language instead of code
 
 ## Use Cases
 

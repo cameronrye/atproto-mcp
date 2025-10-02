@@ -23,7 +23,7 @@ export class GetTimelineTool extends BaseTool {
   public readonly schema = {
     method: 'get_timeline',
     description:
-      "Retrieve the user's timeline/feed from AT Protocol. Returns posts from followed users and recommended content.",
+      "Retrieve the user's timeline/feed from AT Protocol. Returns posts from followed users and recommended content. Requires authentication.",
     params: GetTimelineSchema,
   };
 

@@ -73,9 +73,9 @@ export ATPROTO_CLIENT_SECRET="your-client-secret"
 atproto-mcp --auth oauth
 ```
 
-### 3. Connect Your LLM Client
+### 3. Configure Your LLM Client
 
-Configure your MCP-compatible LLM client to connect to the server:
+Configure your MCP-compatible LLM client (e.g., Claude Desktop) to connect to the server:
 
 ```json
 {
@@ -123,35 +123,43 @@ Options:
 
 ## First Steps
 
-Once your server is running and connected, try these basic operations:
+Once your MCP server is configured and your LLM client is running, try these basic operations by talking to your LLM client in natural language:
 
 ### 1. Create a Post
 
-```typescript
-// Through your LLM client
+**What you say to your LLM client:**
+```
 "Create a post saying 'Hello from AT Protocol MCP Server!'"
 ```
 
+Your LLM client will use the `create_post` tool to publish your post.
+
 ### 2. Search Posts
 
-```typescript
-// Search for posts about a topic
+**What you say to your LLM client:**
+```
 "Search for posts about 'artificial intelligence' from the last week"
 ```
 
+Your LLM client will use the `search_posts` tool to find relevant posts.
+
 ### 3. Get User Profile
 
-```typescript
-// Get information about a user
+**What you say to your LLM client:**
+```
 "Get the profile information for @bsky.app"
 ```
 
+Your LLM client will use the `get_user_profile` tool to retrieve the profile.
+
 ### 4. Follow a User
 
-```typescript
-// Follow a user
+**What you say to your LLM client:**
+```
 "Follow @atproto.com"
 ```
+
+Your LLM client will use the `follow_user` tool to follow the user.
 
 ## Verification
 
@@ -176,10 +184,10 @@ To verify everything is working correctly:
 - Check AT Protocol service URL
 - Ensure app password is valid
 
-**MCP client can't connect:**
-- Verify server is running
-- Check client configuration
-- Review server logs for errors
+**LLM client can't connect to MCP server:**
+- Verify MCP server configuration in your LLM client
+- Check that the server command is correct
+- Review LLM client logs for MCP connection errors
 
 **Rate limiting errors:**
 - Reduce request frequency
@@ -197,12 +205,12 @@ If you encounter issues:
 
 ## Next Steps
 
-Now that you have the server running:
+Now that you have the MCP server configured with your LLM client:
 
-- Explore the available MCP tools through your LLM client
-- Try creating posts, searching content, and managing your social graph
-- Review the source code to understand the implementation
-- Consider contributing to the project
+- **Explore available tools** - Ask your LLM client what it can do with AT Protocol
+- **Try natural language commands** - Create posts, search content, manage your social graph
+- **Review the documentation** - Learn about all available MCP tools and resources
+- **Extend the server** - Consider contributing new MCP tools to the project
 
 ## Development Setup
 

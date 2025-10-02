@@ -190,7 +190,8 @@ describe('MCP Integration Tests', () => {
         serverInfo: {
           name: expect.any(String),
           version: expect.any(String),
-          description: expect.any(String),
+          // Note: 'description' field removed per MCP specification
+          // serverInfo should only contain 'name' and 'version'
         },
       });
     });

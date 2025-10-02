@@ -29,7 +29,7 @@ export class StartOAuthFlowTool extends BaseTool {
   public readonly schema = {
     method: 'start_oauth_flow',
     description:
-      'Start OAuth authorization flow for AT Protocol authentication. Returns authorization URL that user must visit.',
+      'Start OAuth authorization flow for AT Protocol authentication. Returns authorization URL that user must visit. No authentication required.',
     params: StartOAuthFlowSchema,
   };
 

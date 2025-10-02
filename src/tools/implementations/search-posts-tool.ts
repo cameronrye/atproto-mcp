@@ -34,7 +34,7 @@ export class SearchPostsTool extends BaseTool {
   public readonly schema = {
     method: 'search_posts',
     description:
-      'Search for posts on AT Protocol. Supports text search with various filters including author, language, date range, and more.',
+      'Search for posts on AT Protocol. Supports text search with various filters including author, language, date range, and more. No authentication required.',
     params: SearchPostsSchema,
   };
 
@@ -69,8 +69,17 @@ export class SearchPostsTool extends BaseTool {
       // Add optional parameters
       if (params.cursor) searchParams.cursor = params.cursor;
       if (params.sort) searchParams.sort = params.sort;
-      if (params.since) searchParams.since = params.since;
-      if (params.until) searchParams.until = params.until;
+
+      // Validate and add date parameters (ISO 8601 format)
+      if (params.since) {
+        this.validateISO8601Date(params.since, 'since');
+        searchParams.since = params.since;
+      }
+      if (params.until) {
+        this.validateISO8601Date(params.until, 'until');
+        searchParams.until = params.until;
+      }
+
       if (params.mentions) searchParams.mentions = params.mentions;
       if (params.author) {
         this.validateActor(params.author);

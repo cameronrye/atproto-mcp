@@ -8,6 +8,142 @@ export type ATURI = string & { readonly __brand: 'ATURI' };
 export type NSID = string & { readonly __brand: 'NSID' };
 export type CID = string & { readonly __brand: 'CID' };
 
+/**
+ * Runtime validation and type guard functions for branded types
+ */
+
+/**
+ * Validate and create a DID (Decentralized Identifier)
+ * DIDs must start with 'did:' followed by method and identifier
+ * Example: did:plc:abc123xyz
+ */
+export function validateDID(value: string): DID {
+  if (!value || typeof value !== 'string') {
+    throw new Error('DID must be a non-empty string');
+  }
+  if (!value.startsWith('did:')) {
+    throw new Error(`Invalid DID format: ${value}. Must start with 'did:'`);
+  }
+  const parts = value.split(':');
+  if (parts.length < 3) {
+    throw new Error(`Invalid DID format: ${value}. Must be 'did:method:identifier'`);
+  }
+  return value as DID;
+}
+
+/**
+ * Validate and create an ATURI (AT Protocol URI)
+ * AT URIs must start with 'at://' followed by DID/handle, collection, and rkey
+ * Example: at://did:plc:abc123/app.bsky.feed.post/xyz789
+ */
+export function validateATURI(value: string): ATURI {
+  if (!value || typeof value !== 'string') {
+    throw new Error('ATURI must be a non-empty string');
+  }
+  if (!value.startsWith('at://')) {
+    throw new Error(`Invalid ATURI format: ${value}. Must start with 'at://'`);
+  }
+  const parts = value.slice(5).split('/'); // Remove 'at://' and split
+  if (parts.length < 3) {
+    throw new Error(`Invalid ATURI format: ${value}. Must be 'at://did/collection/rkey'`);
+  }
+  return value as ATURI;
+}
+
+/**
+ * Validate and create a CID (Content Identifier)
+ * CIDs are base32-encoded multihashes, typically starting with 'bafy' or 'bafk'
+ */
+export function validateCID(value: string): CID {
+  if (!value || typeof value !== 'string') {
+    throw new Error('CID must be a non-empty string');
+  }
+  // Basic CID validation - should be alphanumeric
+  if (!/^[a-z0-9]+$/i.test(value)) {
+    throw new Error(`Invalid CID format: ${value}. Must be alphanumeric`);
+  }
+  // Most CIDs start with 'baf' but this is not strictly required
+  if (value.length < 10) {
+    throw new Error(`Invalid CID format: ${value}. CID too short`);
+  }
+  return value as CID;
+}
+
+/**
+ * Validate and create an NSID (Namespaced Identifier)
+ * NSIDs are reverse-DNS style identifiers
+ * Example: app.bsky.feed.post
+ */
+export function validateNSID(value: string): NSID {
+  if (!value || typeof value !== 'string') {
+    throw new Error('NSID must be a non-empty string');
+  }
+  // NSID format: reverse DNS with at least 3 segments
+  const parts = value.split('.');
+  if (parts.length < 3) {
+    throw new Error(
+      `Invalid NSID format: ${value}. Must have at least 3 segments (e.g., app.bsky.feed.post)`
+    );
+  }
+  // Each segment should be alphanumeric (with hyphens allowed)
+  if (!parts.every(part => /^[a-z0-9-]+$/i.test(part))) {
+    throw new Error(`Invalid NSID format: ${value}. Segments must be alphanumeric`);
+  }
+  return value as NSID;
+}
+
+/**
+ * Type guard to check if a value is a valid DID
+ */
+export function isDID(value: unknown): value is DID {
+  try {
+    if (typeof value !== 'string') return false;
+    validateDID(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Type guard to check if a value is a valid ATURI
+ */
+export function isATURI(value: unknown): value is ATURI {
+  try {
+    if (typeof value !== 'string') return false;
+    validateATURI(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Type guard to check if a value is a valid CID
+ */
+export function isCID(value: unknown): value is CID {
+  try {
+    if (typeof value !== 'string') return false;
+    validateCID(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Type guard to check if a value is a valid NSID
+ */
+export function isNSID(value: unknown): value is NSID {
+  try {
+    if (typeof value !== 'string') return false;
+    validateNSID(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // AT Protocol specific types
 export interface IAtpSession {
   did: DID;

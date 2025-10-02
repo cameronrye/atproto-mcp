@@ -8,6 +8,25 @@ Retrieve detailed user profile information from AT Protocol.
 
 This tool works without authentication for public profiles, but provides additional viewer-specific information when authenticated.
 
+### Authentication Behavior Details
+
+**Unauthenticated Mode:**
+- Returns basic profile information: handle, display name, description, avatar, banner
+- Returns public statistics: followers count, following count, posts count
+- Returns labels and indexed timestamps
+- Does NOT include viewer-specific data
+
+**Authenticated Mode:**
+- Returns all basic information from unauthenticated mode
+- PLUS viewer-specific data in the `viewer` object:
+  - `viewer.following`: URI if you follow this user
+  - `viewer.followedBy`: URI if this user follows you
+  - `viewer.muted`: Boolean indicating if you've muted this user
+  - `viewer.blocking`: URI if you've blocked this user
+  - `viewer.blockedBy`: Boolean indicating if this user has blocked you
+
+**Note:** The difference in returned data comes from the AT Protocol API itself. This tool calls the same `agent.getProfile()` method in both modes, but the AT Protocol API provides viewer-specific information only when the request includes authentication credentials.
+
 ## Parameters
 
 ### `actor` (required)

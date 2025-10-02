@@ -11,6 +11,7 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
+import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ConfigurationError, type IMcpServerConfig, McpError } from './types/index.js';
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
@@ -150,6 +151,10 @@ export class AtpMcpServer {
 
   /**
    * Set up basic MCP protocol handlers
+   *
+   * Note: While the MCP SDK Server class provides the infrastructure, we still need
+   * to explicitly register handlers for 'initialize' and 'ping' requests as per the
+   * MCP specification. The SDK uses setRequestHandler for all protocol methods.
    */
   private setupBasicHandlers(): void {
     // Handle server info requests
@@ -172,7 +177,8 @@ export class AtpMcpServer {
         serverInfo: {
           name: config.name,
           version: config.version,
-          description: config.description,
+          // Note: 'description' field removed per MCP specification
+          // serverInfo should only contain 'name' and 'version'
         },
       };
     });
@@ -191,25 +197,18 @@ export class AtpMcpServer {
    */
   private registerTools(tools: IMcpTool[]): void {
     // Register tools/list handler
-    this.server.setRequestHandler(z.object({ method: z.literal('tools/list') }), async () => {
-      // Filter tools based on availability (authentication status)
-      const availableTools = tools.filter(tool => {
-        // Check if tool has isAvailable method (from BaseTool)
-        if ('isAvailable' in tool && typeof tool.isAvailable === 'function') {
-          return tool.isAvailable();
-        }
-        // Default to available for tools that don't implement availability check
-        return true;
-      });
-
-      return {
-        tools: availableTools.map(tool => ({
+    this.server.setRequestHandler(z.object({ method: z.literal('tools/list') }), async () =>
+      // Return all tools with static descriptions per MCP specification.
+      // Tools should always be listed regardless of authentication state.
+      // If a tool requires authentication, it will return an appropriate error when called.
+      ({
+        tools: tools.map(tool => ({
           name: tool.schema.method,
-          description: tool.schema.description,
+          description: tool.schema.description || '',
           inputSchema: tool.schema.params ? this.zodToJsonSchema(tool.schema.params) : undefined,
         })),
-      };
-    });
+      })
+    );
 
     // Register individual tool handlers
     for (const tool of tools) {
@@ -240,6 +239,35 @@ export class AtpMcpServer {
             }
 
             const result = await tool.handler(request.params.arguments || {});
+
+            // DESIGN DECISION: Return results as formatted JSON text for LLM consumption
+            //
+            // This server intentionally returns all tool results as stringified JSON text
+            // rather than using MCP's structured content types. This is a deliberate
+            // architectural choice with the following rationale:
+            //
+            // 1. Consistency: All tools return the same format, making it easier for LLMs
+            //    to parse and understand responses without needing to handle multiple
+            //    content type variations.
+            //
+            // 2. Readability: Pretty-printed JSON (with 2-space indentation) is optimized
+            //    for LLM token processing and human readability during debugging.
+            //
+            // 3. Compatibility: Text content is universally supported across all MCP clients,
+            //    ensuring maximum compatibility without client-specific handling.
+            //
+            // 4. Debugging: Formatted JSON makes it easier to debug and inspect responses
+            //    in logs and during development.
+            //
+            // 5. LLM Processing: LLMs are highly effective at parsing JSON text and can
+            //    extract structured information from formatted JSON strings.
+            //
+            // Alternative Approach: MCP supports structured content types (e.g., JSON objects,
+            // arrays, etc.) which could be used instead. However, testing has shown that
+            // stringified JSON provides better results for LLM clients in practice.
+            //
+            // If you need structured content types for programmatic processing, consider
+            // parsing the JSON text in your client application.
             return {
               content: [
                 {
@@ -394,111 +422,15 @@ export class AtpMcpServer {
 
   /**
    * Convert Zod schema to JSON Schema for MCP compatibility
+   *
+   * Uses the well-tested zod-to-json-schema library to ensure comprehensive
+   * support for all Zod schema types and proper JSON Schema conversion.
    */
   private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
-    // Handle ZodOptional wrapper first
-    if (schema instanceof z.ZodOptional) {
-      return this.zodToJsonSchema((schema as z.ZodOptional<z.ZodSchema>)._def.innerType);
-    }
-
-    // Handle ZodObject
-    if (schema instanceof z.ZodObject) {
-      const shape = schema.shape;
-      const properties: Record<string, unknown> = {};
-      const required: string[] = [];
-
-      for (const [key, value] of Object.entries(shape)) {
-        const zodValue = value as z.ZodSchema;
-        const isOptional = zodValue.isOptional();
-
-        // Recursively convert the property schema
-        properties[key] = this.zodToJsonSchema(zodValue);
-
-        if (!isOptional) {
-          required.push(key);
-        }
-      }
-
-      return {
-        type: 'object',
-        properties,
-        required: required.length > 0 ? required : undefined,
-      };
-    }
-
-    // Handle ZodString
-    if (schema instanceof z.ZodString) {
-      const stringSchema: any = { type: 'string' };
-
-      // Add string constraints
-      if ((schema as any)._def.checks) {
-        for (const check of (schema as any)._def.checks) {
-          if (check.kind === 'min') stringSchema.minLength = check.value;
-          if (check.kind === 'max') stringSchema.maxLength = check.value;
-          if (check.kind === 'regex') stringSchema.pattern = check.regex.source;
-        }
-      }
-
-      return stringSchema;
-    }
-
-    // Handle ZodNumber
-    if (schema instanceof z.ZodNumber) {
-      const numberSchema: any = { type: 'number' };
-
-      // Add number constraints
-      if ((schema as any)._def.checks) {
-        for (const check of (schema as any)._def.checks) {
-          if (check.kind === 'min') numberSchema.minimum = check.value;
-          if (check.kind === 'max') numberSchema.maximum = check.value;
-          if (check.kind === 'int') numberSchema.type = 'integer';
-        }
-      }
-
-      return numberSchema;
-    }
-
-    // Handle ZodBoolean
-    if (schema instanceof z.ZodBoolean) {
-      return { type: 'boolean' };
-    }
-
-    // Handle ZodArray
-    if (schema instanceof z.ZodArray) {
-      const arraySchema: any = { type: 'array' };
-
-      // Add array item type if available
-      if ((schema as any)._def.type) {
-        arraySchema.items = this.zodToJsonSchema((schema as any)._def.type);
-      }
-
-      return arraySchema;
-    }
-
-    // Handle ZodEnum
-    if (schema instanceof z.ZodEnum) {
-      return {
-        type: 'string',
-        enum: (schema as any)._def.values,
-      };
-    }
-
-    // Handle ZodUnion
-    if (schema instanceof z.ZodUnion) {
-      return {
-        anyOf: (schema as any)._def.options.map((option: z.ZodSchema) =>
-          this.zodToJsonSchema(option)
-        ),
-      };
-    }
-
-    // Handle ZodAny and other unknown types
-    if (schema instanceof z.ZodAny) {
-      return { type: 'object' };
-    }
-
-    // Default fallback
-    return { type: 'object' };
+    return zodToJsonSchema(schema, {
+      target: 'jsonSchema7',
+      $refStrategy: 'none',
+    }) as Record<string, unknown>;
   }
 
   /**
@@ -716,31 +648,16 @@ export class AtpMcpServer {
 }
 
 /**
- * Create and start the server if this file is run directly
+ * Export the server class for use by the CLI and programmatic usage
+ *
+ * Note: This file should not be run directly. Use the CLI (src/cli.ts) instead:
+ *   npm start
+ *   or
+ *   node dist/cli.js
+ *
+ * For programmatic usage, import and instantiate the AtpMcpServer class:
+ *   import { AtpMcpServer } from './index.js';
+ *   const server = new AtpMcpServer(config);
+ *   await server.start();
  */
-if (import.meta.url === `file://${process.argv[1]}`) {
-  const server = new AtpMcpServer();
-
-  // Handle graceful shutdown
-  process.on('SIGINT', () => {
-    console.log('\nReceived SIGINT, shutting down gracefully...');
-    void server.stop().then(() => {
-      process.exit(0);
-    });
-  });
-
-  process.on('SIGTERM', () => {
-    console.log('\nReceived SIGTERM, shutting down gracefully...');
-    void server.stop().then(() => {
-      process.exit(0);
-    });
-  });
-
-  // Start the server
-  server.start().catch(error => {
-    console.error('Failed to start server:', error);
-    process.exit(1);
-  });
-}
-
 export default AtpMcpServer;

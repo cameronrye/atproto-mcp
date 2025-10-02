@@ -67,7 +67,7 @@ export abstract class BasePrompt implements IMcpPrompt {
 export class ContentCompositionPrompt extends BasePrompt {
   public readonly name = 'content_composition';
   public readonly description =
-    'Generate engaging social media post content with proper formatting and hashtags';
+    'Generate engaging social media post content with proper formatting and hashtags. Requires authentication.';
   public readonly arguments = [
     {
       name: 'topic',
@@ -148,7 +148,8 @@ Please provide the post text ready to publish.`,
  */
 export class ReplyTemplatePrompt extends BasePrompt {
   public readonly name = 'reply_template';
-  public readonly description = 'Generate thoughtful reply templates for different types of posts';
+  public readonly description =
+    'Generate thoughtful reply templates for different types of posts. Requires authentication.';
   public readonly arguments = [
     {
       name: 'original_post',
