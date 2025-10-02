@@ -2,10 +2,27 @@
 
 Thank you for your interest in contributing to the AT Protocol MCP Server! This document provides guidelines and information for contributors.
 
+## 🎯 About This Project
+
+The AT Protocol MCP Server is an **MCP (Model Context Protocol) server** that enables **LLM clients** to interact with the AT Protocol ecosystem. Contributions to this project help improve how LLMs access and use AT Protocol functionality.
+
+**What we're building:**
+- MCP tools that LLMs can call to interact with AT Protocol
+- MCP resources that provide context data to LLMs
+- MCP prompts that help LLMs perform common tasks
+- Infrastructure for deploying and scaling the MCP server
+
+**What this is NOT:**
+- A direct-use API or SDK for application developers
+- A JavaScript/TypeScript library for importing into apps
+- An end-user application
+
+If you're looking to build applications with AT Protocol, consider using the official `@atproto/api` package directly instead.
+
 ## 🚀 Getting Started
 
 ### Prerequisites
-- Node.js 20+ 
+- Node.js 20+
 - pnpm (recommended) or npm
 - Git
 - Basic knowledge of TypeScript, AT Protocol, and MCP
@@ -19,12 +36,93 @@ Thank you for your interest in contributing to the AT Protocol MCP Server! This 
    ```
 3. Install dependencies:
    ```bash
-   pnpm install
+   pnpm install  # or: npm install
    ```
 4. Start the development server:
    ```bash
-   pnpm run dev
+   pnpm dev      # or: npm run dev
    ```
+
+### Cross-Platform Development
+
+This project supports development on **Windows, macOS, and Linux**. All build commands are cross-platform compatible.
+
+#### Using npm Scripts
+
+All development tasks are available as npm scripts that work on any platform:
+
+```bash
+# Show all available commands
+npm run help
+
+# Common development tasks
+npm run dev              # Start development server
+npm run build            # Build for production
+npm test                 # Run tests
+npm run lint             # Run linter
+npm run format           # Format code
+npm run check            # Run all quality checks
+npm run clean            # Clean build artifacts
+npm run status           # Show project status
+```
+
+#### Cross-Platform Best Practices
+
+When contributing code, please follow these guidelines to ensure cross-platform compatibility:
+
+1. **Use npm scripts** for all build tasks instead of shell commands
+2. **Avoid Unix-specific commands** like `rm`, `chmod`, `grep`, `awk`, `sed`
+3. **Use Node.js APIs** for file operations (fs, path modules)
+4. **Use cross-platform packages**:
+   - `rimraf` for deleting files/directories
+   - `chalk` for colored terminal output
+   - `command-exists` for checking if commands are available
+5. **Test on multiple platforms** when possible (Windows, macOS, Linux)
+6. **Use forward slashes** in paths (Node.js normalizes them automatically)
+7. **Avoid hardcoded paths** - use `path.join()` or `path.resolve()`
+8. **Don't assume shell availability** - use Node.js scripts instead of shell scripts
+
+#### Example: Cross-Platform File Deletion
+
+❌ **Don't do this** (Unix-only):
+```json
+{
+  "scripts": {
+    "clean": "rm -rf dist"
+  }
+}
+```
+
+✅ **Do this instead** (cross-platform):
+```json
+{
+  "scripts": {
+    "clean": "rimraf dist"
+  }
+}
+```
+
+#### Example: Cross-Platform Executable
+
+❌ **Don't do this** (Unix-only):
+```json
+{
+  "scripts": {
+    "build": "tsc && chmod +x dist/cli.js"
+  }
+}
+```
+
+✅ **Do this instead** (cross-platform):
+```json
+{
+  "scripts": {
+    "build": "tsc && node scripts/make-executable.js"
+  }
+}
+```
+
+Where `scripts/make-executable.js` checks the platform and only runs chmod on Unix systems.
 
 ## 📋 Development Workflow
 
@@ -139,23 +237,29 @@ describe('createPost tool', () => {
 ## 🔧 Adding New Features
 
 ### MCP Tools
-When adding new MCP tools:
+When adding new MCP tools that LLMs can call:
 
-1. Create the tool in `src/tools/`
-2. Implement proper Zod schema validation
-3. Add comprehensive error handling
-4. Write unit and integration tests
-5. Update documentation
-6. Add examples to the docs site
+1. **Create the tool** in `src/tools/`
+2. **Define clear schemas** - Use Zod for parameter validation
+3. **Write descriptive metadata** - LLMs use descriptions to understand what tools do
+4. **Add error handling** - Return clear error messages that LLMs can explain to users
+5. **Write tests** - Unit and integration tests for the tool
+6. **Update documentation** - Add examples showing how LLMs use the tool
+7. **Add usage examples** - Show natural language requests that would trigger the tool
+
+**Example**: When adding a `search_users` tool, document it like:
+- **What it does**: "Allows LLMs to search for AT Protocol users by name or handle"
+- **Example user request**: "Find users named John on Bluesky"
+- **What the LLM does**: Calls `search_users({ query: "John" })`
 
 ### AT Protocol Integration
-When adding AT Protocol features:
+When adding AT Protocol features to MCP tools:
 
-1. Use the official `@atproto/api` package
-2. Implement proper authentication handling
-3. Respect rate limits and implement backoff
-4. Handle AT Protocol errors gracefully
-5. Validate responses against expected schemas
+1. **Use official SDK** - Use the `@atproto/api` package
+2. **Handle authentication** - Support both authenticated and unauthenticated modes
+3. **Respect rate limits** - Implement backoff and return clear rate limit errors
+4. **Error handling** - Translate AT Protocol errors into LLM-friendly messages
+5. **Validate responses** - Ensure data matches expected schemas before returning to LLM
 
 ## 📚 Documentation
 

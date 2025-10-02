@@ -5,7 +5,13 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { ATURI, CID, ICreatePostParams } from '../../types/index.js';
+import {
+  type ATURI,
+  type CID,
+  type ICreatePostParams,
+  validateATURI,
+  validateCID,
+} from '../../types/index.js';
 
 /**
  * Zod schema for create post parameters
@@ -51,7 +57,7 @@ export class CreatePostTool extends BaseTool {
   public readonly schema = {
     method: 'create_post',
     description:
-      'Create a new post on AT Protocol. Supports text, replies, images, external links, and language tags.',
+      'Create a new post on AT Protocol. Supports text, replies, images, external links, and language tags. Requires authentication.',
     params: CreatePostSchema,
   };
 
@@ -125,9 +131,13 @@ export class CreatePostTool extends BaseTool {
         cid: response.cid,
       });
 
+      // Validate and convert response values to branded types
+      const uri = validateATURI(response.uri);
+      const cid = validateCID(response.cid);
+
       return {
-        uri: response.uri as ATURI,
-        cid: response.cid as CID,
+        uri,
+        cid,
         success: true,
         message: 'Post created successfully',
       };
@@ -138,21 +148,60 @@ export class CreatePostTool extends BaseTool {
   }
 
   /**
-   * Get CID from AT Protocol URI
+   * Get CID from AT Protocol URI by resolving the record
+   *
+   * AT Protocol URIs have the format: at://did:plc:xxx/collection/rkey
+   * This method fetches the actual record to get its CID
    */
   private async getCidFromUri(uri: string): Promise<string> {
     try {
-      // Extract the CID from the URI or fetch it from the network
-      // For now, we'll use a placeholder implementation
-      // In a real implementation, you would resolve the URI to get the CID
-      const parts = uri.split('/');
-      const rkey = parts[parts.length - 1];
+      this.logger.debug('Resolving CID from URI', { uri });
 
-      // This is a simplified approach - in practice you'd need to resolve the record
-      return rkey || 'placeholder-cid';
+      // Parse the AT URI: at://did:plc:xxx/collection/rkey
+      if (!uri.startsWith('at://')) {
+        throw new Error(`Invalid AT Protocol URI: ${uri}`);
+      }
+
+      const uriWithoutProtocol = uri.slice(5); // Remove 'at://'
+      const parts = uriWithoutProtocol.split('/');
+
+      if (parts.length < 3) {
+        throw new Error(`Malformed AT Protocol URI: ${uri}`);
+      }
+
+      const repo = parts[0]!; // DID (guaranteed by length check)
+      const collection = parts[1]!; // e.g., 'app.bsky.feed.post' (guaranteed by length check)
+      const rkey = parts[2]!; // Record key (guaranteed by length check)
+
+      // Fetch the record from AT Protocol to get its CID
+      const response = await this.executeAtpOperation(
+        async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.com.atproto.repo.getRecord({
+            repo,
+            collection,
+            rkey,
+          });
+        },
+        'getRecord',
+        { uri, repo, collection, rkey }
+      );
+
+      if (!response.data.cid) {
+        throw new Error(`No CID found in record response for URI: ${uri}`);
+      }
+
+      this.logger.debug('Successfully resolved CID from URI', {
+        uri,
+        cid: response.data.cid,
+      });
+
+      return response.data.cid;
     } catch (error) {
-      this.logger.warn('Could not resolve CID from URI, using placeholder', { uri });
-      return 'placeholder-cid';
+      this.logger.error('Failed to resolve CID from URI', error, { uri });
+      throw new Error(
+        `Could not resolve CID from URI ${uri}: ${error instanceof Error ? error.message : 'Unknown error'}`
+      );
     }
   }
 

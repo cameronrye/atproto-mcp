@@ -353,10 +353,21 @@ export class AtpClient {
   }
 
   /**
-   * Check if authentication is required for this client instance
+   * Check if authentication credentials were provided to this client instance
+   *
+   * This indicates whether the client was configured with credentials (identifier/password or OAuth),
+   * not whether those credentials are currently valid or authenticated.
+   * Use isAuthenticated() to check if the client has an active authenticated session.
+   */
+  public hasCredentials(): boolean {
+    return this.isAuthenticationRequired;
+  }
+
+  /**
+   * @deprecated Use hasCredentials() instead. This method will be removed in a future version.
    */
   public requiresAuthentication(): boolean {
-    return this.isAuthenticationRequired;
+    return this.hasCredentials();
   }
 
   /**

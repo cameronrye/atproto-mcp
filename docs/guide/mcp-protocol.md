@@ -283,27 +283,15 @@ See [API Reference](../api/prompts.md) for details.
 
 ## Transport Protocols
 
-MCP supports multiple transport mechanisms:
-
-### stdio (Standard Input/Output)
-
-Default for local integrations:
+The AT Protocol MCP Server uses the **stdio (Standard Input/Output)** transport mechanism for local integrations:
 
 ```bash
 atproto-mcp
 ```
 
-Communication via stdin/stdout using JSON-RPC 2.0.
+Communication occurs via stdin/stdout using JSON-RPC 2.0, which is the standard transport for MCP servers integrated with LLM clients like Claude Desktop.
 
-### HTTP/SSE (Server-Sent Events)
-
-For remote integrations:
-
-```bash
-atproto-mcp --transport http --port 3000
-```
-
-Communication via HTTP with SSE for server-to-client messages.
+**Note:** HTTP/SSE transport is not currently implemented. The stdio transport is recommended for all MCP server integrations as it provides secure, local communication between the LLM client and the server.
 
 ## Message Format
 

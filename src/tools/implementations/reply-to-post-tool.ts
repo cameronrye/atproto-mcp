@@ -27,7 +27,7 @@ export class ReplyToPostTool extends BaseTool {
   public readonly schema = {
     method: 'reply_to_post',
     description:
-      'Reply to an existing post on AT Protocol. Creates a threaded reply with proper parent/root references.',
+      'Reply to an existing post on AT Protocol. Creates a threaded reply with proper parent/root references. Requires authentication.',
     params: ReplyToPostSchema,
   };
 

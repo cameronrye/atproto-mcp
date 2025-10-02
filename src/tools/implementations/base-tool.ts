@@ -104,14 +104,20 @@ export abstract class BaseTool implements IMcpTool {
 
   /**
    * Check if this tool is available in the current authentication mode
+   *
+   * - PUBLIC tools: Always available (no authentication needed)
+   * - ENHANCED tools: Always available (work better with authentication but don't require it)
+   * - PRIVATE tools: Only available when authenticated
    */
   public isAvailable(): boolean {
+    // PUBLIC and ENHANCED tools are always available
     if (this.authMode === ToolAuthMode.PUBLIC || this.authMode === ToolAuthMode.ENHANCED) {
-      return true; // Always available
+      return true;
     }
 
+    // PRIVATE tools require active authentication
     if (this.authMode === ToolAuthMode.PRIVATE) {
-      return this.atpClient.requiresAuthentication() && this.atpClient.isAuthenticated();
+      return this.atpClient.isAuthenticated();
     }
 
     return false;
@@ -119,6 +125,8 @@ export abstract class BaseTool implements IMcpTool {
 
   /**
    * Get availability status message
+   *
+   * Provides a human-readable message explaining the tool's availability status.
    */
   public getAvailabilityMessage(): string {
     if (this.isAvailable()) {
@@ -126,11 +134,11 @@ export abstract class BaseTool implements IMcpTool {
     }
 
     if (this.authMode === ToolAuthMode.PRIVATE) {
-      if (!this.atpClient.requiresAuthentication()) {
+      if (!this.atpClient.hasCredentials()) {
         return 'Requires authentication - please provide credentials';
       }
       if (!this.atpClient.isAuthenticated()) {
-        return 'Authentication required but not authenticated';
+        return 'Authentication credentials provided but not authenticated - please authenticate';
       }
     }
 
@@ -260,6 +268,44 @@ export abstract class BaseTool implements IMcpTool {
     // Basic CID validation (should start with 'bafy' for most cases)
     if (!cid.match(/^[a-z0-9]+$/i)) {
       throw new ValidationError('CID must be a valid content identifier', 'cid', cid);
+    }
+  }
+
+  /**
+   * Validate ISO 8601 date format
+   *
+   * Ensures the provided date string is a valid ISO 8601 timestamp.
+   * Examples of valid formats:
+   * - 2024-01-15T10:30:00Z
+   * - 2024-01-15T10:30:00.000Z
+   * - 2024-01-15T10:30:00+00:00
+   */
+  protected validateISO8601Date(dateString: string, fieldName: string = 'date'): void {
+    if (!dateString || typeof dateString !== 'string') {
+      throw new ValidationError(`${fieldName} must be a non-empty string`);
+    }
+
+    // Parse the date string
+    const date = new Date(dateString);
+
+    // Check if the date is valid
+    if (isNaN(date.getTime())) {
+      throw new ValidationError(
+        `${fieldName} must be a valid ISO 8601 timestamp (e.g., 2024-01-15T10:30:00Z)`,
+        fieldName,
+        dateString
+      );
+    }
+
+    // Verify it's in ISO 8601 format by checking if it contains 'T' separator
+    // and either 'Z' or timezone offset
+    const iso8601Pattern = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?(Z|[+-]\d{2}:\d{2})$/;
+    if (!iso8601Pattern.test(dateString)) {
+      throw new ValidationError(
+        `${fieldName} must be in ISO 8601 format (e.g., 2024-01-15T10:30:00Z)`,
+        fieldName,
+        dateString
+      );
     }
   }
 

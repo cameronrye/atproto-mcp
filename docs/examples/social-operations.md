@@ -2,458 +2,772 @@
 
 Practical examples for common social networking operations on AT Protocol.
 
+These examples show how an LLM interacts with the AT Protocol MCP Server tools using JSON-formatted parameters.
+
 ## Creating Posts
 
 ### Simple Text Post
 
-```typescript
-import { createPost } from './tools/create-post';
+**User Request:**
+```
+"Create a post saying 'Hello from AT Protocol! 🚀'"
+```
 
-const result = await createPost({
-  text: "Hello from AT Protocol! 🚀"
-});
+**Tool Call:** `create_post`
 
-console.log(`Post created: ${result.uri}`);
+**Parameters (JSON):**
+```json
+{
+  "text": "Hello from AT Protocol! 🚀"
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "cid": "bafyreiabc123...",
+  "success": true,
+  "message": "Post created successfully"
+}
 ```
 
 ### Post with Multiple Languages
 
-```typescript
-const result = await createPost({
-  text: "Hello world! Bonjour le monde!",
-  langs: ["en", "fr"]
-});
+**User Request:**
+```
+"Create a bilingual post saying 'Hello world! Bonjour le monde!' in English and French"
+```
+
+**Tool Call:** `create_post`
+
+**Parameters (JSON):**
+```json
+{
+  "text": "Hello world! Bonjour le monde!",
+  "langs": ["en", "fr"]
+}
 ```
 
 ### Post with Images
 
-```typescript
-import { readFileSync } from 'fs';
+**User Request:**
+```
+"Create a post with the text 'Check out this amazing photo!' and attach the sunset image"
+```
 
-const imageData = readFileSync('./photo.jpg');
-const imageBlob = new Blob([imageData], { type: 'image/jpeg' });
+**Tool Call:** `create_post`
 
-const result = await createPost({
-  text: "Check out this amazing photo!",
-  embed: {
-    images: [
+**Parameters (JSON):**
+```json
+{
+  "text": "Check out this amazing photo!",
+  "embed": {
+    "images": [
       {
-        alt: "A beautiful sunset over the ocean",
-        image: imageBlob
+        "alt": "A beautiful sunset over the ocean",
+        "image": "<blob reference or base64 data>"
       }
     ]
   }
-});
+}
 ```
+
+**Note:** Images are typically uploaded first using the `upload_image` tool, then referenced in the post.
 
 ### Post with Link Preview
 
-```typescript
-const result = await createPost({
-  text: "Interesting article about AT Protocol",
-  embed: {
-    external: {
-      uri: "https://atproto.com/guides/overview",
-      title: "AT Protocol Overview",
-      description: "Learn about the AT Protocol architecture and features"
+**User Request:**
+```
+"Create a post about the AT Protocol overview article at https://atproto.com/guides/overview"
+```
+
+**Tool Call:** `create_post`
+
+**Parameters (JSON):**
+```json
+{
+  "text": "Interesting article about AT Protocol",
+  "embed": {
+    "external": {
+      "uri": "https://atproto.com/guides/overview",
+      "title": "AT Protocol Overview",
+      "description": "Learn about the AT Protocol architecture and features"
     }
   }
-});
+}
 ```
 
 ## Threading and Replies
 
 ### Reply to a Post
 
-```typescript
-import { replyToPost } from './tools/reply-to-post';
+**User Request:**
+```
+"Reply to the post at at://did:plc:abc123/app.bsky.feed.post/xyz789 saying 'Great point! I totally agree.'"
+```
 
-// Get the post you want to reply to
-const originalPost = await getPost(postUri);
+**Tool Call:** `reply_to_post`
 
-// Reply to it
-const reply = await replyToPost({
-  text: "Great point! I totally agree.",
-  root: originalPost.uri,
-  parent: originalPost.uri
-});
+**Parameters (JSON):**
+```json
+{
+  "text": "Great point! I totally agree.",
+  "root": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "parent": "at://did:plc:abc123/app.bsky.feed.post/xyz789"
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/reply456",
+  "cid": "bafyreireply...",
+  "success": true,
+  "message": "Reply posted successfully"
+}
 ```
 
 ### Reply to a Reply (Nested Thread)
 
-```typescript
-// Reply to a reply in a thread
-const nestedReply = await replyToPost({
-  text: "Thanks for the clarification!",
-  root: threadRootUri,      // First post in thread
-  parent: previousReplyUri  // Immediate parent
-});
+**User Request:**
 ```
+"Reply to the comment in the thread saying 'Thanks for the clarification!'"
+```
+
+**Tool Call:** `reply_to_post`
+
+**Parameters (JSON):**
+```json
+{
+  "text": "Thanks for the clarification!",
+  "root": "at://did:plc:abc123/app.bsky.feed.post/thread-root",
+  "parent": "at://did:plc:abc123/app.bsky.feed.post/previous-reply"
+}
+```
+
+**Note:** `root` is the first post in the thread, `parent` is the immediate post being replied to.
 
 ### View Full Thread
 
-```typescript
-import { getThread } from './tools/get-thread';
+**User Request:**
+```
+"Show me the full conversation thread for this post"
+```
 
-const thread = await getThread({
-  uri: postUri,
-  depth: 6  // Get up to 6 levels of replies
-});
+**Tool Call:** `get_thread`
 
-// Navigate the thread
-console.log('Root post:', thread.thread.post.record.text);
-console.log('Replies:', thread.thread.replies?.length);
+**Parameters (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "depth": 6
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "success": true,
+  "thread": {
+    "post": {
+      "uri": "at://...",
+      "record": {
+        "text": "Root post content"
+      }
+    },
+    "replies": [
+      {
+        "post": {
+          "record": {
+            "text": "First reply"
+          }
+        },
+        "replies": []
+      }
+    ]
+  }
+}
 ```
 
 ## Engagement
 
 ### Like a Post
 
-```typescript
-import { likePost } from './tools/like-post';
-
-const result = await likePost({
-  uri: post.uri,
-  cid: post.cid
-});
-
-console.log(`Like URI: ${result.uri}`);
-// Store this URI to unlike later
+**User Request:**
 ```
+"Like this post"
+```
+
+**Tool Call:** `like_post`
+
+**Parameters (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "cid": "bafyreiabc123..."
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.like/like456",
+  "success": true,
+  "message": "Post liked successfully"
+}
+```
+
+**Note:** Store the returned `uri` to unlike the post later.
 
 ### Unlike a Post
 
-```typescript
-import { unlikePost } from './tools/unlike-post';
+**User Request:**
+```
+"Unlike the post I just liked"
+```
 
-await unlikePost({
-  likeUri: storedLikeUri
-});
+**Tool Call:** `unlike_post`
+
+**Parameters (JSON):**
+```json
+{
+  "likeUri": "at://did:plc:abc123/app.bsky.feed.like/like456"
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "success": true,
+  "message": "Post unliked successfully"
+}
 ```
 
 ### Repost Content
 
-```typescript
-import { repost } from './tools/repost';
+**User Request:**
+```
+"Repost this post"
+```
 
-// Simple repost
-const result = await repost({
-  uri: post.uri,
-  cid: post.cid
-});
+**Tool Call:** `repost`
 
-// Quote post (repost with commentary)
-const quotePost = await repost({
-  uri: post.uri,
-  cid: post.cid,
-  text: "This is exactly what I was thinking! Great insights."
-});
+**Parameters (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "cid": "bafyreiabc123..."
+}
+```
+
+**For Quote Post (repost with commentary):**
+
+**User Request:**
+```
+"Repost this with the comment 'This is exactly what I was thinking! Great insights.'"
+```
+
+**Parameters (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "cid": "bafyreiabc123...",
+  "text": "This is exactly what I was thinking! Great insights."
+}
 ```
 
 ### Remove a Repost
 
-```typescript
-import { unrepost } from './tools/unrepost';
+**User Request:**
+```
+"Remove my repost"
+```
 
-await unrepost({
-  repostUri: storedRepostUri
-});
+**Tool Call:** `unrepost`
+
+**Parameters (JSON):**
+```json
+{
+  "repostUri": "at://did:plc:abc123/app.bsky.feed.repost/repost456"
+}
 ```
 
 ## Following Users
 
 ### Follow a User
 
-```typescript
-import { followUser } from './tools/follow-user';
-
-// Follow by handle
-const result = await followUser({
-  actor: "alice.bsky.social"
-});
-
-console.log(`Follow URI: ${result.uri}`);
-// Store this URI to unfollow later
+**User Request:**
 ```
+"Follow @alice.bsky.social"
+```
+
+**Tool Call:** `follow_user`
+
+**Parameters (JSON):**
+```json
+{
+  "actor": "alice.bsky.social"
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.graph.follow/follow789",
+  "success": true,
+  "message": "Now following alice.bsky.social"
+}
+```
+
+**Note:** Store the returned `uri` to unfollow the user later.
 
 ### Unfollow a User
 
-```typescript
-import { unfollowUser } from './tools/unfollow-user';
+**User Request:**
+```
+"Unfollow alice"
+```
 
-await unfollowUser({
-  followUri: storedFollowUri
-});
+**Tool Call:** `unfollow_user`
+
+**Parameters (JSON):**
+```json
+{
+  "followUri": "at://did:plc:abc123/app.bsky.graph.follow/follow789"
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "success": true,
+  "message": "Unfollowed successfully"
+}
 ```
 
 ### Get User Profile
 
-```typescript
-import { getUserProfile } from './tools/get-user-profile';
+**User Request:**
+```
+"Show me alice.bsky.social's profile"
+```
 
-const profile = await getUserProfile({
-  actor: "alice.bsky.social"
-});
+**Tool Call:** `get_user_profile`
 
-console.log(`Display Name: ${profile.profile.displayName}`);
-console.log(`Followers: ${profile.profile.followersCount}`);
-console.log(`Following: ${profile.profile.followsCount}`);
-console.log(`Posts: ${profile.profile.postsCount}`);
-
-// Check relationship (when authenticated)
-if (profile.profile.viewer) {
-  console.log(`Following: ${!!profile.profile.viewer.following}`);
-  console.log(`Followed by: ${!!profile.profile.viewer.followedBy}`);
+**Parameters (JSON):**
+```json
+{
+  "actor": "alice.bsky.social"
 }
 ```
 
-## Building a Social Bot
-
-### Auto-Reply Bot
-
-```typescript
-import { getNotifications } from './tools/get-notifications';
-import { replyToPost } from './tools/reply-to-post';
-
-async function autoReplyBot() {
-  // Get recent notifications
-  const notifications = await getNotifications({ limit: 20 });
-  
-  // Find mentions
-  const mentions = notifications.notifications.filter(
-    n => n.reason === 'mention' && !n.isRead
-  );
-  
-  for (const mention of mentions) {
-    // Reply to mentions
-    await replyToPost({
-      text: "Thanks for mentioning me! 🤖",
-      root: mention.reasonSubject!,
-      parent: mention.reasonSubject!
-    });
-  }
-}
-
-// Run every minute
-setInterval(autoReplyBot, 60000);
-```
-
-### Engagement Bot
-
-```typescript
-import { searchPosts } from './tools/search-posts';
-import { likePost } from './tools/like-post';
-
-async function engagementBot() {
-  // Search for posts about a topic
-  const results = await searchPosts({
-    q: "atproto",
-    sort: "latest",
-    limit: 10
-  });
-  
-  for (const post of results.posts) {
-    // Like relevant posts
-    if (!post.viewer?.like) {
-      await likePost({
-        uri: post.uri,
-        cid: post.cid
-      });
-      
-      console.log(`Liked post: ${post.record.text}`);
-      
-      // Wait to avoid rate limits
-      await sleep(5000);
+**Response (JSON):**
+```json
+{
+  "success": true,
+  "profile": {
+    "did": "did:plc:alice123",
+    "handle": "alice.bsky.social",
+    "displayName": "Alice Smith",
+    "description": "Software engineer and coffee enthusiast",
+    "followersCount": 1250,
+    "followsCount": 340,
+    "postsCount": 892,
+    "viewer": {
+      "following": "at://did:plc:abc123/app.bsky.graph.follow/follow789",
+      "followedBy": "at://did:plc:alice123/app.bsky.graph.follow/follow456"
     }
   }
 }
+```
 
-function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+**Note:** The `viewer` field shows your relationship with this user (only when authenticated).
+
+## Building a Social Bot
+
+These examples show workflow sequences for automated social interactions.
+
+### Auto-Reply Bot Workflow
+
+**Concept:** Automatically reply to mentions
+
+**Step 1: Get Notifications**
+
+**Tool Call:** `get_notifications`
+
+**Parameters (JSON):**
+```json
+{
+  "limit": 20
 }
 ```
+
+**Step 2: Filter for Unread Mentions**
+
+The LLM analyzes the response to identify notifications where:
+- `reason` is `"mention"`
+- `isRead` is `false`
+
+**Step 3: Reply to Each Mention**
+
+**Tool Call:** `reply_to_post` (for each mention)
+
+**Parameters (JSON):**
+```json
+{
+  "text": "Thanks for mentioning me! 🤖",
+  "root": "at://did:plc:abc123/app.bsky.feed.post/mention-uri",
+  "parent": "at://did:plc:abc123/app.bsky.feed.post/mention-uri"
+}
+```
+
+**Implementation Note:** This workflow would be triggered periodically (e.g., every minute) by an external scheduler, not by the LLM itself.
+
+### Engagement Bot Workflow
+
+**Concept:** Automatically like posts about a specific topic
+
+**Step 1: Search for Posts**
+
+**Tool Call:** `search_posts`
+
+**Parameters (JSON):**
+```json
+{
+  "q": "atproto",
+  "sort": "latest",
+  "limit": 10
+}
+```
+
+**Step 2: Like Each Post**
+
+For each post in the results that hasn't been liked yet (check `viewer.like` field):
+
+**Tool Call:** `like_post`
+
+**Parameters (JSON):**
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "cid": "bafyreiabc123..."
+}
+```
+
+**Best Practice:** Wait 5 seconds between likes to avoid rate limits.
 
 ## Content Discovery
 
 ### Search for Posts
 
-```typescript
-import { searchPosts } from './tools/search-posts';
+**User Request:**
+```
+"Search for top posts about machine learning in English"
+```
 
-// Search by keyword
-const results = await searchPosts({
-  q: "machine learning",
-  sort: "top",
-  lang: "en",
-  limit: 50
-});
+**Tool Call:** `search_posts`
 
-console.log(`Found ${results.posts.length} posts`);
+**Parameters (JSON):**
+```json
+{
+  "q": "machine learning",
+  "sort": "top",
+  "lang": "en",
+  "limit": 50
+}
+```
 
-// Search by author
-const authorPosts = await searchPosts({
-  q: "typescript",
-  author: "alice.bsky.social"
-});
+**Search by Author:**
 
-// Search with date range
-const recentPosts = await searchPosts({
-  q: "atproto",
-  since: "2024-01-01T00:00:00Z",
-  until: "2024-01-31T23:59:59Z"
-});
+**User Request:**
+```
+"Find alice's posts about TypeScript"
+```
+
+**Parameters (JSON):**
+```json
+{
+  "q": "typescript",
+  "author": "alice.bsky.social"
+}
+```
+
+**Search with Date Range:**
+
+**User Request:**
+```
+"Search for posts about atproto from January 2024"
+```
+
+**Parameters (JSON):**
+```json
+{
+  "q": "atproto",
+  "since": "2024-01-01T00:00:00Z",
+  "until": "2024-01-31T23:59:59Z"
+}
 ```
 
 ### Get Timeline
 
-```typescript
-import { getTimeline } from './tools/get-timeline';
+**User Request:**
+```
+"Show me my timeline"
+```
 
-const timeline = await getTimeline({
-  limit: 50
-});
+**Tool Call:** `get_timeline`
 
-for (const item of timeline.feed) {
-  const post = item.post;
-  console.log(`${post.author.displayName}: ${post.record.text}`);
-  console.log(`Likes: ${post.likeCount}, Reposts: ${post.repostCount}`);
+**Parameters (JSON):**
+```json
+{
+  "limit": 50
 }
+```
 
-// Paginate through timeline
-if (timeline.cursor) {
-  const nextPage = await getTimeline({
-    limit: 50,
-    cursor: timeline.cursor
-  });
+**Response (JSON):**
+```json
+{
+  "success": true,
+  "feed": [
+    {
+      "post": {
+        "uri": "at://...",
+        "author": {
+          "displayName": "Alice",
+          "handle": "alice.bsky.social"
+        },
+        "record": {
+          "text": "Post content here"
+        },
+        "likeCount": 42,
+        "repostCount": 15
+      }
+    }
+  ],
+  "cursor": "next-page-cursor"
+}
+```
+
+**Paginate to Next Page:**
+
+**Parameters (JSON):**
+```json
+{
+  "limit": 50,
+  "cursor": "next-page-cursor"
 }
 ```
 
 ### Explore Custom Feeds
 
-```typescript
-import { getCustomFeed } from './tools/get-custom-feed';
+**User Request:**
+```
+"Show me posts from the tech feed"
+```
 
-const feed = await getCustomFeed({
-  feed: "at://did:plc:abc123/app.bsky.feed.generator/tech-feed",
-  limit: 30
-});
+**Tool Call:** `get_custom_feed`
 
-console.log(`Feed has ${feed.feed.length} posts`);
+**Parameters (JSON):**
+```json
+{
+  "feed": "at://did:plc:abc123/app.bsky.feed.generator/tech-feed",
+  "limit": 30
+}
 ```
 
 ## Social Graph Analysis
 
 ### Get Followers
 
-```typescript
-import { getFollowers } from './tools/get-followers';
-
-const followers = await getFollowers({
-  actor: "alice.bsky.social",
-  limit: 100
-});
-
-console.log(`${followers.subject.displayName} has ${followers.followers.length} followers`);
-
-// Analyze followers
-const verifiedFollowers = followers.followers.filter(
-  f => f.displayName && f.avatar
-);
-console.log(`Verified profiles: ${verifiedFollowers.length}`);
+**User Request:**
 ```
+"Show me alice.bsky.social's followers"
+```
+
+**Tool Call:** `get_followers`
+
+**Parameters (JSON):**
+```json
+{
+  "actor": "alice.bsky.social",
+  "limit": 100
+}
+```
+
+**Response (JSON):**
+```json
+{
+  "success": true,
+  "subject": {
+    "did": "did:plc:alice123",
+    "handle": "alice.bsky.social",
+    "displayName": "Alice Smith"
+  },
+  "followers": [
+    {
+      "did": "did:plc:bob456",
+      "handle": "bob.bsky.social",
+      "displayName": "Bob Jones",
+      "avatar": "https://..."
+    }
+  ],
+  "cursor": "next-page-cursor"
+}
+```
+
+**Analysis:** The LLM can analyze the response to count verified profiles (those with `displayName` and `avatar`).
 
 ### Get Following
 
-```typescript
-import { getFollows } from './tools/get-follows';
-
-const follows = await getFollows({
-  actor: "alice.bsky.social",
-  limit: 100
-});
-
-console.log(`Following ${follows.follows.length} users`);
+**User Request:**
+```
+"Who does alice.bsky.social follow?"
 ```
 
-### Find Mutual Follows
+**Tool Call:** `get_follows`
 
-```typescript
-async function findMutualFollows(userHandle: string) {
-  const [followers, following] = await Promise.all([
-    getFollowers({ actor: userHandle, limit: 100 }),
-    getFollows({ actor: userHandle, limit: 100 })
-  ]);
-  
-  const followerDids = new Set(followers.followers.map(f => f.did));
-  const mutuals = following.follows.filter(f => followerDids.has(f.did));
-  
-  console.log(`Found ${mutuals.length} mutual follows`);
-  return mutuals;
+**Parameters (JSON):**
+```json
+{
+  "actor": "alice.bsky.social",
+  "limit": 100
 }
 ```
+
+**Response (JSON):**
+```json
+{
+  "success": true,
+  "subject": {
+    "did": "did:plc:alice123",
+    "handle": "alice.bsky.social"
+  },
+  "follows": [
+    {
+      "did": "did:plc:charlie789",
+      "handle": "charlie.bsky.social",
+      "displayName": "Charlie Brown"
+    }
+  ]
+}
+```
+
+### Find Mutual Follows Workflow
+
+**User Request:**
+```
+"Find mutual follows for alice.bsky.social"
+```
+
+**Step 1: Get Followers**
+
+**Tool Call:** `get_followers`
+
+**Parameters (JSON):**
+```json
+{
+  "actor": "alice.bsky.social",
+  "limit": 100
+}
+```
+
+**Step 2: Get Following**
+
+**Tool Call:** `get_follows`
+
+**Parameters (JSON):**
+```json
+{
+  "actor": "alice.bsky.social",
+  "limit": 100
+}
+```
+
+**Step 3: Analysis**
+
+The LLM compares the two lists to find users who appear in both `followers` and `follows` arrays (matching by `did`).
 
 ## Best Practices
 
 ### Rate Limiting
 
-```typescript
-class RateLimiter {
-  private queue: Array<() => Promise<any>> = [];
-  private processing = false;
-  
-  async add<T>(fn: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => {
-      this.queue.push(async () => {
-        try {
-          const result = await fn();
-          resolve(result);
-        } catch (error) {
-          reject(error);
-        }
-      });
-      
-      this.process();
-    });
-  }
-  
-  private async process() {
-    if (this.processing || this.queue.length === 0) return;
-    
-    this.processing = true;
-    
-    while (this.queue.length > 0) {
-      const fn = this.queue.shift()!;
-      await fn();
-      await sleep(1000); // 1 second between requests
-    }
-    
-    this.processing = false;
-  }
+**Concept:** Space out multiple operations to avoid rate limits
+
+When performing multiple operations in sequence, wait between each call:
+
+**Example: Creating Multiple Posts**
+
+```
+1. Create first post
+2. Wait 1-2 seconds
+3. Create second post
+4. Wait 1-2 seconds
+5. Create third post
+```
+
+**Tool Calls:**
+
+```json
+// First post
+{
+  "text": "Post 1"
 }
 
-const limiter = new RateLimiter();
+// Wait 1-2 seconds, then second post
+{
+  "text": "Post 2"
+}
 
-// Use rate limiter
-await limiter.add(() => createPost({ text: "Post 1" }));
-await limiter.add(() => createPost({ text: "Post 2" }));
+// Wait 1-2 seconds, then third post
+{
+  "text": "Post 3"
+}
 ```
+
+**Rate Limit Guidelines:**
+- **Posts:** Wait 1-2 seconds between posts
+- **Likes:** Wait 0.5-1 seconds between likes
+- **Follows:** Wait 1-2 seconds between follows
+- **Searches:** Can be done more frequently, but monitor for rate limit errors
 
 ### Error Handling
 
-```typescript
-async function safeCreatePost(text: string) {
-  try {
-    return await createPost({ text });
-  } catch (error) {
-    if (error.code === 'RATE_LIMIT_EXCEEDED') {
-      console.log(`Rate limited, waiting ${error.retryAfter}s`);
-      await sleep(error.retryAfter * 1000);
-      return await createPost({ text });
-    }
-    throw error;
-  }
+**Handling Rate Limit Errors:**
+
+When a tool returns a rate limit error:
+
+**Error Response (JSON):**
+```json
+{
+  "error": "Rate limit exceeded. Please try again later.",
+  "code": "RATE_LIMIT_EXCEEDED",
+  "retryAfter": 60
 }
 ```
+
+**Recommended Action:**
+1. Inform the user about the rate limit
+2. Wait for the `retryAfter` duration (in seconds)
+3. Retry the operation
+
+**Example LLM Response:**
+```
+"I've hit the rate limit. I'll wait 60 seconds and try again."
+```
+
+**Handling Authentication Errors:**
+
+**Error Response (JSON):**
+```json
+{
+  "error": "Authentication required",
+  "code": "AUTHENTICATION_FAILED"
+}
+```
+
+**Recommended Action:**
+Inform the user that authentication is required for this operation.
 
 ## See Also
 

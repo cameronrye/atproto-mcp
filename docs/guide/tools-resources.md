@@ -82,13 +82,13 @@ Through your LLM client:
 "Search for posts about artificial intelligence"
 ```
 
-The LLM will call:
-```typescript
-search_posts({
-  q: "artificial intelligence",
-  limit: 25,
-  sort: "latest"
-})
+The LLM will call `search_posts` with:
+```json
+{
+  "q": "artificial intelligence",
+  "limit": 25,
+  "sort": "latest"
+}
 ```
 
 ### Tool with Parameters
@@ -97,12 +97,12 @@ search_posts({
 "Create a post saying 'Hello from AT Protocol!' in English"
 ```
 
-The LLM will call:
-```typescript
-create_post({
-  text: "Hello from AT Protocol!",
-  langs: ["en"]
-})
+The LLM will call `create_post` with:
+```json
+{
+  "text": "Hello from AT Protocol!",
+  "langs": ["en"]
+}
 ```
 
 ### Chained Tool Calls
@@ -112,8 +112,23 @@ create_post({
 ```
 
 The LLM will:
-1. Call `search_posts({ q: "AI", sort: "top", limit: 1 })`
-2. Call `like_post({ uri: "at://..." })`
+
+1. Call `search_posts` with:
+```json
+{
+  "q": "AI",
+  "sort": "top",
+  "limit": 1
+}
+```
+
+2. Call `like_post` with:
+```json
+{
+  "uri": "at://...",
+  "cid": "bafyrei..."
+}
+```
 
 ## Tool Authentication Modes
 

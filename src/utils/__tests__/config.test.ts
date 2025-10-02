@@ -11,7 +11,7 @@ describe('ConfigManager', () => {
   beforeEach(() => {
     // Mock console to reduce test noise
     mockConsole();
-    
+
     // Clear environment variables
     delete process.env.ATPROTO_SERVICE;
     delete process.env.ATPROTO_IDENTIFIER;
@@ -96,13 +96,14 @@ describe('ConfigManager', () => {
 
       try {
         await expectToThrow(
-          () => new ConfigManager({
-            atproto: {
-              service: 'https://bsky.social',
-              authMethod: 'app-password',
-              password: 'test-password',
-            },
-          }),
+          () =>
+            new ConfigManager({
+              atproto: {
+                service: 'https://bsky.social',
+                authMethod: 'app-password',
+                password: 'test-password',
+              },
+            }),
           ConfigurationError,
           /requires both identifier and password/
         );
@@ -118,13 +119,14 @@ describe('ConfigManager', () => {
 
       try {
         await expectToThrow(
-          () => new ConfigManager({
-            atproto: {
-              service: 'https://bsky.social',
-              authMethod: 'app-password',
-              identifier: 'test.bsky.social',
-            },
-          }),
+          () =>
+            new ConfigManager({
+              atproto: {
+                service: 'https://bsky.social',
+                authMethod: 'app-password',
+                identifier: 'test.bsky.social',
+              },
+            }),
           ConfigurationError,
           /requires both identifier and password/
         );
@@ -153,13 +155,14 @@ describe('ConfigManager', () => {
 
       try {
         await expectToThrow(
-          () => new ConfigManager({
-            atproto: {
-              service: 'https://bsky.social',
-              authMethod: 'oauth',
-              clientSecret: 'test-client-secret',
-            },
-          }),
+          () =>
+            new ConfigManager({
+              atproto: {
+                service: 'https://bsky.social',
+                authMethod: 'oauth',
+                clientSecret: 'test-client-secret',
+              },
+            }),
           ConfigurationError,
           /requires both clientId and clientSecret/
         );
@@ -178,14 +181,15 @@ describe('ConfigManager', () => {
 
     it('should throw error for invalid service URL', async () => {
       await expectToThrow(
-        () => new ConfigManager({
-          atproto: {
-            service: 'not-a-url',
-            authMethod: 'app-password',
-            identifier: 'test',
-            password: 'test',
-          },
-        }),
+        () =>
+          new ConfigManager({
+            atproto: {
+              service: 'not-a-url',
+              authMethod: 'app-password',
+              identifier: 'test',
+              password: 'test',
+            },
+          }),
         ConfigurationError,
         /validation failed/
       );

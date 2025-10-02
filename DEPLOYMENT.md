@@ -2,6 +2,18 @@
 
 This guide covers deploying the AT Protocol MCP Server in production environments.
 
+## Overview
+
+This deployment guide is for **deploying the MCP server infrastructure** that LLM clients connect to. The MCP server acts as middleware between LLM clients (like Claude Desktop) and the AT Protocol ecosystem.
+
+**Deployment scenarios:**
+- **Personal use**: Run locally for your own LLM client
+- **Team deployment**: Shared server for multiple users' LLM clients
+- **Enterprise**: Scalable infrastructure for organization-wide LLM access to AT Protocol
+- **Custom integrations**: Deploy for your own MCP-compatible applications
+
+**Note**: End users don't interact with this server directly. They interact with their LLM client, which connects to this MCP server via the MCP protocol.
+
 ## Prerequisites
 
 - Docker and Docker Compose

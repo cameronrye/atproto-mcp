@@ -5,7 +5,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AtpClient } from '../atp-client.js';
 import { AuthenticationError, AtpError } from '../../types/index.js';
-import { mockConsole, expectToThrow, createMockAtpConfig, createMockSession } from '../../test/setup.js';
+import {
+  mockConsole,
+  expectToThrow,
+  createMockAtpConfig,
+  createMockSession,
+} from '../../test/setup.js';
 
 // Mock the @atproto/api module
 vi.mock('@atproto/api', () => ({
@@ -67,11 +72,7 @@ describe('AtpClient', () => {
         error: 'Invalid credentials',
       });
 
-      await expectToThrow(
-        () => client.initialize(),
-        AuthenticationError,
-        /authentication failed/
-      );
+      await expectToThrow(() => client.initialize(), AuthenticationError, /authentication failed/);
     });
 
     it('should throw error for OAuth (requires user interaction)', async () => {
@@ -106,18 +107,20 @@ describe('AtpClient', () => {
       const persistSession = constructorCall?.[0]?.persistSession;
 
       await client.initialize();
-      
+
       // Simulate session create event
       if (persistSession) {
         persistSession('create', mockSession);
       }
 
       expect(client.isAuthenticated()).toBe(true);
-      expect(client.getSession()).toEqual(expect.objectContaining({
-        did: mockSession.did,
-        handle: mockSession.handle,
-        active: true,
-      }));
+      expect(client.getSession()).toEqual(
+        expect.objectContaining({
+          did: mockSession.did,
+          handle: mockSession.handle,
+          active: true,
+        })
+      );
     });
 
     it('should handle session refresh', async () => {
@@ -207,10 +210,10 @@ describe('AtpClient', () => {
     });
 
     it('should handle rate limit errors', async () => {
-      const error = { 
-        status: 429, 
+      const error = {
+        status: 429,
         message: 'Rate limited',
-        headers: { 'retry-after': '60' }
+        headers: { 'retry-after': '60' },
       };
       const operation = vi.fn().mockRejectedValue(error);
 

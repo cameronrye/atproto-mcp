@@ -103,12 +103,16 @@ graph TB
 
 ## Use Cases
 
-- **Social Media Automation**: Automate posting, engagement, and content management
-- **Content Analysis**: Analyze social media trends and user behavior
-- **Community Management**: Manage communities and moderate content
-- **Data Integration**: Integrate AT Protocol data with other systems
-- **Research & Analytics**: Conduct social media research and analytics
-- **Bot Development**: Create intelligent social media bots
+This MCP server enables LLMs to provide powerful AT Protocol capabilities through natural language interaction:
+
+- **LLM-Powered Social Automation**: Enable AI assistants to manage posting, engagement, and content on behalf of users through conversational commands
+- **AI-Driven Content Analysis**: Allow LLMs to analyze social media trends and user behavior through natural language queries and provide insights
+- **Intelligent Community Management**: Empower LLMs to help users manage communities, moderate content, and engage with followers
+- **Conversational Data Integration**: Let LLMs integrate AT Protocol data with other systems through natural language workflows
+- **AI-Assisted Research & Analytics**: Enable LLMs to conduct social media research and analytics by querying and processing AT Protocol data
+- **Smart Bot Development**: Build intelligent social media bots where LLMs handle natural language understanding and this server handles AT Protocol actions
+
+**How it works**: Users interact with their LLM client (like Claude Desktop) in natural language, and the LLM uses this MCP server to access AT Protocol functionality. For example, a user might say "Search for trending posts about AI and summarize them," and the LLM would use the `search_posts` tool to fulfill that request.
 
 ## Community
 

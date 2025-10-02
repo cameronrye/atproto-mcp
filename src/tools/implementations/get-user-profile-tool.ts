@@ -16,12 +16,28 @@ const GetUserProfileSchema = z.object({
 
 /**
  * Tool for retrieving user profiles from AT Protocol
+ *
+ * AUTHENTICATION BEHAVIOR:
+ * - Works in both authenticated and unauthenticated modes (ToolAuthMode.ENHANCED)
+ * - In unauthenticated mode: Returns basic profile information (handle, display name,
+ *   description, avatar, follower counts, etc.)
+ * - In authenticated mode: Returns the same basic information PLUS viewer-specific
+ *   data such as:
+ *   - Whether you follow this user (viewer.following)
+ *   - Whether this user follows you (viewer.followedBy)
+ *   - Whether you have muted this user (viewer.muted)
+ *   - Whether you have blocked this user (viewer.blocking)
+ *   - Whether this user has blocked you (viewer.blockedBy)
+ *
+ * The difference in data comes from the AT Protocol API itself, not from this tool's
+ * implementation. The tool calls the same agent.getProfile() method in both modes,
+ * but the AT Protocol API returns different data based on authentication state.
  */
 export class GetUserProfileTool extends BaseTool {
   public readonly schema = {
     method: 'get_user_profile',
     description:
-      'Retrieve a user profile from AT Protocol. Returns detailed profile information including stats and verification status.',
+      'Retrieve a user profile from AT Protocol. Returns detailed profile information including stats and verification status. Works without authentication but provides additional viewer-specific data (following status, muted/blocked status) when authenticated.',
     params: GetUserProfileSchema,
   };
 

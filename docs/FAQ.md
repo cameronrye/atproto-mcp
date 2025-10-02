@@ -6,63 +6,94 @@ Common questions and answers about the AT Protocol MCP Server.
 
 ### What is the AT Protocol MCP Server?
 
-The AT Protocol MCP Server is a Model Context Protocol (MCP) server that provides tools and resources for interacting with the AT Protocol ecosystem, including Bluesky and other AT Protocol-based social networks.
+The AT Protocol MCP Server is a **Model Context Protocol (MCP) server** that enables **Large Language Models (LLMs)** to interact with the AT Protocol ecosystem, including Bluesky and other AT Protocol-based social networks.
+
+**Key Point**: This is not a direct-use API or SDK. It's middleware that LLM clients (like Claude Desktop) connect to via the MCP protocol.
 
 ### What is MCP?
 
-MCP (Model Context Protocol) is a protocol that allows AI assistants and applications to access external tools and data sources in a standardized way. It enables seamless integration between AI models and various services.
+MCP (Model Context Protocol) is an open protocol that standardizes how **LLM clients** access external tools and data sources. It enables AI assistants to seamlessly integrate with various services through a JSON-RPC 2.0 interface.
 
-### What can I do with this server?
+### How does this work?
 
-You can:
-- Create and manage posts
+```
+You (User) → LLM Client (Claude Desktop) → MCP Protocol → This Server → AT Protocol → Bluesky
+```
+
+1. **You** interact with your LLM client in natural language
+2. **Your LLM client** (e.g., Claude Desktop) decides to use this MCP server
+3. **The MCP server** translates LLM requests into AT Protocol API calls
+4. **Results** flow back through the chain to your LLM client
+5. **Your LLM** presents the information to you in natural language
+
+### What can LLMs do through this server?
+
+When connected to this MCP server, LLMs can help users:
+- Create and manage posts on Bluesky
 - Follow and interact with users
 - Search and discover content
 - Stream real-time data from the firehose
-- Build bots and automation
 - Access user profiles and timelines
-- Manage OAuth authentication
+- Manage authentication and sessions
+
+**Example**: You ask your LLM client "Search for posts about AI from this week", and the LLM uses this MCP server's `search_posts` tool to fulfill your request.
 
 ## Installation and Setup
 
-### How do I install the server?
+### How do I set up this MCP server with my LLM client?
 
-```bash
-npm install atproto-mcp
-```
+The setup process depends on your LLM client. For **Claude Desktop**:
 
-Or clone the repository:
-```bash
-git clone https://github.com/cameronrye/atproto-mcp.git
-cd atproto-mcp
-npm install
-npm run build
-```
+1. **Install the server** (if not using npx):
+   ```bash
+   npm install -g atproto-mcp
+   ```
+
+2. **Configure Claude Desktop** to use the MCP server:
+
+   Edit your Claude Desktop MCP configuration file and add:
+   ```json
+   {
+     "mcpServers": {
+       "atproto": {
+         "command": "npx",
+         "args": ["atproto-mcp"],
+         "env": {
+           "ATPROTO_IDENTIFIER": "your-handle.bsky.social",
+           "ATPROTO_PASSWORD": "your-app-password"
+         }
+       }
+     }
+   }
+   ```
+
+3. **Restart Claude Desktop** - it will automatically connect to the MCP server
+
+4. **Start using it** - Ask Claude to search posts, create content, etc.
 
 ### What are the system requirements?
 
-- Node.js 18 or higher
-- npm or yarn
+For running the MCP server:
+- Node.js 20 or higher
+- npm or pnpm
 - Internet connection for AT Protocol API access
 
-### How do I configure the server?
+For using the MCP server:
+- An MCP-compatible LLM client (Claude Desktop, etc.)
 
-Set environment variables:
+### Can I run the server standalone?
 
-**For App Password authentication:**
+Yes, for development or custom integrations:
+
 ```bash
-export ATPROTO_SERVICE=https://bsky.social
-export ATPROTO_IDENTIFIER=your-handle.bsky.social
-export ATPROTO_PASSWORD=your-app-password
+# Install globally
+npm install -g atproto-mcp
+
+# Run the server
+atproto-mcp
 ```
 
-**For OAuth authentication:**
-```bash
-export ATPROTO_SERVICE=https://bsky.social
-export OAUTH_CLIENT_ID=your-client-id
-export OAUTH_CLIENT_SECRET=your-client-secret
-export OAUTH_REDIRECT_URI=https://your-app.com/callback
-```
+However, most users should configure their LLM client to launch the server automatically.
 
 ## Authentication
 
@@ -90,147 +121,149 @@ The server automatically refreshes OAuth tokens when they expire. You can also m
 
 ### Can I use the server without authentication?
 
-Yes! Many tools work without authentication for accessing public data:
-- `search_posts`
-- `get_user_profile`
-- `get_followers`
-- `get_follows`
-- `get_thread`
-- `get_custom_feed`
+Yes! Many MCP tools work without authentication for accessing public data:
+- `search_posts` - Search public posts
+- `get_user_profile` - View public profiles
+- `get_followers` / `get_follows` - View public social graphs
+- `get_thread` - Read public conversations
+- `get_custom_feed` - Browse public feeds
 
-## Usage Questions
+## How LLMs Use This Server
 
-### How do I create a post?
+### How does an LLM interact with this MCP server?
 
-```typescript
-await createPost({
-  text: "Hello from AT Protocol!"
-});
-```
+LLMs don't write code or make HTTP requests. Instead, they use the **MCP protocol** (JSON-RPC 2.0):
 
-### How do I post with images?
+1. **LLM discovers available tools** by calling `tools/list`
+2. **LLM reads tool descriptions** to understand what each tool does
+3. **LLM decides which tool to use** based on user's request
+4. **LLM calls the tool** via MCP protocol with appropriate parameters
+5. **Server executes the tool** and returns results
+6. **LLM presents results** to the user in natural language
 
-```typescript
-const imageBlob = new Blob([imageData], { type: 'image/jpeg' });
+### Example: Creating a Post
 
-await createPost({
-  text: "Check out this photo!",
-  embed: {
-    images: [{
-      alt: "Description of image",
-      image: imageBlob
-    }]
+**User says to their LLM client:**
+> "Create a post saying 'Hello from AT Protocol!'"
+
+**What happens behind the scenes:**
+
+1. LLM client sends MCP request to this server:
+   ```json
+   {
+     "method": "tools/call",
+     "params": {
+       "name": "create_post",
+       "arguments": {
+         "text": "Hello from AT Protocol!"
+       }
+     }
+   }
+   ```
+
+2. Server executes the `create_post` tool via AT Protocol API
+
+3. Server returns MCP response:
+   ```json
+   {
+     "content": [{
+       "type": "text",
+       "text": "Post created successfully at at://did:plc:xyz.../app.bsky.feed.post/abc123"
+     }]
+   }
+   ```
+
+4. LLM tells the user: "I've created your post on Bluesky!"
+
+### Example: Searching Posts
+
+**User says:**
+> "Find posts about artificial intelligence from this week"
+
+**LLM client sends:**
+```json
+{
+  "method": "tools/call",
+  "params": {
+    "name": "search_posts",
+    "arguments": {
+      "q": "artificial intelligence",
+      "sort": "latest",
+      "limit": 25
+    }
   }
-});
+}
 ```
 
-### How do I reply to a post?
-
-```typescript
-await replyToPost({
-  text: "Great post!",
-  root: rootPostUri,
-  parent: parentPostUri
-});
-```
-
-### How do I search for posts?
-
-```typescript
-const results = await searchPosts({
-  q: "atproto",
-  sort: "latest",
-  limit: 50
-});
-```
-
-### How do I start streaming real-time data?
-
-```typescript
-// Start streaming
-await startStreaming({
-  subscriptionId: "my-stream",
-  collections: ["app.bsky.feed.post"]
-});
-
-// Poll for events
-setInterval(async () => {
-  const events = await getRecentEvents({ limit: 20 });
-  // Process events
-}, 5000);
-```
+**Server returns search results, LLM summarizes them for the user.**
 
 ## Rate Limiting
 
 ### What are the rate limits?
 
-AT Protocol has various rate limits:
+AT Protocol has various rate limits enforced by the PDS (Personal Data Server):
 - **Posts**: ~300 per hour
 - **Likes**: ~1000 per hour
 - **Follows**: ~100 per hour
 - **Searches**: ~300 per hour
 
-Exact limits may vary by PDS (Personal Data Server).
+Exact limits may vary by PDS.
 
-### How do I handle rate limits?
+### How does the MCP server handle rate limits?
 
-The server returns rate limit errors with a `retryAfter` value:
+The server automatically handles rate limiting:
 
-```typescript
-try {
-  await createPost({ text: "Hello!" });
-} catch (error) {
-  if (error.code === 'RATE_LIMIT_EXCEEDED') {
-    await sleep(error.retryAfter * 1000);
-    // Retry
-  }
-}
-```
+1. **Detects rate limit errors** from AT Protocol API
+2. **Returns error to LLM client** with retry information
+3. **LLM explains to user**: "I've hit the rate limit. I'll need to wait a few minutes before continuing."
+
+The LLM client can then decide whether to retry after the rate limit resets.
 
 ### Can I increase rate limits?
 
-Rate limits are set by the PDS. Contact your PDS administrator for limit increases.
+Rate limits are set by the PDS (Personal Data Server). For Bluesky's official PDS, limits are fixed. If you're running a custom PDS, you can configure your own limits.
 
 ## Troubleshooting
 
+### My LLM client can't connect to the MCP server
+
+1. **Check your LLM client configuration** - Ensure the MCP server is properly configured
+2. **Verify the server is installed** - Run `npx atproto-mcp --version`
+3. **Check Node.js version** - Requires Node.js 20+
+4. **Review LLM client logs** - Look for MCP connection errors
+5. **Try running standalone** - Test with `npx atproto-mcp` to see if it starts
+
 ### I'm getting "Authentication failed" errors
 
-1. Check your credentials are correct
-2. Verify environment variables are set
-3. For app passwords, ensure it's not your main password
-4. For OAuth, verify client ID and secret
-5. Check if your session has expired
+When your LLM tries to create posts or access private data:
 
-### Posts aren't appearing immediately
+1. **Check credentials in MCP configuration** - Verify `ATPROTO_IDENTIFIER` and `ATPROTO_PASSWORD`
+2. **Use app password, not main password** - Generate an app password in Bluesky settings
+3. **Verify environment variables** - Ensure they're set in your LLM client's MCP config
+4. **Check session expiration** - The server will automatically refresh sessions
+
+### The LLM says posts aren't appearing
 
 This is normal. AT Protocol uses eventual consistency:
-- Posts may take a few seconds to appear
+- Posts may take a few seconds to appear in feeds
 - Search indexing can take longer
-- Use the firehose for real-time updates
+- The LLM can use the firehose for real-time updates
 
-### Images aren't uploading
+### The LLM can't upload images
 
-Check:
-- Image size (max 1MB)
-- Image format (JPEG, PNG, WebP supported)
-- File is properly read as Blob
-- You have authentication
+Common issues:
+- **Image size** - Max 1MB per image
+- **Image format** - JPEG, PNG, WebP supported
+- **Authentication required** - Image uploads need authenticated mode
+- **File encoding** - Ensure the LLM client properly encodes image data
 
 ### Streaming isn't working
 
-Verify:
-- Firehose connection is established
-- Subscription ID is unique
-- You're polling for events regularly
-- Network connection is stable
-
-### I'm getting "Invalid URI" errors
-
-Ensure:
-- URIs start with `at://`
-- DIDs start with `did:`
-- URIs are properly formatted
-- You're using the correct URI for the operation
+If your LLM can't access real-time data:
+- **Check firehose connection** - Server logs will show connection status
+- **Verify subscription** - Ensure unique subscription ID
+- **Network stability** - Streaming requires stable connection
+- **Collection filters** - Make sure you're subscribing to the right collections
 
 ## Performance
 
@@ -261,61 +294,96 @@ Limit concurrent requests to avoid rate limits:
 
 ### Can I contribute to the project?
 
-Yes! Contributions are welcome:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Submit a pull request
+Yes! Contributions are welcome. This project is for developers who want to:
+- **Add new MCP tools** for additional AT Protocol functionality
+- **Improve existing tools** with better error handling or features
+- **Enhance the MCP server** with performance improvements
+- **Extend documentation** to help others use the server
+
+See [CONTRIBUTING.md](../CONTRIBUTING.md) for guidelines.
 
 ### How do I report bugs?
 
 Open an issue on GitHub with:
-- Description of the bug
-- Steps to reproduce
-- Expected vs actual behavior
-- Environment details
-- Error messages/logs
+- **Description** - What's wrong with the MCP server?
+- **Steps to reproduce** - How can we recreate the issue?
+- **Expected vs actual behavior** - What should happen vs what does happen?
+- **Environment** - LLM client, Node.js version, OS
+- **Logs** - MCP server logs (with credentials redacted)
 
 ### Is there a test suite?
 
-Yes, run tests with:
+Yes! The MCP server has comprehensive tests:
+
 ```bash
+# Run all tests
 npm test
+
+# Run with coverage
+npm run test:coverage
+
+# Run in watch mode
+npm run test:watch
 ```
 
-### How do I debug issues?
+### How do I debug MCP server issues?
 
-Enable debug logging:
+Enable debug logging when running the server:
+
 ```bash
-export LOG_LEVEL=debug
+# In your LLM client's MCP configuration
+{
+  "mcpServers": {
+    "atproto": {
+      "command": "npx",
+      "args": ["atproto-mcp"],
+      "env": {
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}
+```
+
+Or run standalone with debug logging:
+```bash
+LOG_LEVEL=debug npx atproto-mcp
 ```
 
 ## Deployment
 
-### Can I deploy this in production?
+### Can I deploy this MCP server in production?
 
-Yes, but:
-- Use OAuth instead of app passwords
-- Implement proper error handling
-- Set up monitoring and logging
-- Use environment-specific configs
-- Follow security best practices
+Yes! You can deploy the MCP server for:
+- **Shared LLM access** - Multiple users' LLM clients connecting to one server
+- **Enterprise deployments** - Internal LLM tools accessing AT Protocol
+- **Custom integrations** - Your own MCP-compatible applications
+
+**Production considerations:**
+- Use OAuth instead of app passwords for multi-user scenarios
+- Implement proper error handling and monitoring
+- Set up logging and observability
+- Use environment-specific configurations
+- Follow security best practices (see [DEPLOYMENT.md](../DEPLOYMENT.md))
 
 ### What hosting options are available?
 
-The server can run on:
-- Local machines
-- VPS (DigitalOcean, Linode, etc.)
-- Cloud platforms (AWS, GCP, Azure)
-- Container platforms (Docker, Kubernetes)
-- Serverless (with limitations)
+The MCP server can run on:
+- **Local machines** - For personal LLM client use
+- **VPS** - DigitalOcean, Linode, etc. for remote access
+- **Cloud platforms** - AWS, GCP, Azure for scalability
+- **Container platforms** - Docker, Kubernetes for orchestration
+- **Serverless** - With limitations (MCP protocol requires persistent connections)
 
-### How do I scale the server?
+### How do I scale the MCP server?
 
-- Use load balancing for multiple instances
-- Implement distributed caching
-- Use message queues for async operations
-- Monitor and optimize bottlenecks
+For high-traffic deployments:
+- **Load balancing** - Multiple server instances behind a load balancer
+- **Distributed caching** - Redis for shared session/data cache
+- **Message queues** - For async operations and rate limiting
+- **Monitoring** - Prometheus + Grafana for observability
+
+See [DEPLOYMENT.md](../DEPLOYMENT.md) for detailed production deployment guides.
 
 ## Security
 
@@ -346,30 +414,52 @@ The server stores:
 
 ### Can I use custom PDS instances?
 
-Yes, set the `ATPROTO_SERVICE` environment variable to your PDS URL:
-```bash
-export ATPROTO_SERVICE=https://my-pds.example.com
+Yes! Configure the MCP server to use your custom PDS:
+
+```json
+{
+  "mcpServers": {
+    "atproto": {
+      "command": "npx",
+      "args": ["atproto-mcp"],
+      "env": {
+        "ATPROTO_SERVICE": "https://my-pds.example.com"
+      }
+    }
+  }
+}
 ```
 
-### How do I build a bot?
+### Can LLMs process the entire AT Protocol firehose?
 
-See the [Custom Integration Examples](./examples/custom-integration.md) for bot frameworks and patterns.
+Yes, the MCP server provides streaming tools for real-time data:
 
-### Can I process the entire firehose?
+**What LLMs can do:**
+- Subscribe to specific collections (posts, likes, follows, etc.)
+- Filter events by criteria
+- Process events in real-time
+- Build custom feeds and notifications
 
-Yes, but be aware:
-- High volume (thousands of events per second)
-- Requires significant resources
-- Use collection filters to reduce load
-- Consider distributed processing
+**Be aware:**
+- **High volume** - Thousands of events per second
+- **Resource intensive** - Requires significant memory/CPU
+- **Use filters** - Subscribe only to needed collections
+- **Consider limits** - May need distributed processing for full firehose
 
-### How do I handle deleted content?
+**Example user request:**
+> "Monitor the firehose for posts mentioning 'AI' and summarize trends"
 
-Deleted content may briefly appear in streams:
-- Check for delete operations in events
-- Handle 404 errors gracefully
-- Don't cache deleted content
-- Update UI when content is deleted
+The LLM would use the `start_streaming` tool with appropriate filters.
+
+### How does the MCP server handle deleted content?
+
+The server handles deletions gracefully:
+- **Delete events** are included in firehose streams
+- **404 errors** are returned for deleted content with clear messages
+- **LLMs are informed** when content is no longer available
+- **Caching** respects deletion events
+
+The LLM can explain to users: "That post has been deleted and is no longer available."
 
 ## Getting Help
 

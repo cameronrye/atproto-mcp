@@ -15,7 +15,7 @@
     "LICENSE"
   ],
   "scripts": {
-    "build": "tsc && chmod +x dist/cli.js",
+    "build": "tsc && node scripts/make-executable.js",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "test": "vitest",
@@ -26,12 +26,19 @@
     "format": "prettier --write src/**/*.ts",
     "format:check": "prettier --check src/**/*.ts",
     "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist",
+    "clean": "rimraf dist coverage .vitest",
+    "clean:all": "node scripts/clean-all.js",
+    "check": "npm run lint && npm run format:check && npm run type-check && npm run test",
+    "ci": "npm install && npm run check && npm run build",
     "prepare": "husky install",
     "prepublishOnly": "npm run clean && npm run build && vitest run",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
-    "docs:preview": "vitepress preview docs"
+    "docs:preview": "vitepress preview docs",
+    "help": "node scripts/help.js",
+    "status": "node scripts/status.js",
+    "deps:update": "npm update",
+    "deps:audit": "npm audit"
   },
   "keywords": [
     "mcp",
@@ -62,7 +69,8 @@
     "@modelcontextprotocol/sdk": "^1.0.0",
     "@types/ws": "^8.18.1",
     "ws": "^8.18.3",
-    "zod": "^3.22.4"
+    "zod": "^3.22.4",
+    "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
     "@types/node": "^20.10.0",
@@ -70,6 +78,8 @@
     "@typescript-eslint/parser": "^6.15.0",
     "@vitest/coverage-v8": "^1.6.1",
     "@vitest/ui": "^1.6.1",
+    "chalk": "^5.6.2",
+    "command-exists": "^1.2.9",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.1.0",
     "eslint-plugin-prettier": "^5.1.0",
@@ -77,6 +87,7 @@
     "lint-staged": "^15.2.0",
     "mermaid": "^11.12.0",
     "prettier": "^3.1.1",
+    "rimraf": "^6.0.1",
     "tsx": "^4.6.2",
     "typescript": "^5.3.3",
     "vitepress": "^1.6.4",

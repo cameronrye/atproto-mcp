@@ -60,7 +60,8 @@ export abstract class BaseResource implements IMcpResource {
 export class TimelineResource extends BaseResource {
   public readonly uri = 'atproto://timeline';
   public readonly name = 'User Timeline';
-  public readonly description = "Current user's timeline feed with recent posts";
+  public readonly description =
+    "Current user's timeline feed with recent posts. Requires authentication.";
   public readonly mimeType = 'application/json';
 
   constructor(atpClient: AtpClient) {
@@ -123,7 +124,8 @@ export class TimelineResource extends BaseResource {
 export class ProfileResource extends BaseResource {
   public readonly uri = 'atproto://profile';
   public readonly name = 'User Profile';
-  public readonly description = "Current user's profile information and statistics";
+  public readonly description =
+    "Current user's profile information and statistics. Requires authentication.";
   public readonly mimeType = 'application/json';
 
   constructor(atpClient: AtpClient) {
@@ -191,7 +193,8 @@ export class ProfileResource extends BaseResource {
 export class NotificationsResource extends BaseResource {
   public readonly uri = 'atproto://notifications';
   public readonly name = 'User Notifications';
-  public readonly description = "Current user's recent notifications and mentions";
+  public readonly description =
+    "Current user's recent notifications and mentions. Requires authentication.";
   public readonly mimeType = 'application/json';
 
   constructor(atpClient: AtpClient) {

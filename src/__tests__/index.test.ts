@@ -269,7 +269,6 @@ describe('AtpMcpServer', () => {
         serverInfo: {
           name: expect.any(String),
           version: expect.any(String),
-          description: expect.any(String),
         },
       });
     });

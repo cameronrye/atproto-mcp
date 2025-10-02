@@ -20,7 +20,8 @@ const FollowUserSchema = z.object({
 export class FollowUserTool extends BaseTool {
   public readonly schema = {
     method: 'follow_user',
-    description: 'Follow a user on AT Protocol. Creates a follow record for the specified user.',
+    description:
+      'Follow a user on AT Protocol. Creates a follow record for the specified user. Requires authentication.',
     params: FollowUserSchema,
   };
 
