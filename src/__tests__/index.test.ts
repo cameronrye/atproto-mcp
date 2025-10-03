@@ -354,4 +354,42 @@ describe('AtpMcpServer', () => {
       expect(configManager).toBe(mockConfigManager);
     });
   });
+
+  describe('getConnectionPool', () => {
+    it('should return connection pool', () => {
+      const server = new AtpMcpServer();
+      const pool = server.getConnectionPool();
+
+      expect(pool).toBeDefined();
+    });
+  });
+
+  describe('getWebSocketManager', () => {
+    it('should return WebSocket manager', () => {
+      const server = new AtpMcpServer();
+      const wsManager = server.getWebSocketManager();
+
+      expect(wsManager).toBeDefined();
+    });
+  });
+
+  describe('getSecurityManager', () => {
+    it('should return security manager', () => {
+      const server = new AtpMcpServer();
+      const securityManager = server.getSecurityManager();
+
+      expect(securityManager).toBeDefined();
+    });
+  });
+
+  describe('getSystemMetrics', () => {
+    it('should return comprehensive system metrics', () => {
+      const server = new AtpMcpServer();
+      const metrics = server.getSystemMetrics();
+
+      expect(metrics).toBeDefined();
+      expect(metrics.performance).toBeDefined();
+      expect(metrics.security).toBeDefined();
+    });
+  });
 });
