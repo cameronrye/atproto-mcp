@@ -52,6 +52,10 @@ const CreatePostSchema = z.object({
 
 /**
  * Tool for creating new posts on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to create posts
  */
 export class CreatePostTool extends BaseTool {
   public readonly schema = {

@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type { ATURI, CID, ILikePostParams } from '../../types/index.js';
 
@@ -17,6 +17,10 @@ const LikePostSchema = z.object({
 
 /**
  * Tool for liking posts on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to like posts
  */
 export class LikePostTool extends BaseTool {
   public readonly schema = {
@@ -27,7 +31,7 @@ export class LikePostTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'LikePost');
+    super(atpClient, 'LikePost', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: ILikePostParams): Promise<{
@@ -165,6 +169,10 @@ export class LikePostTool extends BaseTool {
 
 /**
  * Unlike Post Tool - Removes likes from posts on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to unlike posts
  */
 export class UnlikePostTool extends BaseTool {
   public readonly schema = {
@@ -176,7 +184,7 @@ export class UnlikePostTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'UnlikePost');
+    super(atpClient, 'UnlikePost', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: { likeUri: string }): Promise<{

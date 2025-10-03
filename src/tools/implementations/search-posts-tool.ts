@@ -29,17 +29,22 @@ const SearchPostsSchema = z.object({
 
 /**
  * Tool for searching posts on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - As of 2025, the AT Protocol search API requires authentication
+ * - Previously this was a public endpoint, but the API has changed
+ * - This tool now requires valid credentials to function
  */
 export class SearchPostsTool extends BaseTool {
   public readonly schema = {
     method: 'search_posts',
     description:
-      'Search for posts on AT Protocol. Supports text search with various filters including author, language, date range, and more. No authentication required.',
+      'Search for posts on AT Protocol. Supports text search with various filters including author, language, date range, and more. Requires authentication (AT Protocol API changed in 2025 to require auth for search).',
     params: SearchPostsSchema,
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'SearchPosts', ToolAuthMode.PUBLIC);
+    super(atpClient, 'SearchPosts', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: ISearchPostsParams): Promise<{
@@ -89,10 +94,10 @@ export class SearchPostsTool extends BaseTool {
       if (params.domain) searchParams.domain = params.domain;
       if (params.url) searchParams.url = params.url;
 
-      // Execute search using AT Protocol (public endpoint)
+      // Execute search using AT Protocol (requires authentication as of 2025)
       const response = await this.executeAtpOperation(
         async () => {
-          const agent = this.atpClient.getPublicAgent();
+          const agent = this.atpClient.getAgent();
           return await agent.app.bsky.feed.searchPosts(searchParams);
         },
         'searchPosts',

@@ -244,11 +244,12 @@ describe('MCP Integration Tests', () => {
       expect(toolNames.length).toBeGreaterThan(0);
 
       // Check for tools that should always be available (public/enhanced mode)
-      expect(toolNames).toContain('search_posts'); // PUBLIC mode
       expect(toolNames).toContain('get_user_profile'); // ENHANCED mode
+      expect(toolNames).toContain('start_oauth_flow'); // PUBLIC mode
 
-      // Note: create_post, like_post, follow_user are PRIVATE mode tools that may be filtered out
+      // Note: search_posts, create_post, like_post, follow_user are PRIVATE mode tools that may be filtered out
       // due to authentication mocking complexities in the test environment
+      // search_posts was changed to PRIVATE in 2025 when AT Protocol API started requiring auth
     });
   });
 

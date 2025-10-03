@@ -126,11 +126,11 @@ npx atproto-mcp
 3. **Interact in natural language** - Ask your LLM to search posts, view profiles, etc.
 
 **What your LLM can do in unauthenticated mode:**
-- ✅ Search posts and hashtags (`search_posts`)
 - ✅ View user profiles (`get_user_profile` - works without auth, provides additional viewer-specific data when authenticated)
 - ✅ Manage OAuth authentication flows (`start_oauth_flow`, `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`)
 
 **Note:** The following features require authentication:
+- ❌ Searching posts and hashtags (`search_posts`) - **API changed in 2025 to require authentication**
 - ❌ Viewing follower/following lists (`get_followers`, `get_follows`)
 - ❌ Browsing feeds and threads (`get_thread`, `get_custom_feed`, `get_timeline`)
 - ❌ All write operations (create, like, repost, follow, etc.)
@@ -176,14 +176,15 @@ The server provides **30+ MCP tools** across multiple categories. See the [compl
 ### 🔓 Public Tools (No Authentication Required)
 
 **Data Retrieval**
-- `search_posts` - Search for posts and content across the network
-- `get_user_profile` - Retrieve basic user information (enhanced with authentication)
+- `get_user_profile` - Retrieve basic user information (ENHANCED mode: works without auth, provides additional viewer-specific data when authenticated)
 
 **OAuth Management**
 - `start_oauth_flow` - Initiate OAuth authentication
 - `handle_oauth_callback` - Complete OAuth flow
 - `refresh_oauth_tokens` - Refresh authentication tokens
 - `revoke_oauth_tokens` - Revoke OAuth tokens
+
+**Note:** As of 2025, the AT Protocol API has changed to require authentication for most endpoints that were previously public, including `search_posts`.
 
 ### 🔐 Private Tools (Authentication Required)
 
@@ -196,7 +197,7 @@ The server provides **30+ MCP tools** across multiple categories. See the [compl
 - `follow_user` / `unfollow_user` - Follow and unfollow users
 
 **Data Retrieval**
-- `get_user_profiles` - Get multiple user profiles at once
+- `search_posts` - Search for posts and content across the network (⚠️ API changed in 2025 to require auth)
 - `get_followers` - Get follower lists
 - `get_follows` - Get following lists
 - `get_thread` - View post threads and conversations
@@ -292,6 +293,11 @@ npm run start            # Start production server
 # Testing & Quality
 npm test                 # Run tests
 npm run test:coverage    # Run tests with coverage
+npm run test:ui          # Run tests with interactive UI
+
+# Integration Tests (connects to real AT Protocol servers)
+npm run test:integration
+
 npm run lint             # Run ESLint
 npm run lint:fix         # Fix linting issues
 npm run format           # Format code with Prettier
@@ -313,6 +319,42 @@ npm run deps:audit       # Audit for security issues
 
 All build commands work on **Windows, macOS, and Linux** without requiring additional tools.
 Simply use npm scripts on any platform (e.g., `npm run dev`, `npm test`, `npm run build`).
+
+## 🧪 Testing
+
+The project includes comprehensive test coverage:
+
+### Unit Tests
+
+```bash
+# Run all unit tests
+pnpm test
+
+# Run with coverage
+pnpm test:coverage
+
+# Run with interactive UI
+pnpm test:ui
+```
+
+### Integration Tests
+
+Comprehensive integration tests that connect to real AT Protocol servers to validate all public-facing functionality:
+
+```bash
+# Run integration tests (requires internet connection)
+npm run test:integration
+```
+
+**What's tested:**
+- ✅ All public tools (search_posts, get_user_profile, get_followers, get_follows, get_thread, get_custom_feed)
+- ✅ DID and handle resolution
+- ✅ Pagination support
+- ✅ Error handling
+- ✅ AT Protocol specification compliance
+- ✅ Rate limiting behavior
+
+**Note:** Integration tests are opt-in and disabled by default to avoid hitting real servers during normal development. See [Integration Tests Documentation](src/__tests__/INTEGRATION_TESTS.md) for details.
 
 ## 🤝 Contributing
 

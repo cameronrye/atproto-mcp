@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type { ATURI, CID, DID, IFollowUserParams } from '../../types/index.js';
 
@@ -16,6 +16,10 @@ const FollowUserSchema = z.object({
 
 /**
  * Tool for following users on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to follow users
  */
 export class FollowUserTool extends BaseTool {
   public readonly schema = {
@@ -26,7 +30,7 @@ export class FollowUserTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'FollowUser');
+    super(atpClient, 'FollowUser', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: IFollowUserParams): Promise<{
@@ -189,6 +193,10 @@ export class FollowUserTool extends BaseTool {
 
 /**
  * Unfollow User Tool - Unfollows users on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to unfollow users
  */
 export class UnfollowUserTool extends BaseTool {
   public readonly schema = {
@@ -200,7 +208,7 @@ export class UnfollowUserTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'UnfollowUser');
+    super(atpClient, 'UnfollowUser', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: { followUri: string }): Promise<{

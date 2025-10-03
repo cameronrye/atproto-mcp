@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type { ATURI, CID, IRepostParams } from '../../types/index.js';
 
@@ -18,6 +18,10 @@ const RepostSchema = z.object({
 
 /**
  * Tool for reposting content on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to repost content
  */
 export class RepostTool extends BaseTool {
   public readonly schema = {
@@ -28,7 +32,7 @@ export class RepostTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'Repost');
+    super(atpClient, 'Repost', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: IRepostParams): Promise<{
@@ -164,6 +168,10 @@ export class RepostTool extends BaseTool {
 
 /**
  * Unrepost Tool - Removes reposts on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to remove reposts
  */
 export class UnrepostTool extends BaseTool {
   public readonly schema = {
@@ -175,7 +183,7 @@ export class UnrepostTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'Unrepost');
+    super(atpClient, 'Unrepost', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: { repostUri: string }): Promise<{

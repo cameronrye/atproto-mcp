@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type { ATURI, CID, IReplyToPostParams } from '../../types/index.js';
 
@@ -22,6 +22,10 @@ const ReplyToPostSchema = z.object({
 
 /**
  * Tool for replying to posts on AT Protocol
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Requires authentication (PRIVATE mode)
+ * - Must have valid credentials to reply to posts
  */
 export class ReplyToPostTool extends BaseTool {
   public readonly schema = {
@@ -32,7 +36,7 @@ export class ReplyToPostTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'ReplyToPost');
+    super(atpClient, 'ReplyToPost', ToolAuthMode.PRIVATE);
   }
 
   protected async execute(params: IReplyToPostParams): Promise<{
