@@ -46,7 +46,7 @@ const TEST_CONFIG = {
 };
 
 // Helper to add delay between tests (rate limiting)
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 describeIntegration('Real AT Protocol Integration Tests', () => {
   let server: AtpMcpServer;
@@ -239,4 +239,3 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
     );
   });
 });
-
