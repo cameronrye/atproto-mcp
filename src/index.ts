@@ -551,7 +551,7 @@ export class AtpMcpServer {
 
     if (errors.length > 0) {
       this.logger.error('Errors during cleanup', { errors: errors.map(e => e.message) });
-      throw errors[0];
+      throw new Error(`Cleanup failed: ${errors[0]?.message ?? 'Unknown error'}`);
     }
 
     this.logger.info('AT Protocol MCP Server stopped successfully');

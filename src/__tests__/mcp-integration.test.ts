@@ -32,7 +32,9 @@ const mockAtpClient = {
 
 // Mock the AT Protocol client to avoid real network calls
 vi.mock('../utils/atp-client.js', () => ({
-  AtpClient: vi.fn().mockImplementation(() => mockAtpClient),
+  AtpClient: vi.fn().mockImplementation(function () {
+    return mockAtpClient;
+  }),
 }));
 
 // Mock the MCP SDK to capture handler registrations
@@ -98,14 +100,16 @@ const mockServer = {
 };
 
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: vi.fn().mockImplementation(() => {
+  Server: vi.fn().mockImplementation(function () {
     console.log('Mock Server constructor called');
     return mockServer;
   }),
 }));
 
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: vi.fn().mockImplementation(() => ({})),
+  StdioServerTransport: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 describe('MCP Integration Tests', () => {

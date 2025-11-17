@@ -282,7 +282,7 @@ export class UpdateProfileTool extends BaseTool {
       );
 
       return response.data.value || {};
-    } catch (error) {
+    } catch {
       // If profile doesn't exist, return empty object
       this.logger.debug('No existing profile found, creating new one');
       return {};

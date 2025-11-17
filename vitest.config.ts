@@ -8,6 +8,8 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
+      // Vitest 4.0: Explicitly include source files for coverage
+      include: ['src/**/*.{js,ts}'],
       exclude: [
         'node_modules/',
         'dist/',
@@ -16,6 +18,7 @@ export default defineConfig({
         '**/*.config.*',
         '**/coverage/**',
         '**/test/**',
+        '**/__tests__/**',
         '**/*.test.*',
         '**/*.spec.*',
       ],

@@ -135,7 +135,7 @@ function showVersion(): void {
       description: string;
     };
     console.log(`AT Protocol MCP Server v${packageJson.version}`);
-  } catch (error) {
+  } catch {
     console.log('AT Protocol MCP Server v0.1.0');
   }
 }
@@ -212,7 +212,7 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
             `Invalid auth method: ${values.auth}. Must be 'app-password' or 'oauth'`
           );
         }
-        config.atproto.authMethod = values.auth as 'app-password' | 'oauth';
+        config.atproto.authMethod = values.auth;
       }
     }
 

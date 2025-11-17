@@ -272,9 +272,13 @@ export class AtpClient {
           });
         }
         break;
+      case 'create-failed':
+      case 'network-error':
+        this.logger.error('Session creation or network error', { event });
+        break;
       case 'expired':
         this.logger.warn('Session expired, attempting refresh');
-        this.refreshSession().catch(error => {
+        this.refreshSession().catch((error: unknown) => {
           this.logger.error('Failed to refresh expired session', error);
         });
         break;

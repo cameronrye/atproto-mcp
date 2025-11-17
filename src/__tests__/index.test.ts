@@ -9,37 +9,45 @@ import { mockConsole, expectToThrow, createMockServerConfig } from '../test/setu
 
 // Mock dependencies
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: vi.fn().mockImplementation(() => ({
-    setRequestHandler: vi.fn(),
-    connect: vi.fn(),
-    close: vi.fn(),
-  })),
+  Server: vi.fn().mockImplementation(function () {
+    return {
+      setRequestHandler: vi.fn(),
+      connect: vi.fn(),
+      close: vi.fn(),
+    };
+  }),
 }));
 
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: vi.fn().mockImplementation(() => ({})),
+  StdioServerTransport: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 vi.mock('../utils/atp-client.js', () => ({
-  AtpClient: vi.fn().mockImplementation(() => ({
-    initialize: vi.fn().mockResolvedValue(undefined),
-    cleanup: vi.fn().mockResolvedValue(undefined),
-    isAuthenticated: vi.fn().mockReturnValue(true),
-  })),
+  AtpClient: vi.fn().mockImplementation(function () {
+    return {
+      initialize: vi.fn().mockResolvedValue(undefined),
+      cleanup: vi.fn().mockResolvedValue(undefined),
+      isAuthenticated: vi.fn().mockReturnValue(true),
+    };
+  }),
 }));
 
 vi.mock('../utils/config.js', () => ({
-  ConfigManager: vi.fn().mockImplementation(() => ({
-    getConfig: vi.fn().mockReturnValue(createMockServerConfig()),
-    getAtpConfig: vi.fn().mockReturnValue({
-      service: 'https://bsky.social',
-      authMethod: 'app-password',
-      identifier: 'test.bsky.social',
-      password: 'test-password',
-    }),
-    getAuthMode: vi.fn().mockReturnValue('app-password'),
-    hasAuthentication: vi.fn().mockReturnValue(true),
-  })),
+  ConfigManager: vi.fn().mockImplementation(function () {
+    return {
+      getConfig: vi.fn().mockReturnValue(createMockServerConfig()),
+      getAtpConfig: vi.fn().mockReturnValue({
+        service: 'https://bsky.social',
+        authMethod: 'app-password',
+        identifier: 'test.bsky.social',
+        password: 'test-password',
+      }),
+      getAuthMode: vi.fn().mockReturnValue('app-password'),
+      hasAuthentication: vi.fn().mockReturnValue(true),
+    };
+  }),
 }));
 
 describe('AtpMcpServer', () => {
@@ -82,9 +90,15 @@ describe('AtpMcpServer', () => {
       hasAuthentication: vi.fn().mockReturnValue(true),
     };
 
-    vi.mocked(Server).mockImplementation(() => mockServer);
-    vi.mocked(AtpClient).mockImplementation(() => mockAtpClient);
-    vi.mocked(ConfigManager).mockImplementation(() => mockConfigManager);
+    vi.mocked(Server).mockImplementation(function () {
+      return mockServer;
+    });
+    vi.mocked(AtpClient).mockImplementation(function () {
+      return mockAtpClient;
+    });
+    vi.mocked(ConfigManager).mockImplementation(function () {
+      return mockConfigManager;
+    });
   });
 
   describe('constructor', () => {
@@ -190,7 +204,7 @@ describe('AtpMcpServer', () => {
 
       await server.start();
 
-      await expectToThrow(() => server.stop(), Error, 'Cleanup failed');
+      await expectToThrow(() => server.stop(), Error, /Cleanup failed/);
     });
   });
 

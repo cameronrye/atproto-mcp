@@ -14,10 +14,12 @@ import {
 
 // Mock the @atproto/api module
 vi.mock('@atproto/api', () => ({
-  AtpAgent: vi.fn().mockImplementation(() => ({
-    login: vi.fn(),
-    refreshSession: vi.fn(),
-  })),
+  AtpAgent: vi.fn().mockImplementation(function () {
+    return {
+      login: vi.fn(),
+      refreshSession: vi.fn(),
+    };
+  }),
 }));
 
 describe('AtpClient', () => {
@@ -35,7 +37,9 @@ describe('AtpClient', () => {
 
     // Mock AtpAgent constructor
     const { AtpAgent } = await import('@atproto/api');
-    vi.mocked(AtpAgent).mockImplementation(() => mockAgent);
+    vi.mocked(AtpAgent).mockImplementation(function () {
+      return mockAgent;
+    });
 
     client = new AtpClient(createMockAtpConfig());
   });

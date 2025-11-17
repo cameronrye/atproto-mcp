@@ -258,7 +258,7 @@ export class WebSocketManager {
 
         ws.onerror = (error: any) => {
           this.logger.error('WebSocket error', error, { key, url });
-          reject(error);
+          reject(new Error(`WebSocket error: ${String(error)}`));
         };
 
         ws.onclose = () => {
@@ -272,7 +272,7 @@ export class WebSocketManager {
         }, 100);
       } catch (error) {
         this.logger.error('Failed to create WebSocket', error as Error, { key, url });
-        reject(error);
+        reject(error instanceof Error ? error : new Error(String(error)));
       }
     });
   }

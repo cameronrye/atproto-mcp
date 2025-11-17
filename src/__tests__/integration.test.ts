@@ -71,11 +71,15 @@ const mockServer = {
 };
 
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
-  Server: vi.fn().mockImplementation(() => mockServer),
+  Server: vi.fn().mockImplementation(function () {
+    return mockServer;
+  }),
 }));
 
 vi.mock('@modelcontextprotocol/sdk/server/stdio.js', () => ({
-  StdioServerTransport: vi.fn().mockImplementation(() => ({})),
+  StdioServerTransport: vi.fn().mockImplementation(function () {
+    return {};
+  }),
 }));
 
 // Create a mock AtpClient instance that will be reused
@@ -103,7 +107,9 @@ const mockAtpClientInstance = {
 
 // Mock the AT Protocol client to avoid real network calls
 vi.mock('../utils/atp-client.js', () => ({
-  AtpClient: vi.fn().mockImplementation(() => mockAtpClientInstance),
+  AtpClient: vi.fn().mockImplementation(function () {
+    return mockAtpClientInstance;
+  }),
 }));
 
 describe('Phase 2 Integration Tests', () => {
