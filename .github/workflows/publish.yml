@@ -89,6 +89,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: Commit version change
+        if: '!inputs.dry_run && inputs.tag == ''latest'''
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add package.json
+          git commit -m "chore: bump version to ${{ inputs.version }}" || echo "No changes to commit"
+          git push origin main
+
       - name: Create git tag
         if: '!inputs.dry_run && inputs.tag == ''latest'''
         run: |
@@ -97,6 +106,50 @@ jobs:
           git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
           git push origin "v${{ inputs.version }}"
 
+      - name: Generate changelog
+        if: '!inputs.dry_run && inputs.tag == ''latest'''
+        id: changelog
+        run: |
+          # Generate changelog from git commits since last tag
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          if git describe --tags --abbrev=0 HEAD^ >/dev/null 2>&1; then
+            LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
+            echo "Changes since $LAST_TAG:" >> $GITHUB_OUTPUT
+            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
+          else
+            echo "- Initial release" >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        if: '!inputs.dry_run && inputs.tag == ''latest'''
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ inputs.version }}
+          name: Release v${{ inputs.version }}
+          body: |
+            ## AT Protocol MCP Server ${{ inputs.version }}
+
+            ### Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
+
+            ### Installation
+            ```bash
+            npm install -g atproto-mcp@${{ inputs.version }}
+            ```
+
+            ### Quick Start
+            ```bash
+            # Start in unauthenticated mode (works immediately!)
+            atproto-mcp
+            ```
+
+            For more information, see the [documentation](https://cameronrye.github.io/atproto-mcp).
+          draft: false
+          prerelease: false
+          files: |
+            dist/**/*
+
       - name: Summary
         run: |
           if [ "${{ inputs.dry_run }}" = "true" ]; then
@@ -104,6 +157,11 @@ jobs:
             echo "Would have published version ${{ inputs.version }} with tag ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
           else
             echo "✅ **Published Successfully**" >> $GITHUB_STEP_SUMMARY
-            echo "Published version ${{ inputs.version }} with tag ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
-            echo "Package: https://www.npmjs.com/package/atproto-mcp/v/${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "- **Version**: ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **npm tag**: ${{ inputs.tag }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **npm Package**: https://www.npmjs.com/package/atproto-mcp/v/${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+            if [ "${{ inputs.tag }}" = "latest" ]; then
+              echo "- **GitHub Release**: https://github.com/cameronrye/atproto-mcp/releases/tag/v${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+            fi
           fi
