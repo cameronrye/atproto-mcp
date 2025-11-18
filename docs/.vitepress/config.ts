@@ -8,15 +8,82 @@ export default withMermaid(defineConfig({
   ignoreDeadLinks: true, // Ignore dead links during development
   
   head: [
+    // Favicons
     ['link', { rel: 'icon', type: 'image/svg+xml', href: '/atproto-mcp/favicon.svg' }],
     ['link', { rel: 'icon', type: 'image/png', href: '/atproto-mcp/logo.svg' }],
+    ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/atproto-mcp/logo.svg' }],
+
+    // Theme and viewport
     ['meta', { name: 'theme-color', content: '#1d4ed8' }],
+    ['meta', { name: 'viewport', content: 'width=device-width, initial-scale=1.0' }],
+
+    // SEO Meta Tags
+    ['meta', { name: 'description', content: 'Comprehensive MCP server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem. Build intelligent social media bots and applications.' }],
+    ['meta', { name: 'keywords', content: 'MCP, Model Context Protocol, AT Protocol, Bluesky, LLM, AI, TypeScript, social networking, API integration' }],
+    ['meta', { name: 'author', content: 'Cameron Rye' }],
+    ['meta', { name: 'robots', content: 'index, follow' }],
+    ['link', { rel: 'canonical', href: 'https://cameronrye.github.io/atproto-mcp/' }],
+
+    // Open Graph / Facebook
     ['meta', { property: 'og:type', content: 'website' }],
-    ['meta', { property: 'og:locale', content: 'en' }],
-    ['meta', { property: 'og:title', content: 'AT Protocol MCP Server' }],
+    ['meta', { property: 'og:locale', content: 'en_US' }],
     ['meta', { property: 'og:site_name', content: 'AT Protocol MCP Server' }],
-    ['meta', { property: 'og:image', content: '/atproto-mcp/og-image.svg' }],
+    ['meta', { property: 'og:title', content: 'AT Protocol MCP Server - Comprehensive LLM Integration' }],
+    ['meta', { property: 'og:description', content: 'Enable LLMs to interact directly with the AT Protocol ecosystem through a powerful Model Context Protocol server. Build intelligent social media bots and applications.' }],
     ['meta', { property: 'og:url', content: 'https://cameronrye.github.io/atproto-mcp/' }],
+    ['meta', { property: 'og:image', content: 'https://cameronrye.github.io/atproto-mcp/og-image.png' }],
+    ['meta', { property: 'og:image:width', content: '1200' }],
+    ['meta', { property: 'og:image:height', content: '630' }],
+    ['meta', { property: 'og:image:alt', content: 'AT Protocol MCP Server Logo' }],
+    ['meta', { property: 'og:image:type', content: 'image/png' }],
+
+    // Twitter Card
+    ['meta', { name: 'twitter:card', content: 'summary_large_image' }],
+    ['meta', { name: 'twitter:site', content: '@cameronrye' }],
+    ['meta', { name: 'twitter:creator', content: '@cameronrye' }],
+    ['meta', { name: 'twitter:title', content: 'AT Protocol MCP Server - Comprehensive LLM Integration' }],
+    ['meta', { name: 'twitter:description', content: 'Enable LLMs to interact directly with the AT Protocol ecosystem through a powerful Model Context Protocol server.' }],
+    ['meta', { name: 'twitter:image', content: 'https://cameronrye.github.io/atproto-mcp/og-image.png' }],
+    ['meta', { name: 'twitter:image:alt', content: 'AT Protocol MCP Server Logo' }],
+
+    // JSON-LD Structured Data
+    ['script', { type: 'application/ld+json' }, JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'SoftwareApplication',
+      'name': 'AT Protocol MCP Server',
+      'applicationCategory': 'DeveloperApplication',
+      'operatingSystem': 'Cross-platform',
+      'description': 'Comprehensive MCP server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem',
+      'url': 'https://cameronrye.github.io/atproto-mcp/',
+      'author': {
+        '@type': 'Person',
+        'name': 'Cameron Rye',
+        'url': 'https://rye.dev/'
+      },
+      'offers': {
+        '@type': 'Offer',
+        'price': '0',
+        'priceCurrency': 'USD'
+      },
+      'softwareVersion': '0.1.1',
+      'programmingLanguage': 'TypeScript',
+      'codeRepository': 'https://github.com/cameronrye/atproto-mcp',
+      'license': 'https://opensource.org/licenses/MIT'
+    })],
+
+    // Additional JSON-LD for Organization
+    ['script', { type: 'application/ld+json' }, JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'WebSite',
+      'name': 'AT Protocol MCP Server',
+      'url': 'https://cameronrye.github.io/atproto-mcp/',
+      'description': 'Documentation for AT Protocol MCP Server',
+      'publisher': {
+        '@type': 'Person',
+        'name': 'Cameron Rye',
+        'url': 'https://rye.dev/'
+      }
+    })],
   ],
 
   themeConfig: {
@@ -208,7 +275,7 @@ export default withMermaid(defineConfig({
     ],
 
     footer: {
-      message: 'Released under the MIT License.',
+      message: 'Released under the MIT License. | <a href="/atproto-mcp/llms.txt" target="_blank">llms.txt</a> | <a href="/atproto-mcp/llms-full.txt" target="_blank">llms-full.txt</a>',
       copyright: 'Copyright © 2025 <a href="https://rye.dev/" target="_blank" rel="noopener noreferrer">Cameron Rye</a>',
     },
 

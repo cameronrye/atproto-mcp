@@ -1,0 +1,8 @@
+Contact: https://github.com/cameronrye/atproto-mcp/security/advisories/new
+Contact: mailto:cameronrye@users.noreply.github.com
+Expires: 2026-12-31T23:59:59.000Z
+Preferred-Languages: en
+Canonical: https://cameronrye.github.io/atproto-mcp/.well-known/security.txt
+Policy: https://github.com/cameronrye/atproto-mcp/blob/main/SECURITY.md
+Acknowledgments: https://github.com/cameronrye/atproto-mcp/blob/main/SECURITY.md#acknowledgments
+

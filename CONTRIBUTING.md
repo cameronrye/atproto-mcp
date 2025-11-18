@@ -2,7 +2,7 @@
 
 Thank you for your interest in contributing to the AT Protocol MCP Server! This document provides guidelines and information for contributors.
 
-## 🎯 About This Project
+## About This Project
 
 The AT Protocol MCP Server is an **MCP (Model Context Protocol) server** that enables **LLM clients** to interact with the AT Protocol ecosystem. Contributions to this project help improve how LLMs access and use AT Protocol functionality.
 
@@ -19,7 +19,7 @@ The AT Protocol MCP Server is an **MCP (Model Context Protocol) server** that en
 
 If you're looking to build applications with AT Protocol, consider using the official `@atproto/api` package directly instead.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js 20+
@@ -84,7 +84,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 
 #### Example: Cross-Platform File Deletion
 
-❌ **Don't do this** (Unix-only):
+**Don't do this** (Unix-only):
 ```json
 {
   "scripts": {
@@ -93,7 +93,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 }
 ```
 
-✅ **Do this instead** (cross-platform):
+**Do this instead** (cross-platform):
 ```json
 {
   "scripts": {
@@ -104,7 +104,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 
 #### Example: Cross-Platform Executable
 
-❌ **Don't do this** (Unix-only):
+**Don't do this** (Unix-only):
 ```json
 {
   "scripts": {
@@ -113,7 +113,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 }
 ```
 
-✅ **Do this instead** (cross-platform):
+**Do this instead** (cross-platform):
 ```json
 {
   "scripts": {
@@ -124,7 +124,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 
 Where `scripts/make-executable.js` checks the platform and only runs chmod on Unix systems.
 
-## 📋 Development Workflow
+## Development Workflow
 
 ### Branch Strategy
 - `main` - Production-ready code
@@ -170,7 +170,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 - `test:` - Adding or updating tests
 - `chore:` - Maintenance tasks
 
-## 🧪 Testing
+## Testing
 
 ### Running Tests
 ```bash
@@ -212,7 +212,7 @@ describe('createPost tool', () => {
 });
 ```
 
-## 📝 Code Style
+## Code Style
 
 ### TypeScript Guidelines
 - Use strict TypeScript configuration
@@ -234,7 +234,7 @@ describe('createPost tool', () => {
 - Use UPPER_CASE for enum members
 - Use descriptive names that explain purpose
 
-## 🔧 Adding New Features
+## Adding New Features
 
 ### MCP Tools
 When adding new MCP tools that LLMs can call:
@@ -261,7 +261,7 @@ When adding AT Protocol features to MCP tools:
 4. **Error handling** - Translate AT Protocol errors into LLM-friendly messages
 5. **Validate responses** - Ensure data matches expected schemas before returning to LLM
 
-## 📚 Documentation
+## Documentation
 
 ### Code Documentation
 - Use JSDoc comments for all public APIs
@@ -275,7 +275,7 @@ When adding AT Protocol features to MCP tools:
 - Update API reference documentation
 - Include troubleshooting information
 
-## 🐛 Bug Reports
+## Bug Reports
 
 When reporting bugs:
 1. Use the bug report template
@@ -284,7 +284,7 @@ When reporting bugs:
 4. Add relevant logs (remove sensitive data)
 5. Describe expected vs actual behavior
 
-## 💡 Feature Requests
+## Feature Requests
 
 When requesting features:
 1. Use the feature request template
@@ -293,7 +293,7 @@ When requesting features:
 4. Consider AT Protocol compatibility
 5. Indicate priority and impact
 
-## 🔍 Code Review Process
+## Code Review Process
 
 ### For Contributors
 - Ensure all tests pass
@@ -308,22 +308,22 @@ When requesting features:
 - Provide constructive feedback
 - Approve when ready for merge
 
-## 📄 License
+## License
 
 By contributing to this project, you agree that your contributions will be licensed under the MIT License.
 
-## 🤝 Community
+## Community
 
 - Be respectful and inclusive
 - Help others learn and grow
 - Share knowledge and best practices
 - Follow our Code of Conduct
 
-## 📞 Getting Help
+## Getting Help
 
 - Check existing issues and discussions
 - Ask questions in GitHub Discussions
 - Review the documentation
 - Reach out to maintainers if needed
 
-Thank you for contributing to the AT Protocol MCP Server! 🎉
+Thank you for contributing to the AT Protocol MCP Server!

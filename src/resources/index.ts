@@ -4,55 +4,10 @@
 
 import type { AtpClient } from '../utils/atp-client.js';
 import { Logger } from '../utils/logger.js';
+import { BaseResource, type IResourceContent } from './base.js';
 
-export interface IMcpResource {
-  uri: string;
-  name: string;
-  description: string;
-  mimeType: string;
-}
-
-export interface IResourceContent {
-  uri: string;
-  mimeType: string;
-  text?: string;
-  blob?: Uint8Array;
-}
-
-/**
- * Base class for MCP resources
- */
-export abstract class BaseResource implements IMcpResource {
-  public abstract readonly uri: string;
-  public abstract readonly name: string;
-  public abstract readonly description: string;
-  public abstract readonly mimeType: string;
-
-  protected logger: Logger;
-
-  constructor(
-    protected atpClient: AtpClient,
-    loggerName: string
-  ) {
-    this.logger = new Logger(loggerName);
-  }
-
-  /**
-   * Read the resource content
-   */
-  abstract read(): Promise<IResourceContent>;
-
-  /**
-   * Check if the resource is available
-   */
-  async isAvailable(): Promise<boolean> {
-    try {
-      return this.atpClient.isAuthenticated();
-    } catch {
-      return false;
-    }
-  }
-}
+// Export base classes and interfaces
+export { BaseResource, type IMcpResource, type IResourceContent } from './base.js';
 
 /**
  * Timeline resource - exposes user's timeline as JSON
@@ -249,6 +204,12 @@ export class NotificationsResource extends BaseResource {
   }
 }
 
+// Import conversation context resource
+import { ConversationContextResource } from './conversation-context-resource.js';
+
+// Export conversation context resource
+export { ConversationContextResource };
+
 /**
  * Create all MCP resources for AT Protocol data
  */
@@ -260,6 +221,7 @@ export function createResources(atpClient: AtpClient): BaseResource[] {
       new TimelineResource(atpClient),
       new ProfileResource(atpClient),
       new NotificationsResource(atpClient),
+      new ConversationContextResource(atpClient),
     ];
 
     logger.info(`Created ${resources.length} AT Protocol MCP resources`);

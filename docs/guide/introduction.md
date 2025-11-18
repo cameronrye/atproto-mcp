@@ -8,28 +8,32 @@ The AT Protocol MCP Server is a production-ready implementation that bridges the
 
 ## Key Features
 
-### 🔓 Unauthenticated Mode
-One of the standout features is the ability to work **without authentication**. This makes it perfect for:
-- LLM clients that need to access public AT Protocol data
-- Quick prototyping and development
-- Read-only applications
-- Public data analysis and research
+### Unauthenticated Mode
+The server supports limited operation **without authentication**. This makes it perfect for:
+- OAuth flow management (starting and completing authentication)
+- Viewing basic public profile information
+- Quick prototyping before setting up authentication
+
+**Note:** As of 2025, the AT Protocol API has changed to require authentication for most endpoints that were previously public, including search, timelines, feeds, and social graphs.
 
 Available operations without authentication:
-- Search posts and hashtags
-- View user profiles and follower lists
-- Browse public feeds and threads
-- Access public timelines
+- View basic user profiles (ENHANCED mode: provides additional data when authenticated)
+- Manage OAuth flows (start, callback, refresh, revoke)
 
-### 🔐 Optional Authentication
+### Optional Authentication
 When you need full functionality, authentication unlocks:
 - Creating, editing, and deleting posts
 - Following and unfollowing users
 - Liking and reposting content
+- Searching posts and content
 - Accessing personalized timelines and notifications
+- Viewing social graphs (followers, follows)
+- Reading threads and custom feeds
 - Managing lists and moderation settings
+- Real-time streaming and analytics
+- Batch operations and advanced features
 
-### 🏗️ Architecture
+### Architecture
 
 The server follows a clean, modular architecture:
 

@@ -9,6 +9,7 @@ export { BaseTool } from './base-tool.js';
 
 // Core social operations
 export { CreatePostTool } from './create-post-tool.js';
+export { CreateThreadTool } from './create-thread-tool.js';
 export { ReplyToPostTool } from './reply-to-post-tool.js';
 export { LikePostTool, UnlikePostTool } from './like-post-tool.js';
 export { RepostTool, UnrepostTool } from './repost-tool.js';
@@ -41,6 +42,7 @@ export {
   UnblockUserTool,
   ReportContentTool,
   ReportUserTool,
+  AnalyzeModerationStatusTool,
 } from './moderation-tools.js';
 
 // Real-time streaming
@@ -49,6 +51,8 @@ export {
   StopStreamingTool,
   GetStreamingStatusTool,
   GetRecentEventsTool,
+  MonitorKeywordsTool,
+  TrackUsersTool,
 } from './streaming-tools.js';
 
 // Advanced social features
@@ -68,3 +72,31 @@ export {
   CreateRichTextPostTool,
   GenerateLinkPreviewTool,
 } from './media-tools.js';
+export { GenerateAltTextTool } from './generate-alt-text-tool.js';
+
+// Analytics and insights
+export { AnalyzeEngagementTool } from './analyze-engagement-tool.js';
+export {
+  AnalyzeNetworkTool,
+  SuggestContentStrategyTool,
+  FindInfluentialUsersTool,
+} from './analytics-tools.js';
+
+// Content discovery
+export {
+  FindSimilarUsersTool,
+  RecommendContentTool,
+  DiscoverCommunitiesTool,
+} from './content-discovery-tools.js';
+
+// Content discovery
+export { DiscoverTrendingTool } from './discover-trending-tool.js';
+
+// Batch operations
+export { BatchFollowTool, BatchLikeTool, BatchRepostTool } from './batch-operations-tools.js';
+
+// Composite operations
+export { GetUserSummaryTool, GetPostContextTool } from './composite-tools.js';
+
+// Rich media
+export { AnalyzeImageTool, ExtractMediaFromPostTool } from './rich-media-tools.js';

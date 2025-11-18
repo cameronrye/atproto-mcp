@@ -331,3 +331,244 @@ export class GetRecentEventsTool extends BaseTool {
     }
   }
 }
+
+export class MonitorKeywordsTool extends BaseTool {
+  public readonly schema = {
+    method: 'monitor_keywords',
+    description:
+      'Monitor the firehose for posts containing specific keywords. Returns matching posts from the event buffer.',
+    params: z.object({
+      keywords: z.array(z.string()).min(1, 'At least one keyword is required'),
+      limit: z.number().min(1).max(100).default(20),
+      caseSensitive: z.boolean().default(false),
+    }),
+  };
+
+  constructor(atpClient: AtpClient) {
+    super(atpClient, 'MonitorKeywords');
+  }
+
+  protected async execute(params: {
+    keywords: string[];
+    limit?: number;
+    caseSensitive?: boolean;
+  }): Promise<{
+    success: boolean;
+    keywords: string[];
+    matches: Array<{
+      keyword: string;
+      post: {
+        uri: string;
+        text: string;
+        author: string;
+        createdAt: string;
+      };
+      seq: number;
+      receivedAt: string;
+    }>;
+    totalMatches: number;
+    totalScanned: number;
+  }> {
+    try {
+      this.logger.info('Monitoring keywords', {
+        keywords: params.keywords,
+        limit: params.limit,
+        caseSensitive: params.caseSensitive,
+      });
+
+      const matches: Array<{
+        keyword: string;
+        post: {
+          uri: string;
+          text: string;
+          author: string;
+          createdAt: string;
+        };
+        seq: number;
+        receivedAt: string;
+      }> = [];
+
+      // Prepare keywords for matching
+      const keywords = params.caseSensitive
+        ? params.keywords
+        : params.keywords.map(k => k.toLowerCase());
+
+      // Scan event buffer for posts containing keywords
+      const postEvents = StartStreamingTool.eventBuffer.filter(
+        event =>
+          event.commit?.collection === 'app.bsky.feed.post' &&
+          event.commit?.operation === 'create' &&
+          event.commit?.record
+      );
+
+      for (const event of postEvents) {
+        const text = event.commit.record.text || '';
+        const searchText = params.caseSensitive ? text : text.toLowerCase();
+
+        // Check if any keyword matches
+        for (let i = 0; i < keywords.length; i++) {
+          const keyword = keywords[i];
+          const originalKeyword = params.keywords[i];
+          if (searchText.includes(keyword) && originalKeyword) {
+            matches.push({
+              keyword: originalKeyword, // Original keyword
+              post: {
+                uri: `at://${event.repo}/${event.commit.collection}/${event.commit.rkey}`,
+                text,
+                author: event.repo,
+                createdAt: event.commit.record.createdAt || event.time,
+              },
+              seq: event.seq,
+              receivedAt: event.receivedAt,
+            });
+
+            // Stop checking other keywords for this post
+            break;
+          }
+        }
+
+        // Stop if we've reached the limit
+        if (matches.length >= (params.limit || 20)) {
+          break;
+        }
+      }
+
+      this.logger.info('Keyword monitoring complete', {
+        keywords: params.keywords,
+        totalMatches: matches.length,
+        totalScanned: postEvents.length,
+      });
+
+      return {
+        success: true,
+        keywords: params.keywords,
+        matches: matches.slice(0, params.limit || 20),
+        totalMatches: matches.length,
+        totalScanned: postEvents.length,
+      };
+    } catch (error) {
+      this.logger.error('Failed to monitor keywords', error);
+      this.formatError(error);
+    }
+  }
+}
+
+export class TrackUsersTool extends BaseTool {
+  public readonly schema = {
+    method: 'track_users',
+    description:
+      'Track activity from specific users in the firehose stream. Returns recent events from the specified users.',
+    params: z.object({
+      users: z.array(z.string()).min(1, 'At least one user DID or handle is required'),
+      limit: z.number().min(1).max(100).default(20),
+      eventTypes: z
+        .array(z.enum(['post', 'like', 'repost', 'follow', 'profile']))
+        .optional()
+        .default(['post']),
+    }),
+  };
+
+  constructor(atpClient: AtpClient) {
+    super(atpClient, 'TrackUsers');
+  }
+
+  protected async execute(params: {
+    users: string[];
+    limit?: number;
+    eventTypes?: string[];
+  }): Promise<{
+    success: boolean;
+    users: string[];
+    events: Array<{
+      user: string;
+      eventType: string;
+      collection: string;
+      operation: string;
+      record?: any;
+      seq: number;
+      time: string;
+      receivedAt: string;
+    }>;
+    totalEvents: number;
+    totalScanned: number;
+  }> {
+    try {
+      this.logger.info('Tracking users', {
+        users: params.users,
+        limit: params.limit,
+        eventTypes: params.eventTypes,
+      });
+
+      // Map event types to collections
+      const collectionMap: Record<string, string> = {
+        post: 'app.bsky.feed.post',
+        like: 'app.bsky.feed.like',
+        repost: 'app.bsky.feed.repost',
+        follow: 'app.bsky.graph.follow',
+        profile: 'app.bsky.actor.profile',
+      };
+
+      const targetCollections = (params.eventTypes || ['post']).map(type => collectionMap[type]);
+
+      const events: Array<{
+        user: string;
+        eventType: string;
+        collection: string;
+        operation: string;
+        record?: any;
+        seq: number;
+        time: string;
+        receivedAt: string;
+      }> = [];
+
+      // Scan event buffer for events from specified users
+      for (const event of StartStreamingTool.eventBuffer) {
+        // Check if event is from one of the tracked users
+        if (!params.users.includes(event.repo)) {
+          continue;
+        }
+
+        // Check if event type matches
+        if (event.commit?.collection && targetCollections.includes(event.commit.collection)) {
+          const eventType =
+            Object.entries(collectionMap).find(
+              ([_, col]) => col === event.commit!.collection
+            )?.[0] || 'unknown';
+
+          events.push({
+            user: event.repo,
+            eventType,
+            collection: event.commit.collection,
+            operation: event.commit.operation,
+            record: event.commit.record,
+            seq: event.seq,
+            time: event.time,
+            receivedAt: event.receivedAt,
+          });
+
+          // Stop if we've reached the limit
+          if (events.length >= (params.limit || 20)) {
+            break;
+          }
+        }
+      }
+
+      this.logger.info('User tracking complete', {
+        users: params.users,
+        totalEvents: events.length,
+        totalScanned: StartStreamingTool.eventBuffer.length,
+      });
+
+      return {
+        success: true,
+        users: params.users,
+        events: events.slice(0, params.limit || 20),
+        totalEvents: events.length,
+        totalScanned: StartStreamingTool.eventBuffer.length,
+      };
+    } catch (error) {
+      this.logger.error('Failed to track users', error);
+      this.formatError(error);
+    }
+  }
+}

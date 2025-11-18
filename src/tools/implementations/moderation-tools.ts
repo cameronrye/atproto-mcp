@@ -420,3 +420,227 @@ export class ReportUserTool extends BaseTool {
     }
   }
 }
+
+/**
+ * Zod schema for analyze moderation status parameters
+ */
+const AnalyzeModerationStatusSchema = z.object({
+  subject: z.string().min(1, 'Subject (DID or AT-URI) is required'),
+  includeLabels: z.boolean().optional().default(true),
+});
+
+/**
+ * Analyze Moderation Status Tool - Check moderation status of posts and users
+ *
+ * This tool analyzes the moderation status of content including:
+ * - Content labels (NSFW, violence, spam, etc.)
+ * - Moderation decisions
+ * - User blocks and mutes
+ *
+ * AUTHENTICATION REQUIREMENT:
+ * - Enhanced mode (works better with authentication)
+ * - Public labels available without auth
+ * - Personal moderation state requires auth
+ */
+export class AnalyzeModerationStatusTool extends BaseTool {
+  public readonly schema = {
+    method: 'analyze_moderation_status',
+    description:
+      'Analyze moderation status of a post or user. Returns content labels, moderation decisions, and personal moderation state (blocks, mutes). Subject can be a DID (for users) or AT-URI (for posts).',
+    params: AnalyzeModerationStatusSchema,
+  };
+
+  constructor(atpClient: AtpClient) {
+    super(atpClient, 'AnalyzeModerationStatus');
+  }
+
+  protected async execute(params: { subject: string; includeLabels?: boolean }): Promise<{
+    success: boolean;
+    subject: string;
+    subjectType: 'user' | 'post';
+    moderation: {
+      labels?: Array<{
+        src: string;
+        uri: string;
+        val: string;
+        cts: string;
+      }>;
+      blocked?: boolean;
+      muted?: boolean;
+      blockedBy?: boolean;
+      blocking?: boolean;
+      mutedByList?: boolean;
+      blockedByList?: boolean;
+    };
+    analysis: {
+      hasContentWarnings: boolean;
+      isNSFW: boolean;
+      isSpam: boolean;
+      requiresWarning: boolean;
+      safetyLevel: 'safe' | 'warning' | 'restricted' | 'blocked';
+    };
+  }> {
+    try {
+      this.logger.info('Analyzing moderation status', {
+        subject: params.subject,
+        includeLabels: params.includeLabels,
+      });
+
+      const subjectType = params.subject.startsWith('at://') ? 'post' : 'user';
+
+      let moderation: any = {};
+      let labels: any[] = [];
+
+      if (subjectType === 'user') {
+        // Get user profile which includes moderation info
+        const profileResponse = await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.getProfile({ actor: params.subject });
+          },
+          'getProfile',
+          { actor: params.subject }
+        );
+
+        const profile = profileResponse.data;
+
+        moderation = {
+          blocked: profile.viewer?.blocking,
+          muted: profile.viewer?.muted,
+          blockedBy: profile.viewer?.blockedBy,
+          blocking: profile.viewer?.blocking,
+          mutedByList: profile.viewer?.mutedByList,
+          blockedByList: profile.viewer?.blockingByList,
+        };
+
+        if (params.includeLabels && profile.labels) {
+          labels = profile.labels;
+        }
+      } else {
+        // Get post thread which includes moderation info
+        const threadResponse = await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.getPostThread({ uri: params.subject });
+          },
+          'getPostThread',
+          { uri: params.subject }
+        );
+
+        const threadData = threadResponse.data.thread as any;
+
+        if (!threadData.post) {
+          throw new Error('Post not found or blocked');
+        }
+
+        const post = threadData.post;
+
+        moderation = {
+          blocked: post.author?.viewer?.blocking,
+          muted: post.author?.viewer?.muted,
+          blockedBy: post.author?.viewer?.blockedBy,
+        };
+
+        if (params.includeLabels && post.labels) {
+          labels = post.labels;
+        }
+      }
+
+      // Analyze the labels to determine safety level
+      const analysis = this.analyzeSafetyLevel(labels, moderation);
+
+      if (params.includeLabels && labels.length > 0) {
+        moderation.labels = labels;
+      }
+
+      this.logger.info('Moderation analysis completed', {
+        subject: params.subject,
+        subjectType,
+        safetyLevel: analysis.safetyLevel,
+        labelsCount: labels.length,
+      });
+
+      return {
+        success: true,
+        subject: params.subject,
+        subjectType,
+        moderation,
+        analysis,
+      };
+    } catch (error) {
+      this.logger.error('Failed to analyze moderation status', error);
+      this.formatError(error);
+    }
+  }
+
+  /**
+   * Analyze safety level based on labels and moderation state
+   */
+  private analyzeSafetyLevel(
+    labels: any[],
+    moderation: any
+  ): {
+    hasContentWarnings: boolean;
+    isNSFW: boolean;
+    isSpam: boolean;
+    requiresWarning: boolean;
+    safetyLevel: 'safe' | 'warning' | 'restricted' | 'blocked';
+  } {
+    let hasContentWarnings = false;
+    let isNSFW = false;
+    let isSpam = false;
+    let safetyLevel: 'safe' | 'warning' | 'restricted' | 'blocked' = 'safe';
+
+    // Check if blocked
+    if (moderation.blocked || moderation.blockedBy || moderation.blockedByList) {
+      safetyLevel = 'blocked';
+      return { hasContentWarnings: true, isNSFW, isSpam, requiresWarning: true, safetyLevel };
+    }
+
+    // Analyze labels
+    for (const label of labels) {
+      const val = label.val?.toLowerCase() || '';
+
+      // NSFW content
+      if (val.includes('nsfw') || val.includes('porn') || val.includes('sexual')) {
+        isNSFW = true;
+        hasContentWarnings = true;
+        if (safetyLevel === 'safe') safetyLevel = 'warning';
+      }
+
+      // Spam
+      if (val.includes('spam')) {
+        isSpam = true;
+        hasContentWarnings = true;
+        safetyLevel = 'restricted';
+      }
+
+      // Violence or graphic content
+      if (val.includes('violence') || val.includes('gore') || val.includes('graphic')) {
+        hasContentWarnings = true;
+        if (safetyLevel === 'safe') safetyLevel = 'warning';
+      }
+
+      // Hate speech or harassment
+      if (val.includes('hate') || val.includes('harassment') || val.includes('threat')) {
+        hasContentWarnings = true;
+        safetyLevel = 'restricted';
+      }
+    }
+
+    // Check if muted
+    if (moderation.muted || moderation.mutedByList) {
+      if (safetyLevel === 'safe') safetyLevel = 'warning';
+    }
+
+    const requiresWarning = hasContentWarnings || safetyLevel !== 'safe';
+
+    return {
+      hasContentWarnings,
+      isNSFW,
+      isSpam,
+      requiresWarning,
+      safetyLevel,
+    };
+  }
+}

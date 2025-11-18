@@ -1,5 +1,8 @@
 name: CI
 
+# This workflow runs unit tests, linting, and builds
+# For integration tests, see .github/workflows/integration-tests.yml
+
 on:
   push:
     branches: [main, develop]
@@ -40,6 +43,9 @@ jobs:
 
       - name: Format check
         run: pnpm run format:check
+
+      - name: Build
+        run: pnpm run build
 
       - name: Run tests
         run: pnpm run test:coverage

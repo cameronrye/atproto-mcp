@@ -121,12 +121,21 @@ The server automatically refreshes OAuth tokens when they expire. You can also m
 
 ### Can I use the server without authentication?
 
-Yes! Many MCP tools work without authentication for accessing public data:
+Yes, but with limitations. As of 2025, the AT Protocol API has changed to require authentication for most endpoints.
+
+**Tools that work without authentication:**
+- `get_user_profile` - View public profiles (ENHANCED mode: provides additional viewer-specific data when authenticated)
+- `start_oauth_flow` - Initiate OAuth authentication
+- `handle_oauth_callback` - Complete OAuth flow
+- `refresh_oauth_tokens` - Refresh authentication tokens
+- `revoke_oauth_tokens` - Revoke OAuth tokens
+
+**Tools that now require authentication (as of 2025):**
 - `search_posts` - Search public posts
-- `get_user_profile` - View public profiles
-- `get_followers` / `get_follows` - View public social graphs
-- `get_thread` - Read public conversations
-- `get_custom_feed` - Browse public feeds
+- `get_followers` / `get_follows` - View social graphs
+- `get_thread` - Read conversations
+- `get_custom_feed` - Browse feeds
+- Most other data retrieval and write operations
 
 ## How LLMs Use This Server
 
@@ -465,10 +474,10 @@ The LLM can explain to users: "That post has been deleted and is no longer avail
 
 ### Where can I get help?
 
-- 📖 [Documentation](https://cameronrye.github.io/atproto-mcp)
-- 🐛 [GitHub Issues](https://github.com/cameronrye/atproto-mcp/issues)
-- 💬 [GitHub Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
-- 🌐 [AT Protocol Community](https://atproto.com/community)
+- [Documentation](https://cameronrye.github.io/atproto-mcp)
+- [GitHub Issues](https://github.com/cameronrye/atproto-mcp/issues)
+- [GitHub Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
+- [AT Protocol Community](https://atproto.com/community)
 
 ### How do I stay updated?
 
