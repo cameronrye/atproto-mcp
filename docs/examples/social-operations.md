@@ -10,7 +10,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 
 **User Request:**
 ```
-"Create a post saying 'Hello from AT Protocol! 🚀'"
+"Create a post saying 'Hello from AT Protocol!'"
 ```
 
 **Tool Call:** `create_post`
@@ -18,7 +18,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Parameters (JSON):**
 ```json
 {
-  "text": "Hello from AT Protocol! 🚀"
+  "text": "Hello from AT Protocol!"
 }
 ```
 

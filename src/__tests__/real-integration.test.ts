@@ -4,11 +4,13 @@
  * These tests connect to actual AT Protocol servers (bsky.social) to validate
  * that the MCP server correctly interacts with real infrastructure.
  *
- * IMPORTANT: As of 2025, most AT Protocol endpoints now require authentication.
- * These tests only cover the endpoints that genuinely work without authentication.
+ * TEST MODES:
+ * 1. Unauthenticated Mode (default): Tests public endpoints only
+ *    - Run with: RUN_INTEGRATION_TESTS=true npm run test:integration
  *
- * Tests are opt-in via environment variable to prevent accidental server hits:
- * RUN_INTEGRATION_TESTS=true pnpm test real-integration
+ * 2. Authenticated Mode: Tests all 60 tools with real account
+ *    - Requires: .env.test with test account credentials
+ *    - Run with: npm run test:integration:auth
  *
  * NOTE: These tests may occasionally fail due to:
  * - Rate limiting from the AT Protocol server
@@ -17,54 +19,44 @@
  * If tests fail, wait a few minutes and try again.
  *
  * COVERAGE:
- * 1. Server initialization in unauthenticated mode
- * 2. get_user_profile - Profile retrieval (DID and handle resolution)
- * 3. Error handling and validation
- * 4. AT Protocol specification compliance
+ * - Unauthenticated: 10 tests (profile retrieval, public data)
+ * - Authenticated: 100+ tests (all 60 tools, write operations, media, etc.)
  */
 
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { AtpMcpServer } from '../index.js';
 import { GetUserProfileTool } from '../tools/implementations/get-user-profile-tool.js';
 import { AtpClient } from '../utils/atp-client.js';
+import {
+  getIntegrationTestConfig,
+  shouldRunIntegrationTests,
+  canRunAuthenticatedTests,
+  delay,
+} from '../test/integration-config.js';
 
 // Helper to skip tests unless explicitly enabled
-const describeIntegration = process.env.RUN_INTEGRATION_TESTS === 'true' ? describe : describe.skip;
+const describeIntegration = shouldRunIntegrationTests() ? describe : describe.skip;
+const describeAuth = canRunAuthenticatedTests() ? describe : describe.skip;
 
-const TEST_CONFIG = {
-  // Using bsky.social - main Bluesky entryway
-  // Note: public.api.bsky.app was tested and shows identical rate limiting behavior
-  // See AT_PROTOCOL_SERVERS.md for details on all available endpoints
-  service: 'https://bsky.social',
-  rateLimitDelay: 2000, // 2 seconds between tests (increased to avoid rate limiting)
-  requestTimeout: 60000, // 60 seconds (increased for slow responses)
-  testAccounts: {
-    bluesky: 'bsky.app',
-    jay: 'jay.bsky.team',
-    blueskyDid: 'did:plc:z72i7hdynmk6r22z27h6tvur',
-  },
-};
+// Get test configuration
+const config = getIntegrationTestConfig();
 
-// Helper to add delay between tests (rate limiting)
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-describeIntegration('Real AT Protocol Integration Tests', () => {
+describeIntegration('Real AT Protocol Integration Tests - Unauthenticated Mode', () => {
   let server: AtpMcpServer;
   let atpClient: AtpClient;
   let getUserProfileTool: GetUserProfileTool;
 
   beforeAll(async () => {
-    console.log('🚀 Starting Real AT Protocol Integration Tests');
-    console.log(`📡 Connecting to: ${TEST_CONFIG.service}`);
+    console.log('🚀 Starting Real AT Protocol Integration Tests (Unauthenticated)');
+    console.log(`📡 Connecting to: ${config.testAccount?.service || 'https://bsky.social'}`);
     console.log('⚠️  These tests connect to real AT Protocol servers');
-    console.log('⚠️  Note: Most AT Protocol endpoints now require authentication');
-    console.log('⚠️  These tests only cover truly public endpoints');
+    console.log('⚠️  Testing public endpoints only (no authentication)');
     console.log('');
 
     // Create server without authentication (unauthenticated mode)
     server = new AtpMcpServer({
       atproto: {
-        service: TEST_CONFIG.service,
+        service: config.testAccount?.service || 'https://bsky.social',
       },
     });
 
@@ -79,19 +71,19 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
     console.log('✅ Server started in unauthenticated mode');
     console.log('✅ Public tool instances created');
     console.log('');
-  }, TEST_CONFIG.requestTimeout);
+  }, config.requestTimeout);
 
   afterAll(async () => {
     if (server) {
       await server.stop();
     }
     console.log('');
-    console.log('✅ Integration tests completed');
+    console.log('✅ Unauthenticated integration tests completed');
   });
 
   // Add delay between tests to respect rate limits
   beforeEach(async () => {
-    await delay(TEST_CONFIG.rateLimitDelay);
+    await delay();
   });
 
   describe('Server Initialization', () => {
@@ -115,11 +107,8 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
     it(
       'should get profile by handle',
       async () => {
-        // Add a small delay before the first real API call
-        await delay(2000);
-
         const result = await getUserProfileTool.handler({
-          actor: TEST_CONFIG.testAccounts.bluesky,
+          actor: config.publicAccounts.bluesky,
         });
 
         expect(result.success).toBe(true);
@@ -127,7 +116,7 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
 
         // Validate profile structure
         expect(result.profile.did).toBeDefined();
-        expect(result.profile.handle).toBe(TEST_CONFIG.testAccounts.bluesky);
+        expect(result.profile.handle).toBe(config.publicAccounts.bluesky);
         expect(result.profile.displayName).toBeDefined();
         expect(result.profile.description).toBeDefined();
 
@@ -141,25 +130,25 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
         console.log(`    - Display Name: ${result.profile.displayName}`);
         console.log(`    - Followers: ${result.profile.followersCount}`);
       },
-      TEST_CONFIG.requestTimeout
+      config.requestTimeout
     );
 
     it(
       'should get profile by DID',
       async () => {
         const result = await getUserProfileTool.handler({
-          actor: TEST_CONFIG.testAccounts.blueskyDid,
+          actor: config.publicAccounts.blueskyDid,
         });
 
         expect(result.success).toBe(true);
         expect(result.profile).toBeDefined();
-        expect(result.profile.did).toBe(TEST_CONFIG.testAccounts.blueskyDid);
-        expect(result.profile.handle).toBe(TEST_CONFIG.testAccounts.bluesky);
+        expect(result.profile.did).toBe(config.publicAccounts.blueskyDid);
+        expect(result.profile.handle).toBe(config.publicAccounts.bluesky);
 
         console.log(`  ✓ Retrieved profile by DID`);
         console.log(`    - Resolved to handle: @${result.profile.handle}`);
       },
-      TEST_CONFIG.requestTimeout
+      config.requestTimeout
     );
 
     it(
@@ -173,7 +162,7 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
 
         console.log('  ✓ Invalid actor handled correctly');
       },
-      TEST_CONFIG.requestTimeout
+      config.requestTimeout
     );
   });
 
@@ -184,7 +173,7 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
     beforeAll(async () => {
       // Make one request and reuse the result for all spec tests
       profileResult = await getUserProfileTool.handler({
-        actor: TEST_CONFIG.testAccounts.bluesky,
+        actor: config.publicAccounts.bluesky,
       });
     });
 
@@ -224,7 +213,7 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
 
         console.log('  ✓ Required parameter validation works');
       },
-      TEST_CONFIG.requestTimeout
+      config.requestTimeout
     );
 
     it(
@@ -232,10 +221,17 @@ describeIntegration('Real AT Protocol Integration Tests', () => {
       async () => {
         // This test just verifies the timeout mechanism exists
         // We don't actually want to wait for a timeout
-        expect(TEST_CONFIG.requestTimeout).toBeGreaterThan(0);
+        expect(config.requestTimeout).toBeGreaterThan(0);
         console.log('  ✓ Timeout configuration is set');
       },
-      TEST_CONFIG.requestTimeout
+      config.requestTimeout
     );
   });
 });
+
+// ============================================================================
+// AUTHENTICATED INTEGRATION TESTS
+// ============================================================================
+// These tests require a test account and .env.test configuration
+// Run with: npm run test:integration:auth
+// ============================================================================

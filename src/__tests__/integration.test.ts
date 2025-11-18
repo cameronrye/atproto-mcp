@@ -353,7 +353,7 @@ describe('Phase 2 Integration Tests', () => {
       expect(toolNames).toContain('block_user');
       expect(toolNames).toContain('report_content');
       expect(toolNames).toContain('report_user');
-      expect(tools.length).toBe(40); // All 40 tools should be created
+      expect(tools.length).toBe(60); // All 60 tools should be created (includes Phase 3 enhancements)
     });
 
     it('should have moderation tools with correct schemas', () => {
@@ -483,7 +483,7 @@ describe('Phase 2 Integration Tests', () => {
 
       // Test total tools created in factory
       const allTools = createTools(mockAtpClient);
-      expect(allTools.length).toBe(40); // All 40 tools should be created
+      expect(allTools.length).toBe(60); // All 60 tools should be created (includes Phase 3 enhancements)
     });
   });
 });

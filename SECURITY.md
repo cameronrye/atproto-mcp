@@ -4,9 +4,9 @@
 
 We release patches for security vulnerabilities in the following versions:
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 0.1.x   | :white_check_mark: |
+| Version | Supported |
+| ------- | --------- |
+| 0.1.x   | Yes       |
 
 ## Reporting a Vulnerability
 
@@ -99,13 +99,13 @@ The default configuration allows all origins (`*`). **Configure specific origins
 
 ## Security Features
 
-- ✅ Input validation using Zod schemas
-- ✅ Rate limiting to prevent abuse
-- ✅ Input sanitization to prevent injection attacks
-- ✅ Error sanitization to prevent information leakage
-- ✅ Non-root Docker container
-- ✅ Credential redaction in logs
-- ✅ HTTPS support for AT Protocol connections
+- Input validation using Zod schemas
+- Rate limiting to prevent abuse
+- Input sanitization to prevent injection attacks
+- Error sanitization to prevent information leakage
+- Non-root Docker container
+- Credential redaction in logs
+- HTTPS support for AT Protocol connections
 
 ## Disclosure Policy
 

@@ -9,26 +9,44 @@ import type { AtpClient } from '../utils/atp-client.js';
 import { Logger } from '../utils/logger.js';
 import {
   AddToListTool,
+  AnalyzeEngagementTool,
+  AnalyzeImageTool,
+  AnalyzeModerationStatusTool,
+  AnalyzeNetworkTool,
+  BatchFollowTool,
+  BatchLikeTool,
+  BatchRepostTool,
   BlockUserTool,
   CreateListTool,
   CreatePostTool,
   CreateRichTextPostTool,
+  CreateThreadTool,
   DeletePostTool,
+  DiscoverCommunitiesTool,
+  DiscoverTrendingTool,
+  ExtractMediaFromPostTool,
+  FindInfluentialUsersTool,
+  FindSimilarUsersTool,
   FollowUserTool,
+  GenerateAltTextTool,
   GenerateLinkPreviewTool,
   GetCustomFeedTool,
   GetFollowersTool,
   GetFollowsTool,
   GetListTool,
   GetNotificationsTool,
+  GetPostContextTool,
   GetRecentEventsTool,
   GetStreamingStatusTool,
   GetThreadTool,
   GetTimelineTool,
   GetUserProfileTool,
+  GetUserSummaryTool,
   HandleOAuthCallbackTool,
   LikePostTool,
+  MonitorKeywordsTool,
   MuteUserTool,
+  RecommendContentTool,
   RefreshOAuthTokensTool,
   RemoveFromListTool,
   ReplyToPostTool,
@@ -40,6 +58,8 @@ import {
   StartOAuthFlowTool,
   StartStreamingTool,
   StopStreamingTool,
+  SuggestContentStrategyTool,
+  TrackUsersTool,
   UnblockUserTool,
   UnfollowUserTool,
   UnlikePostTool,
@@ -72,6 +92,7 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     const tools = [
       // Core social operations
       new CreatePostTool(atpClient),
+      new CreateThreadTool(atpClient),
       new ReplyToPostTool(atpClient),
       new LikePostTool(atpClient),
       new UnlikePostTool(atpClient),
@@ -107,12 +128,15 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
       new UnblockUserTool(atpClient),
       new ReportContentTool(atpClient),
       new ReportUserTool(atpClient),
+      new AnalyzeModerationStatusTool(atpClient),
 
       // Real-time streaming
       new StartStreamingTool(atpClient),
       new StopStreamingTool(atpClient),
       new GetStreamingStatusTool(atpClient),
       new GetRecentEventsTool(atpClient),
+      new MonitorKeywordsTool(atpClient),
+      new TrackUsersTool(atpClient),
 
       // Advanced social features
       new CreateListTool(atpClient),
@@ -127,6 +151,32 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
       new UploadVideoTool(atpClient),
       new CreateRichTextPostTool(atpClient),
       new GenerateLinkPreviewTool(atpClient),
+      new GenerateAltTextTool(atpClient),
+
+      // Analytics and insights
+      new AnalyzeEngagementTool(atpClient),
+      new AnalyzeNetworkTool(atpClient),
+      new SuggestContentStrategyTool(atpClient),
+      new FindInfluentialUsersTool(atpClient),
+
+      // Content discovery
+      new DiscoverTrendingTool(atpClient),
+      new FindSimilarUsersTool(atpClient),
+      new RecommendContentTool(atpClient),
+      new DiscoverCommunitiesTool(atpClient),
+
+      // Batch operations
+      new BatchFollowTool(atpClient),
+      new BatchLikeTool(atpClient),
+      new BatchRepostTool(atpClient),
+
+      // Composite operations
+      new GetUserSummaryTool(atpClient),
+      new GetPostContextTool(atpClient),
+
+      // Rich media
+      new AnalyzeImageTool(atpClient),
+      new ExtractMediaFromPostTool(atpClient),
     ];
 
     logger.info(`Created ${tools.length} AT Protocol MCP tools`);

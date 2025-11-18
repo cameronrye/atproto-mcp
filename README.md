@@ -6,15 +6,36 @@
   [![npm version](https://badge.fury.io/js/atproto-mcp.svg)](https://badge.fury.io/js/atproto-mcp)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
   [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-  [![Tests](https://github.com/cameronrye/atproto-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cameronrye/atproto-mcp/actions/workflows/ci.yml)
+
+  [![CI](https://github.com/cameronrye/atproto-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/cameronrye/atproto-mcp/actions/workflows/ci.yml)
+  [![Integration Tests](https://github.com/cameronrye/atproto-mcp/actions/workflows/integration-tests.yml/badge.svg)](https://github.com/cameronrye/atproto-mcp/actions/workflows/integration-tests.yml)
+  [![Documentation](https://github.com/cameronrye/atproto-mcp/actions/workflows/docs.yml/badge.svg)](https://github.com/cameronrye/atproto-mcp/actions/workflows/docs.yml)
+  [![Release](https://github.com/cameronrye/atproto-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/cameronrye/atproto-mcp/actions/workflows/release.yml)
   [![Coverage](https://codecov.io/gh/cameronrye/atproto-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/cameronrye/atproto-mcp)
+
+  ![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen?logo=node.js)
+  ![pnpm](https://img.shields.io/badge/pnpm-10.17.1-orange?logo=pnpm)
+  ![AT Protocol](https://img.shields.io/badge/AT_Protocol-0.17.7-7856ff)
+  ![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.22.0-blue)
+
+  ![GitHub stars](https://img.shields.io/github/stars/cameronrye/atproto-mcp?style=social)
+  ![npm downloads](https://img.shields.io/npm/dm/atproto-mcp)
+  ![GitHub last commit](https://img.shields.io/github/last-commit/cameronrye/atproto-mcp)
+  ![GitHub contributors](https://img.shields.io/github/contributors/cameronrye/atproto-mcp)
+
+  ![Code Style](https://img.shields.io/badge/code_style-prettier-ff69b4.svg)
+  [![Documentation](https://img.shields.io/badge/docs-online-success)](https://cameronrye.github.io/atproto-mcp)
+  [![Security](https://img.shields.io/badge/security-policy-blue)](SECURITY.md)
+  ![npm bundle size](https://img.shields.io/bundlephobia/min/atproto-mcp)
 </div>
 
 A comprehensive Model Context Protocol (MCP) server that provides LLMs with direct access to the AT Protocol ecosystem, enabling seamless interaction with Bluesky and other AT Protocol-based social networks.
 
-**🎯 Supports both authenticated and unauthenticated modes** - Start immediately with public data access (search posts, view profiles), or add authentication for full functionality (write operations, private data, feeds).
+**Supports both authenticated and unauthenticated modes** - Start immediately with public data access (search posts, view profiles), or add authentication for full functionality (write operations, private data, feeds).
 
-## 🏗️ Architecture
+> **New in v0.1.1**: Batch operations for bulk actions, advanced analytics and insights, intelligent content discovery, and conversation context tracking for better LLM awareness across interactions!
+
+## Architecture
 
 This MCP server acts as a bridge between LLM clients and the AT Protocol ecosystem:
 
@@ -44,19 +65,28 @@ This MCP server acts as a bridge between LLM clients and the AT Protocol ecosyst
 
 **Key Point**: Users don't interact with this server directly. Instead, they talk to their LLM client in natural language, and the LLM client uses this MCP server to access AT Protocol functionality.
 
-## 🚀 Features
+## Features
 
-- **🔓 Unauthenticated Mode**: Access public data without any setup - search posts and view basic profiles
-- **🔐 Optional Authentication**: Enable full functionality with app passwords or OAuth for write operations, feeds, and private data
+### New in v0.1.1
+
+- **Batch Operations**: Perform multiple operations in a single call (follow/like/repost up to 25 items at once)
+- **Analytics & Insights**: Analyze engagement patterns, network connections, and get content strategy recommendations
+- **Content Discovery**: Find similar users, trending topics, and influential voices in your areas of interest
+- **Conversation Context**: Track conversation state across LLM interactions for better context awareness
+
+### Core Features
+
+- **Unauthenticated Mode**: Access public data without any setup - view basic profiles and manage OAuth flows
+- **Optional Authentication**: Enable full functionality with app passwords or OAuth for write operations, feeds, and private data
 - **Complete AT Protocol Integration**: Full implementation using official `@atproto/api`
 - **MCP Server Compliance**: Built with `@modelcontextprotocol/sdk` following MCP specification
 - **Type-Safe**: Written in TypeScript with strict type checking
-- **Comprehensive Tools**: 30+ MCP tools for social networking operations
-- **Real-time Support**: WebSocket connections for live data streams
+- **Comprehensive Tools**: 57 MCP tools for social networking operations
+- **Real-time Support**: WebSocket connections for live data streams with intelligent filtering and keyword monitoring
 - **Rate Limiting**: Built-in respect for AT Protocol rate limits
 - **Extensible**: Modular architecture for easy customization
 
-## 🎯 Who Is This For?
+## Who Is This For?
 
 ### Primary Audience: LLM Clients
 
@@ -79,17 +109,17 @@ This project is also for developers who want to:
 - **Extend** the server with custom MCP tools and resources
 - **Contribute** to the open-source project
 
-### ⚠️ This Is NOT:
+### This Is NOT:
 
-- ❌ A direct-use REST API or SDK for application developers
-- ❌ A JavaScript/TypeScript library to import into your app
-- ❌ An end-user application
+- A direct-use REST API or SDK for application developers
+- A JavaScript/TypeScript library to import into your app
+- An end-user application
 
 If you're building an application that needs AT Protocol functionality, you should either:
 1. Use the official `@atproto/api` package directly, OR
 2. Build an LLM-powered application that uses this MCP server through an LLM client
 
-## 📦 Installation
+## Installation
 
 ```bash
 npm install -g atproto-mcp
@@ -101,7 +131,7 @@ Or use with npx:
 npx atproto-mcp
 ```
 
-## 🔧 Quick Start
+## Quick Start
 
 ### Option 1: Unauthenticated Mode (Recommended for most use cases)
 
@@ -126,16 +156,16 @@ npx atproto-mcp
 3. **Interact in natural language** - Ask your LLM to search posts, view profiles, etc.
 
 **What your LLM can do in unauthenticated mode:**
-- ✅ View user profiles (`get_user_profile` - works without auth, provides additional viewer-specific data when authenticated)
-- ✅ Manage OAuth authentication flows (`start_oauth_flow`, `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`)
+- View user profiles (`get_user_profile` - works without auth, provides additional viewer-specific data when authenticated)
+- Manage OAuth authentication flows (`start_oauth_flow`, `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`)
 
 **Note:** The following features require authentication:
-- ❌ Searching posts and hashtags (`search_posts`) - **API changed in 2025 to require authentication**
-- ❌ Viewing follower/following lists (`get_followers`, `get_follows`)
-- ❌ Browsing feeds and threads (`get_thread`, `get_custom_feed`, `get_timeline`)
-- ❌ All write operations (create, like, repost, follow, etc.)
-- ❌ Resources (timeline, profile, notifications) - these are listed but will return an error when accessed without authentication
-- ❌ Prompts (content composition, reply templates) - these are listed but will return an error when accessed without authentication
+- Searching posts and hashtags (`search_posts`) - **API changed in 2025 to require authentication**
+- Viewing follower/following lists (`get_followers`, `get_follows`)
+- Browsing feeds and threads (`get_thread`, `get_custom_feed`, `get_timeline`)
+- All write operations (create, like, repost, follow, etc.)
+- Resources (timeline, profile, notifications) - these are listed but will return an error when accessed without authentication
+- Prompts (content composition, reply templates) - these are listed but will return an error when accessed without authentication
 
 **Important:** All tools, resources, and prompts are listed by the MCP server regardless of authentication state. Tools and resources that require authentication will return a clear error message when called without proper credentials.
 
@@ -163,17 +193,17 @@ npx atproto-mcp
 2. **Start your LLM client** - it will launch the authenticated MCP server
 
 **What your LLM can do in authenticated mode:**
-- ✅ Create, edit, and delete posts
-- ✅ Follow/unfollow users
-- ✅ Like and repost content
-- ✅ Access personalized timelines and notifications
-- ✅ Manage lists and moderation settings
+- Create, edit, and delete posts
+- Follow/unfollow users
+- Like and repost content
+- Access personalized timelines and notifications
+- Manage lists and moderation settings
 
-## 🛠️ Available Tools
+## Available Tools
 
-The server provides **30+ MCP tools** across multiple categories. See the [complete API documentation](https://cameronrye.github.io/atproto-mcp/api/) for detailed information on each tool.
+The server provides **57 MCP tools** across multiple categories. See the [complete API documentation](https://cameronrye.github.io/atproto-mcp/api/) for detailed information on each tool.
 
-### 🔓 Public Tools (No Authentication Required)
+### Public Tools (No Authentication Required)
 
 **Data Retrieval**
 - `get_user_profile` - Retrieve basic user information (ENHANCED mode: works without auth, provides additional viewer-specific data when authenticated)
@@ -186,7 +216,7 @@ The server provides **30+ MCP tools** across multiple categories. See the [compl
 
 **Note:** As of 2025, the AT Protocol API has changed to require authentication for most endpoints that were previously public, including `search_posts`.
 
-### 🔐 Private Tools (Authentication Required)
+### Private Tools (Authentication Required)
 
 **Social Operations**
 - `create_post` - Create new posts with rich text support
@@ -221,13 +251,45 @@ The server provides **30+ MCP tools** across multiple categories. See the [compl
 - `block_user` / `unblock_user` - Block and unblock users
 - `report_content` / `report_user` - Report content and users
 
-**Real-time Streaming**
-- `start_streaming` - Start real-time event stream
+**Real-time Streaming & Intelligence**
+- `start_streaming` - Start real-time event stream with filtering
 - `stop_streaming` - Stop event stream
 - `get_streaming_status` - Check streaming status
-- `get_recent_events` - Retrieve recent events
+- `get_recent_events` - Retrieve recent events from stream
+- `monitor_keywords` - Monitor firehose for specific keywords in real-time
+- `track_users` - Track activity from specific users in real-time
 
-## 📚 Documentation
+**Batch Operations**
+- `batch_follow` - Follow multiple users at once (up to 25)
+- `batch_like` - Like multiple posts at once (up to 25)
+- `batch_repost` - Repost multiple posts at once (up to 25)
+
+**Analytics & Insights**
+- `analyze_engagement` - Analyze engagement patterns across posts
+- `analyze_network` - Analyze user's network and connections
+- `suggest_content_strategy` - Get content strategy recommendations based on performance
+- `find_influential_users` - Find influential users in a topic area
+
+**Content Discovery**
+- `discover_trending` - Discover trending topics and posts
+- `find_similar_users` - Find users similar to a given user
+- `recommend_content` - Get personalized content recommendations
+- `discover_communities` - Discover communities around topics
+
+**Composite Operations**
+- `get_user_summary` - Get complete user profile with stats and analysis
+- `get_post_context` - Get post with thread, author, and engagement data
+- `create_thread` - Create multi-post threads in one call
+
+**Rich Media**
+- `generate_alt_text` - Generate descriptive alt text for images
+- `analyze_image` - Analyze image metadata and properties
+- `extract_media_from_post` - Extract all media from posts
+
+**Enhanced Moderation**
+- `analyze_moderation_status` - Check moderation status of content
+
+## Documentation
 
 Visit our [documentation site](https://cameronrye.github.io/atproto-mcp) for:
 
@@ -237,7 +299,7 @@ Visit our [documentation site](https://cameronrye.github.io/atproto-mcp) for:
 - **Examples and Tutorials**
 - **Troubleshooting**
 
-## 🔐 Authentication (Optional)
+## Authentication (Optional)
 
 The server works perfectly without authentication for accessing public data. Authentication is only needed for write operations and private data access.
 
@@ -255,7 +317,7 @@ export ATPROTO_CLIENT_SECRET="your-client-secret"
 atproto-mcp --auth oauth
 ```
 
-## 🧪 Development
+## Development
 
 ### Quick Start
 
@@ -320,7 +382,7 @@ npm run deps:audit       # Audit for security issues
 All build commands work on **Windows, macOS, and Linux** without requiring additional tools.
 Simply use npm scripts on any platform (e.g., `npm run dev`, `npm test`, `npm run build`).
 
-## 🧪 Testing
+## Testing
 
 The project includes comprehensive test coverage:
 
@@ -347,16 +409,16 @@ npm run test:integration
 ```
 
 **What's tested:**
-- ✅ All public tools (search_posts, get_user_profile, get_followers, get_follows, get_thread, get_custom_feed)
-- ✅ DID and handle resolution
-- ✅ Pagination support
-- ✅ Error handling
-- ✅ AT Protocol specification compliance
-- ✅ Rate limiting behavior
+- All public tools (search_posts, get_user_profile, get_followers, get_follows, get_thread, get_custom_feed)
+- DID and handle resolution
+- Pagination support
+- Error handling
+- AT Protocol specification compliance
+- Rate limiting behavior
 
 **Note:** Integration tests are opt-in and disabled by default to avoid hitting real servers during normal development. See [Integration Tests Documentation](src/__tests__/INTEGRATION_TESTS.md) for details.
 
-## 🤝 Contributing
+## Contributing
 
 We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
@@ -366,23 +428,23 @@ We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) f
 4. Add tests
 5. Submit a pull request
 
-## 📄 License
+## License
 
 This project is licensed under the MIT License.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - [AT Protocol Team](https://github.com/bluesky-social/atproto) for the excellent protocol and SDK
 - [Anthropic](https://github.com/modelcontextprotocol) for the Model Context Protocol
 - The open source community for inspiration and contributions
 
-## 📞 Support
+## Support
 
-- 📖 [Documentation](https://cameronrye.github.io/atproto-mcp)
-- 🐛 [Issue Tracker](https://github.com/cameronrye/atproto-mcp/issues)
-- 💬 [Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
+- [Documentation](https://cameronrye.github.io/atproto-mcp)
+- [Issue Tracker](https://github.com/cameronrye/atproto-mcp/issues)
+- [Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
 
-## 🏭 Production Deployment
+## Production Deployment
 
 The AT Protocol MCP Server is production-ready with comprehensive features for enterprise deployment:
 
@@ -421,7 +483,7 @@ LOG_LEVEL=info
 
 For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
 
-## 🔒 Security
+## Security
 
 Security is a top priority for this project. Please review our security practices and policies:
 
@@ -465,12 +527,12 @@ If you discover a security vulnerability, please review our [Security Policy](SE
 
 ### Security Features
 
-- ✅ Input validation and sanitization
-- ✅ Rate limiting and abuse prevention
-- ✅ Credential redaction in logs
-- ✅ Non-root Docker containers
-- ✅ HTTPS support for AT Protocol
-- ✅ Error sanitization to prevent information leakage
+- Input validation and sanitization
+- Rate limiting and abuse prevention
+- Credential redaction in logs
+- Non-root Docker containers
+- HTTPS support for AT Protocol
+- Error sanitization to prevent information leakage
 
 For more details, see [SECURITY.md](SECURITY.md).
 

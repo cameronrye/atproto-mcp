@@ -1,0 +1,109 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_mode:
+        description: 'Test mode to run'
+        required: true
+        default: 'unauthenticated'
+        type: choice
+        options:
+          - unauthenticated
+          - authenticated
+          - all
+
+jobs:
+  # Unauthenticated integration tests (public endpoints only)
+  unauthenticated-tests:
+    name: Unauthenticated Integration Tests
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.test_mode == 'unauthenticated' ||
+      github.event.inputs.test_mode == 'all'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unauthenticated integration tests
+        run: npm run test:integration
+        env:
+          RUN_INTEGRATION_TESTS: 'true'
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unauthenticated-test-results
+          path: |
+            coverage/
+            test-results/
+
+  # Authenticated integration tests (requires test account)
+  authenticated-tests:
+    name: Authenticated Integration Tests
+    runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') &&
+      (github.event.inputs.test_mode == 'authenticated' || github.event.inputs.test_mode == 'all' || github.event_name == 'schedule')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env.test
+        run: |
+          cat > .env.test << EOF
+          RUN_INTEGRATION_TESTS=true
+          ATPROTO_TEST_IDENTIFIER=${{ secrets.BSKY_TEST_HANDLE }}
+          ATPROTO_TEST_PASSWORD=${{ secrets.BSKY_TEST_PASSWORD }}
+          ATPROTO_TEST_SERVICE=https://bsky.social
+          TEST_RATE_LIMIT_DELAY=3000
+          TEST_REQUEST_TIMEOUT=60000
+          TEST_CLEANUP_ENABLED=true
+          TEST_MAX_POSTS_PER_RUN=5
+          TEST_MAX_FOLLOWS_PER_RUN=3
+          TEST_MAX_LIKES_PER_RUN=5
+          EOF
+
+      - name: Run authenticated integration tests
+        run: npm run test:integration:auth
+        env:
+          CI: 'true'
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-test-results
+          path: |
+            coverage/
+            test-results/
+

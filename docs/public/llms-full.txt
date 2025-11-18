@@ -1,0 +1,125 @@
+# AT Protocol MCP Server
+
+> A comprehensive Model Context Protocol (MCP) server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem including Bluesky and other decentralized social networks.
+
+This MCP server provides a complete bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, manage content, and stream real-time updates from the decentralized social web.
+
+Key capabilities:
+- Full AT Protocol integration using official @atproto/api
+- MCP-compliant server implementation with @modelcontextprotocol/sdk
+- Type-safe TypeScript implementation with comprehensive validation
+- OAuth and app password authentication support
+- Real-time data streaming and notifications
+- Extensive social operations (posts, likes, reposts, follows)
+- Content management (images, videos, rich text)
+- User profile and timeline management
+
+## Getting Started
+
+- [Installation Guide](https://cameronrye.github.io/atproto-mcp/guide/installation.html): How to install and set up the MCP server
+- [Quick Start](https://cameronrye.github.io/atproto-mcp/guide/getting-started.html): Get up and running in minutes
+- [Configuration](https://cameronrye.github.io/atproto-mcp/guide/configuration.html): Configure the server for your needs
+- [Authentication](https://cameronrye.github.io/atproto-mcp/guide/authentication.html): Set up OAuth or app password authentication
+- [Introduction](https://cameronrye.github.io/atproto-mcp/guide/introduction.html): Overview of the project and its goals
+
+## Core Concepts
+
+- [MCP Protocol](https://cameronrye.github.io/atproto-mcp/guide/mcp-protocol.html): Understanding the Model Context Protocol
+- [AT Protocol](https://cameronrye.github.io/atproto-mcp/guide/at-protocol.html): Overview of the AT Protocol ecosystem
+- [Tools & Resources](https://cameronrye.github.io/atproto-mcp/guide/tools-resources.html): Available MCP tools and resources
+- [Error Handling](https://cameronrye.github.io/atproto-mcp/guide/error-handling.html): Best practices for error handling
+
+## API Reference
+
+- [API Overview](https://cameronrye.github.io/atproto-mcp/api/): Complete API documentation
+
+### Social Operations
+- [Create Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-post.html): Create text posts on AT Protocol
+- [Create Rich Text Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-rich-text-post.html): Create posts with rich formatting
+- [Reply to Post](https://cameronrye.github.io/atproto-mcp/api/tools/reply-to-post.html): Reply to existing posts
+- [Like Post](https://cameronrye.github.io/atproto-mcp/api/tools/like-post.html): Like posts
+- [Unlike Post](https://cameronrye.github.io/atproto-mcp/api/tools/unlike-post.html): Remove likes from posts
+- [Repost](https://cameronrye.github.io/atproto-mcp/api/tools/repost.html): Repost content
+- [Unrepost](https://cameronrye.github.io/atproto-mcp/api/tools/unrepost.html): Remove reposts
+
+### User Management
+- [Follow User](https://cameronrye.github.io/atproto-mcp/api/tools/follow-user.html): Follow users
+- [Unfollow User](https://cameronrye.github.io/atproto-mcp/api/tools/unfollow-user.html): Unfollow users
+- [Get User Profile](https://cameronrye.github.io/atproto-mcp/api/tools/get-user-profile.html): Retrieve user profiles
+- [Update Profile](https://cameronrye.github.io/atproto-mcp/api/tools/update-profile.html): Update user profiles
+- [Block User](https://cameronrye.github.io/atproto-mcp/api/tools/block-user.html): Block users
+- [Unblock User](https://cameronrye.github.io/atproto-mcp/api/tools/unblock-user.html): Unblock users
+- [Mute User](https://cameronrye.github.io/atproto-mcp/api/tools/mute-user.html): Mute users
+- [Unmute User](https://cameronrye.github.io/atproto-mcp/api/tools/unmute-user.html): Unmute users
+
+### Data Retrieval
+- [Search Posts](https://cameronrye.github.io/atproto-mcp/api/tools/search-posts.html): Search for posts across the network
+- [Get Timeline](https://cameronrye.github.io/atproto-mcp/api/tools/get-timeline.html): Retrieve user timelines
+- [Get Followers](https://cameronrye.github.io/atproto-mcp/api/tools/get-followers.html): Get user followers
+- [Get Follows](https://cameronrye.github.io/atproto-mcp/api/tools/get-follows.html): Get users being followed
+- [Get Notifications](https://cameronrye.github.io/atproto-mcp/api/tools/get-notifications.html): Retrieve notifications
+- [Get Thread](https://cameronrye.github.io/atproto-mcp/api/tools/get-thread.html): Get post threads
+- [Get Custom Feed](https://cameronrye.github.io/atproto-mcp/api/tools/get-custom-feed.html): Access custom feeds
+
+### Content Management
+- [Delete Post](https://cameronrye.github.io/atproto-mcp/api/tools/delete-post.html): Delete posts
+- [Upload Image](https://cameronrye.github.io/atproto-mcp/api/tools/upload-image.html): Upload images
+- [Upload Video](https://cameronrye.github.io/atproto-mcp/api/tools/upload-video.html): Upload videos
+- [Generate Link Preview](https://cameronrye.github.io/atproto-mcp/api/tools/generate-link-preview.html): Generate link previews
+
+### OAuth Authentication
+- [Start OAuth Flow](https://cameronrye.github.io/atproto-mcp/api/tools/start-oauth-flow.html): Initiate OAuth authentication
+- [Handle OAuth Callback](https://cameronrye.github.io/atproto-mcp/api/tools/handle-oauth-callback.html): Handle OAuth callbacks
+- [Refresh OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/refresh-oauth-tokens.html): Refresh authentication tokens
+- [Revoke OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/revoke-oauth-tokens.html): Revoke authentication tokens
+
+### Moderation
+- [Report Content](https://cameronrye.github.io/atproto-mcp/api/tools/report-content.html): Report inappropriate content
+- [Report User](https://cameronrye.github.io/atproto-mcp/api/tools/report-user.html): Report users
+
+### Real-time Streaming
+- [Start Streaming](https://cameronrye.github.io/atproto-mcp/api/tools/start-streaming.html): Start real-time data streaming
+- [Stop Streaming](https://cameronrye.github.io/atproto-mcp/api/tools/stop-streaming.html): Stop data streaming
+- [Get Streaming Status](https://cameronrye.github.io/atproto-mcp/api/tools/get-streaming-status.html): Check streaming status
+- [Get Recent Events](https://cameronrye.github.io/atproto-mcp/api/tools/get-recent-events.html): Retrieve recent streaming events
+
+### Lists Management
+- [Create List](https://cameronrye.github.io/atproto-mcp/api/tools/create-list.html): Create user lists
+- [Add to List](https://cameronrye.github.io/atproto-mcp/api/tools/add-to-list.html): Add users to lists
+- [Remove from List](https://cameronrye.github.io/atproto-mcp/api/tools/remove-from-list.html): Remove users from lists
+- [Get List](https://cameronrye.github.io/atproto-mcp/api/tools/get-list.html): Retrieve list information
+
+### Resources
+- [Timeline Resource](https://cameronrye.github.io/atproto-mcp/api/resources/timeline.html): Timeline resource documentation
+- [Profile Resource](https://cameronrye.github.io/atproto-mcp/api/resources/profile.html): Profile resource documentation
+- [Notifications Resource](https://cameronrye.github.io/atproto-mcp/api/resources/notifications.html): Notifications resource documentation
+
+### Types
+- [Core Types](https://cameronrye.github.io/atproto-mcp/api/types/core.html): Core type definitions
+- [Configuration Types](https://cameronrye.github.io/atproto-mcp/api/types/configuration.html): Configuration type definitions
+- [Parameter Types](https://cameronrye.github.io/atproto-mcp/api/types/parameters.html): Parameter type definitions
+- [Error Types](https://cameronrye.github.io/atproto-mcp/api/types/errors.html): Error type definitions
+- [Utility Types](https://cameronrye.github.io/atproto-mcp/api/types/utilities.html): Utility type definitions
+
+## Examples
+
+- [Basic Usage](https://cameronrye.github.io/atproto-mcp/examples/basic-usage.html): Simple examples to get started
+- [Social Operations](https://cameronrye.github.io/atproto-mcp/examples/social-operations.html): Working with posts, likes, and follows
+- [Content Management](https://cameronrye.github.io/atproto-mcp/examples/content-management.html): Managing images, videos, and rich content
+- [Real-time Data](https://cameronrye.github.io/atproto-mcp/examples/real-time-data.html): Streaming and notifications
+- [Custom Integration](https://cameronrye.github.io/atproto-mcp/examples/custom-integration.html): Building custom integrations
+
+## Diagrams
+
+- [Architecture](https://cameronrye.github.io/atproto-mcp/diagrams/architecture.html): System architecture diagrams
+- [Flows](https://cameronrye.github.io/atproto-mcp/diagrams/flows.html): Data flow diagrams
+- [Sequences](https://cameronrye.github.io/atproto-mcp/diagrams/sequences.html): Sequence diagrams
+
+## Optional
+
+- [Deployment Guide](https://cameronrye.github.io/atproto-mcp/guide/deployment.html): Deploy the server to production
+- [Troubleshooting](https://cameronrye.github.io/atproto-mcp/guide/troubleshooting.html): Common issues and solutions
+- [FAQ](https://cameronrye.github.io/atproto-mcp/FAQ.html): Frequently asked questions
+- [Changelog](https://cameronrye.github.io/atproto-mcp/changelog.html): Version history and updates
+- [Contributing](https://cameronrye.github.io/atproto-mcp/contributing.html): How to contribute to the project
+

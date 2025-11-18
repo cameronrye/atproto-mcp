@@ -15,7 +15,7 @@ This directory contains GitHub Actions workflows for the AT Protocol MCP Server 
 - Security scanning with Trivy
 - Build verification
 
-### 🚀 Release (`release.yml`)
+### Release (`release.yml`)
 **Trigger**: Push of version tags (e.g., `v1.0.0`)
 
 **Purpose**: Automated release process
@@ -33,7 +33,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-### 📖 Documentation (`docs.yml`)
+### Documentation (`docs.yml`)
 **Trigger**: 
 - Push to `main` branch (when docs change)
 - Manual trigger via workflow_dispatch
@@ -43,7 +43,7 @@ git push origin v1.0.0
 - Deploys to GitHub Pages
 - Updates automatically on documentation changes
 
-### 📦 Manual Publish (`publish.yml`)
+### Manual Publish (`publish.yml`)
 **Trigger**: Manual workflow dispatch
 
 **Purpose**: Manual npm publishing for hotfixes or special releases
@@ -103,24 +103,24 @@ Configure these secrets in your GitHub repository settings:
 ## Workflow Features
 
 ### Security
-- ✅ npm provenance for package authenticity
-- ✅ Trivy security scanning
-- ✅ Dependency vulnerability checks
-- ✅ Secure token handling
+- npm provenance for package authenticity
+- Trivy security scanning
+- Dependency vulnerability checks
+- Secure token handling
 
 ### Quality Assurance
-- ✅ Multi-version Node.js testing
-- ✅ TypeScript strict checking
-- ✅ ESLint and Prettier validation
-- ✅ Test coverage reporting
-- ✅ Package content verification
+- Multi-version Node.js testing
+- TypeScript strict checking
+- ESLint and Prettier validation
+- Test coverage reporting
+- Package content verification
 
 ### Automation
-- ✅ Automatic changelog generation
-- ✅ Version validation
-- ✅ Documentation deployment
-- ✅ Release artifact creation
-- ✅ npm tag management
+- Automatic changelog generation
+- Version validation
+- Documentation deployment
+- Release artifact creation
+- npm tag management
 
 ## Troubleshooting
 

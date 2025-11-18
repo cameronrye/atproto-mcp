@@ -1,0 +1,53 @@
+# AT Protocol MCP Server
+
+> A comprehensive Model Context Protocol (MCP) server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem including Bluesky and other decentralized social networks.
+
+This MCP server provides a complete bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, manage content, and stream real-time updates from the decentralized social web.
+
+Key capabilities:
+- Full AT Protocol integration using official @atproto/api
+- MCP-compliant server implementation with @modelcontextprotocol/sdk
+- Type-safe TypeScript implementation with comprehensive validation
+- OAuth and app password authentication support
+- Real-time data streaming and notifications
+- Extensive social operations (posts, likes, reposts, follows)
+- Content management (images, videos, rich text)
+- User profile and timeline management
+
+## Getting Started
+
+- [Installation Guide](https://cameronrye.github.io/atproto-mcp/guide/installation.html): How to install and set up the MCP server
+- [Quick Start](https://cameronrye.github.io/atproto-mcp/guide/getting-started.html): Get up and running in minutes
+- [Configuration](https://cameronrye.github.io/atproto-mcp/guide/configuration.html): Configure the server for your needs
+- [Authentication](https://cameronrye.github.io/atproto-mcp/guide/authentication.html): Set up OAuth or app password authentication
+
+## Core Concepts
+
+- [MCP Protocol](https://cameronrye.github.io/atproto-mcp/guide/mcp-protocol.html): Understanding the Model Context Protocol
+- [AT Protocol](https://cameronrye.github.io/atproto-mcp/guide/at-protocol.html): Overview of the AT Protocol ecosystem
+- [Tools & Resources](https://cameronrye.github.io/atproto-mcp/guide/tools-resources.html): Available MCP tools and resources
+- [Error Handling](https://cameronrye.github.io/atproto-mcp/guide/error-handling.html): Best practices for error handling
+
+## API Reference
+
+- [API Overview](https://cameronrye.github.io/atproto-mcp/api/): Complete API documentation
+- [Social Operations](https://cameronrye.github.io/atproto-mcp/api/tools/create-post.html): Create posts, replies, likes, and reposts
+- [User Management](https://cameronrye.github.io/atproto-mcp/api/tools/follow-user.html): Follow, unfollow, block, and mute users
+- [Data Retrieval](https://cameronrye.github.io/atproto-mcp/api/tools/search-posts.html): Search posts, get timelines, and retrieve user data
+- [Real-time Streaming](https://cameronrye.github.io/atproto-mcp/api/tools/start-streaming.html): Stream live updates from the AT Protocol network
+
+## Examples
+
+- [Basic Usage](https://cameronrye.github.io/atproto-mcp/examples/basic-usage.html): Simple examples to get started
+- [Social Operations](https://cameronrye.github.io/atproto-mcp/examples/social-operations.html): Working with posts, likes, and follows
+- [Content Management](https://cameronrye.github.io/atproto-mcp/examples/content-management.html): Managing images, videos, and rich content
+- [Real-time Data](https://cameronrye.github.io/atproto-mcp/examples/real-time-data.html): Streaming and notifications
+
+## Optional
+
+- [Deployment Guide](https://cameronrye.github.io/atproto-mcp/guide/deployment.html): Deploy the server to production
+- [Troubleshooting](https://cameronrye.github.io/atproto-mcp/guide/troubleshooting.html): Common issues and solutions
+- [FAQ](https://cameronrye.github.io/atproto-mcp/FAQ.html): Frequently asked questions
+- [Changelog](https://cameronrye.github.io/atproto-mcp/changelog.html): Version history and updates
+- [Contributing](https://cameronrye.github.io/atproto-mcp/contributing.html): How to contribute to the project
+

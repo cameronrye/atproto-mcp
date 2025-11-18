@@ -392,19 +392,19 @@ npm install @atproto/api
 
 ### For Developers
 
-- ✅ Use official SDKs
-- ✅ Respect rate limits
-- ✅ Implement proper error handling
-- ✅ Cache responses appropriately
-- ✅ Follow lexicon specifications
+- Use official SDKs
+- Respect rate limits
+- Implement proper error handling
+- Cache responses appropriately
+- Follow lexicon specifications
 
 ### For Users
 
-- ✅ Use app passwords for third-party apps
-- ✅ Verify app permissions
-- ✅ Back up your data
-- ✅ Consider running your own PDS
-- ✅ Participate in moderation
+- Use app passwords for third-party apps
+- Verify app permissions
+- Back up your data
+- Consider running your own PDS
+- Participate in moderation
 
 ## Next Steps
 

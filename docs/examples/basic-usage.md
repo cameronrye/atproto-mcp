@@ -75,24 +75,51 @@ The MCP server is launched automatically by your LLM client. You just need to co
 }
 ```
 
-**For unauthenticated mode** (public data only), omit the `env` section.
+**For unauthenticated mode** (limited functionality), omit the `env` section.
 
 Once configured, restart your LLM client and you're ready to go!
 
-## Public Data Access (No Authentication)
+**Note:** As of 2025, the AT Protocol API has changed to require authentication for most endpoints that were previously public, including search, timelines, feeds, and social graphs. Only basic profile viewing and OAuth management work without authentication.
+
+## Public Data Access (Limited - No Authentication)
 
 These examples show what you say to your LLM client and what happens behind the scenes. **No authentication required** for these:
 
-### Example 1: Search Posts
+### Example 1: View User Profile
 
 **What You Say to Your LLM Client:**
+```
+"Show me the profile for user.bsky.social"
+```
+
+**What Happens Behind the Scenes:**
+
+Your LLM client understands your request and calls the `get_user_profile` tool via MCP:
+```json
+{
+  "actor": "bsky.app"
+}
+```
+
+**What Your LLM Tells You:**
+> "The @bsky.app account is the official Bluesky account with 50,000 followers. They've made 1,000 posts and follow 100 accounts. Their bio says: 'The official Bluesky account'"
+
+## Authenticated Operations
+
+**Note:** As of 2025, most AT Protocol operations require authentication, including searching posts, viewing threads, accessing feeds, and all write operations.
+
+These examples require authentication (configured in your LLM client's MCP settings):
+
+### Example 2: Search Posts
+
+**What You Say:**
 ```
 "Search for posts about artificial intelligence from the last week"
 ```
 
 **What Happens Behind the Scenes:**
 
-Your LLM client understands your request and calls the `search_posts` tool via MCP:
+Your LLM client calls the `search_posts` tool via MCP:
 ```json
 {
   "q": "artificial intelligence",
@@ -102,49 +129,8 @@ Your LLM client understands your request and calls the `search_posts` tool via M
 }
 ```
 
-**What the MCP Server Returns:**
-```json
-{
-  "success": true,
-  "posts": [
-    {
-      "uri": "at://did:plc:abc123.../app.bsky.feed.post/xyz789",
-      "text": "Exciting developments in AI...",
-      "author": {
-        "handle": "user.bsky.social",
-        "displayName": "User Name"
-      },
-      "likeCount": 42,
-      "repostCount": 15,
-      "createdAt": "2024-01-14T10:30:00Z"
-    }
-  ],
-  "hasMore": true,
-  "cursor": "..."
-}
-```
-
 **What Your LLM Tells You:**
 > "I found several posts about artificial intelligence from the last week. Here are some highlights: [summarizes the posts in natural language]"
-
-### Example 2: View User Profile
-
-**What You Say:**
-```
-"Show me the profile for @bsky.app"
-```
-
-**What Happens Behind the Scenes:**
-
-Your LLM client calls the `get_user_profile` tool:
-```json
-{
-  "actor": "bsky.app"
-}
-```
-
-**What Your LLM Tells You:**
-> "The @bsky.app account is the official Bluesky account with 50,000 followers. They've made 1,000 posts and follow 100 accounts. Their bio says: 'The official Bluesky account'"
 
 ### Example 3: Browse a Thread
 
@@ -165,15 +151,11 @@ Your LLM client calls the `get_thread` tool:
 **What Your LLM Tells You:**
 > "This thread has 5 replies. The original post says... The top reply from @user mentions... [summarizes the conversation]"
 
-## Authenticated Operations
-
-These examples require authentication (configured in your LLM client's MCP settings):
-
 ### Example 4: Create a Post
 
 **What You Say:**
 ```
-"Create a post saying 'Hello from AT Protocol MCP Server! 🚀'"
+"Create a post saying 'Hello from AT Protocol MCP Server!'"
 ```
 
 **What Happens Behind the Scenes:**
@@ -181,7 +163,7 @@ These examples require authentication (configured in your LLM client's MCP setti
 Your LLM client calls the `create_post` tool via MCP:
 ```json
 {
-  "text": "Hello from AT Protocol MCP Server! 🚀",
+  "text": "Hello from AT Protocol MCP Server!",
   "langs": ["en"]
 }
 ```
@@ -303,7 +285,7 @@ Your LLM client uses the `content_composition` MCP prompt with:
 "Here's a casual post about TypeScript:
 
 'Just spent the day refactoring with TypeScript and wow,
-the type safety is a game changer! 🎯 No more runtime
+the type safety is a game changer! No more runtime
 surprises. If you're still on the fence, give it a try -
 your future self will thank you. #TypeScript #WebDev #Coding'
 
@@ -435,20 +417,20 @@ continue. Would you like me to:
 
 When talking to your LLM client:
 
-❌ "Search for posts"
-✅ "Search for posts about AI from the last week"
+Bad: "Search for posts"
+Good: "Search for posts about AI from the last week"
 
 The more specific you are, the better your LLM can use the MCP tools.
 
 ### 2. Provide Context
 
-❌ "Like it"
-✅ "Like the post at at://..." or "Like the post we just found"
+Bad: "Like it"
+Good: "Like the post at at://..." or "Like the post we just found"
 
 ### 3. Use Natural Language Chains
 
-✅ "Find posts about decentralization, then like the top one"
-✅ "Search for @user's recent posts and summarize them"
+Good: "Find posts about decentralization, then like the top one"
+Good: "Search for @user's recent posts and summarize them"
 
 Your LLM will chain multiple MCP tool calls automatically.
 
@@ -458,8 +440,8 @@ Your LLM client will receive error messages from the MCP server and explain them
 
 ### 5. Leverage Resources for Context
 
-✅ "Based on my timeline, suggest what to post about"
-✅ "Summarize my notifications and draft replies"
+Good: "Based on my timeline, suggest what to post about"
+Good: "Summarize my notifications and draft replies"
 
 Your LLM can read MCP resources to provide context-aware assistance.
 

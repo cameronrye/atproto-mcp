@@ -381,27 +381,27 @@ The server advertises its capabilities:
 
 ### For Tool Design
 
-- ✅ Use clear, descriptive names
-- ✅ Provide detailed descriptions
-- ✅ Validate all inputs with Zod schemas
-- ✅ Return structured, consistent results
-- ✅ Handle errors gracefully
+- Use clear, descriptive names
+- Provide detailed descriptions
+- Validate all inputs with Zod schemas
+- Return structured, consistent results
+- Handle errors gracefully
 
 ### For Resource Design
 
-- ✅ Use meaningful URI schemes
-- ✅ Return well-structured data
-- ✅ Include timestamps
-- ✅ Implement proper caching
-- ✅ Handle large datasets efficiently
+- Use meaningful URI schemes
+- Return well-structured data
+- Include timestamps
+- Implement proper caching
+- Handle large datasets efficiently
 
 ### For Prompt Design
 
-- ✅ Make prompts reusable
-- ✅ Support customization via arguments
-- ✅ Provide clear guidance
-- ✅ Include examples
-- ✅ Consider context length
+- Make prompts reusable
+- Support customization via arguments
+- Provide clear guidance
+- Include examples
+- Consider context length
 
 ## Next Steps
 

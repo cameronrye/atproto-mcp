@@ -68,7 +68,7 @@ This resource requires authentication to access the user's personalized timeline
         "displayName": "Alice Smith",
         "avatar": "https://cdn.bsky.app/img/avatar/..."
       },
-      "text": "Just deployed a new feature! 🚀",
+      "text": "Just deployed a new feature!",
       "createdAt": "2024-01-15T10:25:00.000Z",
       "replyCount": 5,
       "repostCount": 12,

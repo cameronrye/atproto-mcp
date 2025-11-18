@@ -18,30 +18,56 @@ hero:
       link: https://github.com/cameronrye/atproto-mcp
 
 features:
-  - icon: 🚀
-    title: Complete AT Protocol Integration
+  - title: Complete AT Protocol Integration
     details: Full implementation using official @atproto/api with support for all major AT Protocol operations including posts, follows, likes, and real-time data streams.
 
-  - icon: 🔧
-    title: MCP Server Compliance
+  - title: MCP Server Compliance
     details: Built with @modelcontextprotocol/sdk following the official MCP specification, ensuring compatibility with all MCP-compatible LLM clients.
 
-  - icon: 🛡️
-    title: Type-Safe & Secure
+  - title: Type-Safe & Secure
     details: Written in TypeScript with strict type checking, comprehensive input validation, and secure authentication flows for production use.
 
-  - icon: ⚡
-    title: High Performance
+  - title: Batch Operations (New!)
+    details: Perform multiple operations in a single call - follow, like, or repost up to 25 items at once to reduce round-trips and improve efficiency.
+
+  - title: Analytics & Insights (New!)
+    details: Analyze engagement patterns, network connections, and get AI-powered content strategy recommendations based on your performance data.
+
+  - title: Content Discovery (New!)
+    details: Find similar users, trending topics, and influential voices in your areas of interest with intelligent discovery algorithms.
+
+  - title: Conversation Context (New!)
+    details: Track conversation state across LLM interactions including discussed posts, active threads, and mentioned users for better context awareness.
+
+  - title: High Performance
     details: Optimized for performance with connection pooling, intelligent caching, rate limiting, and efficient data processing pipelines.
 
-  - icon: 🔌
-    title: Extensible Architecture
+  - title: Extensible Architecture
     details: Modular design allows easy customization and extension with custom tools, resources, and prompts for specific use cases.
 
-  - icon: 📚
-    title: Comprehensive Documentation
+  - title: Comprehensive Documentation
     details: Detailed documentation with examples, API reference, troubleshooting guides, and best practices for integration.
 ---
+
+## What's New in v0.1.1
+
+The latest release brings powerful new capabilities to enhance your AT Protocol integration:
+
+::: tip Batch Operations
+Perform multiple operations in a single call! Follow, like, or repost up to 25 items at once to reduce API round-trips and improve efficiency.
+:::
+
+::: tip Analytics & Insights
+Get AI-powered insights into your engagement patterns, network connections, and content strategy with new analytics tools.
+:::
+
+::: tip Content Discovery
+Discover similar users, trending topics, and influential voices in your areas of interest with intelligent discovery algorithms.
+:::
+
+::: tip Conversation Context
+New conversation context resource tracks discussed posts, active threads, and mentioned users across LLM interactions for better context awareness.
+:::
 
 ## Quick Start
 
@@ -52,7 +78,7 @@ Get up and running with the AT Protocol MCP Server in minutes:
 npm install -g atproto-mcp
 
 # Start the server
-atproto-mcp --port 3000
+atproto-mcp
 
 # Or use with npx
 npx atproto-mcp
@@ -60,27 +86,27 @@ npx atproto-mcp
 
 ## Key Features
 
-### 🌐 Social Operations
+### Social Operations
 - Create posts with rich text, images, and embeds
 - Reply to posts with proper threading
 - Like, repost, and manage reactions
 - Follow and unfollow users
 - Access timelines and feeds
 
-### 📊 Data Retrieval
+### Data Retrieval
 - Search posts and content across the network
 - Retrieve user profiles and information
 - Access follower and following lists
 - Get real-time notifications
 - Stream live data updates
 
-### 🔐 Authentication
+### Authentication
 - Secure OAuth flow implementation
 - App password support for development
 - Session management and token refresh
 - Multi-account support
 
-### 🛠️ Developer Experience
+### Developer Experience
 - TypeScript with full type safety
 - Comprehensive error handling
 - Detailed logging and monitoring
@@ -118,11 +144,15 @@ This MCP server enables LLMs to provide powerful AT Protocol capabilities throug
 
 Join our growing community of developers building with the AT Protocol:
 
-- 📖 [Documentation](https://cameronrye.github.io/atproto-mcp)
-- 🐛 [Issue Tracker](https://github.com/cameronrye/atproto-mcp/issues)
-- 💬 [Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
-- 🤝 [Contributing Guide](https://github.com/cameronrye/atproto-mcp/blob/main/CONTRIBUTING.md)
+- [Documentation](https://cameronrye.github.io/atproto-mcp)
+- [Issue Tracker](https://github.com/cameronrye/atproto-mcp/issues)
+- [Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
+- [Contributing Guide](https://github.com/cameronrye/atproto-mcp/blob/main/CONTRIBUTING.md)
 
 ## License
 
 Released under the MIT License.
+
+---
+
+Made with ❤️ by [Cameron Rye](https://rye.dev/)

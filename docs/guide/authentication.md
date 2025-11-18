@@ -25,12 +25,12 @@ Perfect for:
 
 Without authentication, you can:
 
-- ✅ Search posts and hashtags
-- ✅ View user profiles
-- ✅ Get follower/following lists
-- ✅ Browse public feeds
-- ✅ View post threads
-- ✅ Access public timelines
+- Search posts and hashtags
+- View user profiles
+- Get follower/following lists
+- Browse public feeds
+- View post threads
+- Access public timelines
 
 ### Setup
 
@@ -123,11 +123,11 @@ atproto-mcp --log-level debug
 
 ### Security Best Practices
 
-- ✅ **Use app passwords**, not your main account password
-- ✅ **Never commit credentials** to version control
-- ✅ **Rotate passwords regularly** (every 90 days)
-- ✅ **Use different passwords** for different environments
-- ✅ **Revoke unused passwords** in Bluesky settings
+- **Use app passwords**, not your main account password
+- **Never commit credentials** to version control
+- **Rotate passwords regularly** (every 90 days)
+- **Use different passwords** for different environments
+- **Revoke unused passwords** in Bluesky settings
 
 ## OAuth Authentication
 
@@ -227,9 +227,9 @@ The server automatically:
 | **Use Case** | Public data | Development | Production |
 | **User Consent** | N/A | Not required | Required |
 | **Token Refresh** | N/A | Not needed | Automatic |
-| **Multi-user** | ✅ | ❌ | ✅ |
-| **Write Operations** | ❌ | ✅ | ✅ |
-| **Production Ready** | ✅ | ⚠️ | ✅ |
+| **Multi-user** | Yes | No | Yes |
+| **Write Operations** | No | Yes | Yes |
+| **Production Ready** | Yes | Limited | Yes |
 
 ## Switching Between Modes
 

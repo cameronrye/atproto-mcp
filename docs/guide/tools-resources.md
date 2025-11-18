@@ -6,35 +6,47 @@ A comprehensive guide to MCP tools and resources available in the AT Protocol MC
 
 The server provides three types of MCP primitives:
 
-1. **Tools** (30+) - Executable functions for AT Protocol operations
-2. **Resources** (3) - Data sources for context
+1. **Tools** (57) - Executable functions for AT Protocol operations
+2. **Resources** (4) - Data sources for context
 3. **Prompts** (2) - Templates for common tasks
 
 ## Tool Categories
 
-### 🔓 Public Tools (No Authentication Required)
+### Public Tools (No Authentication Required)
 
-These tools work without authentication, perfect for accessing public data:
+These tools work without authentication:
 
 #### Data Retrieval
-- `search_posts` - Search for posts across the network
-- `get_user_profile` - Get public profile information
-- `get_user_profiles` - Get multiple profiles at once
-- `get_followers` - Get follower lists
-- `get_follows` - Get following lists
-- `get_thread` - View post threads and conversations
-- `get_custom_feed` - Access public custom feeds
+- `get_user_profile` - Get public profile information (ENHANCED mode: provides additional viewer-specific data when authenticated)
 
-### 🔐 Private Tools (Authentication Required)
+#### OAuth Management
+- `start_oauth_flow` - Initiate OAuth authentication
+- `handle_oauth_callback` - Complete OAuth flow
+- `refresh_oauth_tokens` - Refresh authentication tokens
+- `revoke_oauth_tokens` - Revoke OAuth tokens
+
+**Note:** As of 2025, the AT Protocol API has changed to require authentication for most endpoints that were previously public, including `search_posts`, `get_followers`, `get_follows`, `get_thread`, and `get_custom_feed`.
+
+### Private Tools (Authentication Required)
 
 These tools require authentication to perform write operations:
 
 #### Social Operations
 - `create_post` - Create new posts
+- `create_thread` - Create multi-post threads in one call
 - `reply_to_post` - Reply to existing posts
 - `like_post` / `unlike_post` - Like and unlike posts
 - `repost` / `unrepost` - Repost content
 - `follow_user` / `unfollow_user` - Follow and unfollow users
+
+#### Data Retrieval
+- `search_posts` - Search for posts across the network (requires auth as of 2025)
+- `get_timeline` - Get personalized timeline
+- `get_followers` - Get follower lists (requires auth as of 2025)
+- `get_follows` - Get following lists (requires auth as of 2025)
+- `get_notifications` - Get notifications
+- `get_thread` - View post threads (requires auth as of 2025)
+- `get_custom_feed` - Access custom feeds (requires auth as of 2025)
 
 #### Content Management
 - `delete_post` - Delete your posts
@@ -50,27 +62,46 @@ These tools require authentication to perform write operations:
 - `remove_from_list` - Remove users from lists
 - `get_list` - Get list details
 
-#### Timeline & Notifications
-- `get_timeline` - Get personalized timeline
-- `get_notifications` - Get notifications
-
 #### Moderation
 - `mute_user` / `unmute_user` - Mute and unmute users
 - `block_user` / `unblock_user` - Block and unblock users
 - `report_content` - Report inappropriate content
 - `report_user` - Report users
+- `analyze_moderation_status` - Check moderation status of content
 
-#### OAuth Management
-- `start_oauth_flow` - Initiate OAuth authentication
-- `handle_oauth_callback` - Complete OAuth flow
-- `refresh_oauth_tokens` - Refresh access tokens
-- `revoke_oauth_tokens` - Revoke tokens and log out
-
-#### Real-time Streaming
-- `start_streaming` - Start real-time event stream
+#### Real-time Streaming & Intelligence
+- `start_streaming` - Start real-time event stream with filtering
 - `stop_streaming` - Stop event stream
 - `get_streaming_status` - Check streaming status
 - `get_recent_events` - Get recent streamed events
+- `monitor_keywords` - Monitor firehose for specific keywords in real-time
+- `track_users` - Track activity from specific users in real-time
+
+#### Batch Operations
+- `batch_follow` - Follow multiple users at once (up to 25)
+- `batch_like` - Like multiple posts at once (up to 25)
+- `batch_repost` - Repost multiple posts at once (up to 25)
+
+#### Analytics & Insights
+- `analyze_engagement` - Analyze engagement patterns across posts
+- `analyze_network` - Analyze user's network and connections
+- `suggest_content_strategy` - Get content strategy recommendations based on performance
+- `find_influential_users` - Find influential users in a topic area
+
+#### Content Discovery
+- `discover_trending` - Discover trending topics and posts
+- `find_similar_users` - Find users similar to a given user
+- `recommend_content` - Get personalized content recommendations
+- `discover_communities` - Discover communities around topics
+
+#### Composite Operations
+- `get_user_summary` - Get complete user profile with stats and analysis
+- `get_post_context` - Get post with thread, author, and engagement data
+
+#### Rich Media
+- `generate_alt_text` - Generate descriptive alt text for images
+- `analyze_image` - Analyze image metadata and properties
+- `extract_media_from_post` - Extract all media from posts
 
 ## Tool Usage Patterns
 
@@ -154,11 +185,11 @@ Each tool has an authentication mode:
 
 ## Resources
 
-Resources provide context data that LLMs can read.
+Resources provide context data that LLMs can read. The server provides 4 resources:
 
 ### atproto://timeline
 
-Your personalized timeline feed.
+Your personalized timeline feed. **Requires authentication.**
 
 **Content**:
 ```json
@@ -188,7 +219,7 @@ Your personalized timeline feed.
 
 ### atproto://profile
 
-Your profile information and statistics.
+Your profile information and statistics. **Requires authentication.**
 
 **Content**:
 ```json
@@ -220,7 +251,7 @@ Your profile information and statistics.
 
 ### atproto://notifications
 
-Your recent notifications and mentions.
+Your recent notifications and mentions. **Requires authentication.**
 
 **Content**:
 ```json
@@ -246,6 +277,86 @@ Your recent notifications and mentions.
 "Check my notifications"
 "Who liked my recent posts?"
 ```
+
+### atproto://conversation-context
+
+Tracks conversation state across LLM interactions. **Always available (no authentication required).**
+
+**Content**:
+```json
+{
+  "uri": "atproto://conversation-context",
+  "timestamp": "2024-01-01T12:00:00Z",
+  "context": {
+    "recentlyDiscussedPosts": [
+      {
+        "uri": "at://...",
+        "cid": "...",
+        "text": "Post content",
+        "author": "user.bsky.social",
+        "discussedAt": "2024-01-01T11:00:00Z",
+        "context": "Discussed in conversation about AI"
+      }
+    ],
+    "activeThreads": [
+      {
+        "rootUri": "at://...",
+        "rootCid": "...",
+        "topic": "AI discussion",
+        "lastInteraction": "2024-01-01T11:00:00Z",
+        "participantCount": 5
+      }
+    ],
+    "mentionedUsers": [
+      {
+        "did": "did:plc:...",
+        "handle": "user.bsky.social",
+        "displayName": "User Name",
+        "mentionedAt": "2024-01-01T11:00:00Z",
+        "context": "Mentioned in discussion about features"
+      }
+    ],
+    "searchHistory": [
+      {
+        "query": "artificial intelligence",
+        "timestamp": "2024-01-01T11:00:00Z",
+        "resultCount": 25
+      }
+    ],
+    "recentActions": [
+      {
+        "action": "create_post",
+        "target": "at://...",
+        "timestamp": "2024-01-01T11:00:00Z",
+        "details": {}
+      }
+    ]
+  },
+  "summary": {
+    "discussedPostsCount": 10,
+    "activeThreadsCount": 3,
+    "mentionedUsersCount": 5,
+    "searchHistoryCount": 8,
+    "recentActionsCount": 15
+  }
+}
+```
+
+**Usage**:
+```
+"What have we been discussing?"
+"Show me the conversation context"
+"What posts have I interacted with recently?"
+```
+
+**Purpose**: This resource helps LLMs maintain context across interactions, tracking:
+- Posts that have been discussed in the conversation
+- Active threads being followed
+- Users that have been mentioned
+- Search queries performed
+- Recent actions taken
+
+This enables more coherent, contextual responses from LLMs by providing conversation history.
 
 ## Prompts
 
@@ -319,25 +430,25 @@ Through your LLM client:
 
 ### For Tool Usage
 
-- ✅ Use descriptive natural language
-- ✅ Provide context when needed
-- ✅ Chain operations logically
-- ✅ Handle errors gracefully
-- ✅ Respect rate limits
+- Use descriptive natural language
+- Provide context when needed
+- Chain operations logically
+- Handle errors gracefully
+- Respect rate limits
 
 ### For Resource Access
 
-- ✅ Access resources when context is needed
-- ✅ Don't over-fetch data
-- ✅ Cache resource data appropriately
-- ✅ Refresh when data is stale
+- Access resources when context is needed
+- Don't over-fetch data
+- Cache resource data appropriately
+- Refresh when data is stale
 
 ### For Prompt Usage
 
-- ✅ Provide relevant arguments
-- ✅ Customize for your use case
-- ✅ Iterate on generated content
-- ✅ Combine with tools for complete workflows
+- Provide relevant arguments
+- Customize for your use case
+- Iterate on generated content
+- Combine with tools for complete workflows
 
 ## Common Workflows
 

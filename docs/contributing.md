@@ -251,5 +251,5 @@ By contributing, you agree that your contributions will be licensed under the MI
 
 ---
 
-Thank you for contributing to the AT Protocol MCP Server! 🎉
+Thank you for contributing to the AT Protocol MCP Server!
 
