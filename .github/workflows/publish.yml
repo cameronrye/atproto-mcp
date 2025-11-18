@@ -86,6 +86,8 @@ jobs:
           echo "📦 Publishing version ${{ inputs.version }} with tag ${{ inputs.tag }}"
           pnpm publish --tag ${{ inputs.tag }} --no-git-checks --provenance --access public
           echo "✅ Published successfully"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Commit version change
         if: '!inputs.dry_run && inputs.tag == ''latest'''
