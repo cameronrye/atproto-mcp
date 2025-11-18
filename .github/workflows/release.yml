@@ -108,9 +108,7 @@ jobs:
             dist/**/*
 
       - name: Publish to npm
-        run: pnpm publish --no-git-checks --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: pnpm publish --no-git-checks --provenance --access public
 
   docs:
     name: Deploy Documentation
