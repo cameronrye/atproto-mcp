@@ -50,7 +50,7 @@ jobs:
       - name: Verify package contents
         run: |
           echo "Package contents:"
-          pnpm pack --dry-run
+          npm pack --dry-run
 
       - name: Extract version from tag
         id: version

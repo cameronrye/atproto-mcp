@@ -71,7 +71,7 @@ jobs:
       - name: Verify package contents
         run: |
           echo "Package contents:"
-          pnpm pack --dry-run
+          npm pack --dry-run
 
       - name: Dry run publish
         if: inputs.dry_run
