@@ -44,6 +44,9 @@ jobs:
       - name: Format check
         run: pnpm run format:check
 
+      - name: Build
+        run: pnpm run build
+
       - name: Run tests
         run: pnpm run test:coverage
 
