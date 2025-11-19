@@ -91,15 +91,6 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Commit version change
-        if: '!inputs.dry_run && inputs.tag == ''latest'''
-        run: |
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
-          git add package.json
-          git commit -m "chore: bump version to ${{ inputs.version }}" || echo "No changes to commit"
-          git push origin main
-
       - name: Create git tag
         if: '!inputs.dry_run && inputs.tag == ''latest'''
         run: |
@@ -107,21 +98,6 @@ jobs:
           git config --local user.name "GitHub Action"
           git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
           git push origin "v${{ inputs.version }}"
-
-      - name: Generate changelog
-        if: '!inputs.dry_run && inputs.tag == ''latest'''
-        id: changelog
-        run: |
-          # Generate changelog from git commits since last tag
-          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
-          if git describe --tags --abbrev=0 HEAD^ >/dev/null 2>&1; then
-            LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
-            echo "Changes since $LAST_TAG:" >> $GITHUB_OUTPUT
-            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
-          else
-            echo "- Initial release" >> $GITHUB_OUTPUT
-          fi
-          echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
         if: '!inputs.dry_run && inputs.tag == ''latest'''
@@ -132,8 +108,7 @@ jobs:
           body: |
             ## AT Protocol MCP Server ${{ inputs.version }}
 
-            ### Changes
-            ${{ steps.changelog.outputs.CHANGELOG }}
+            Published to npm: https://www.npmjs.com/package/atproto-mcp/v/${{ inputs.version }}
 
             ### Installation
             ```bash
@@ -142,7 +117,6 @@ jobs:
 
             ### Quick Start
             ```bash
-            # Start in unauthenticated mode (works immediately!)
             atproto-mcp
             ```
 
