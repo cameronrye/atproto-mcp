@@ -99,6 +99,21 @@ jobs:
           git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
           git push origin "v${{ inputs.version }}"
 
+      - name: Generate changelog
+        if: '!inputs.dry_run && inputs.tag == ''latest'''
+        id: changelog
+        run: |
+          # Generate changelog from git commits since last tag
+          echo "CHANGELOG<<EOF" >> $GITHUB_OUTPUT
+          if git describe --tags --abbrev=0 HEAD^ >/dev/null 2>&1; then
+            LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
+            echo "Changes since $LAST_TAG:" >> $GITHUB_OUTPUT
+            git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
+          else
+            echo "- Initial release" >> $GITHUB_OUTPUT
+          fi
+          echo "EOF" >> $GITHUB_OUTPUT
+
       - name: Create GitHub Release
         if: '!inputs.dry_run && inputs.tag == ''latest'''
         uses: softprops/action-gh-release@v1
@@ -108,7 +123,8 @@ jobs:
           body: |
             ## AT Protocol MCP Server ${{ inputs.version }}
 
-            Published to npm: https://www.npmjs.com/package/atproto-mcp/v/${{ inputs.version }}
+            ### Changes
+            ${{ steps.changelog.outputs.CHANGELOG }}
 
             ### Installation
             ```bash
@@ -117,12 +133,15 @@ jobs:
 
             ### Quick Start
             ```bash
+            # Start in unauthenticated mode (works immediately!)
             atproto-mcp
             ```
 
             For more information, see the [documentation](https://cameronrye.github.io/atproto-mcp).
           draft: false
           prerelease: false
+          files: |
+            dist/**/*
           token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Summary
