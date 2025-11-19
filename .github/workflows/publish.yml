@@ -149,8 +149,7 @@ jobs:
             For more information, see the [documentation](https://cameronrye.github.io/atproto-mcp).
           draft: false
           prerelease: false
-          files: |
-            dist/**/*
+          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Summary
         run: |
