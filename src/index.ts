@@ -10,9 +10,10 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { ConfigurationError, type IMcpServerConfig, McpError } from './types/index.js';
+import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
@@ -130,8 +131,10 @@ export class AtpMcpServer {
   private setupServer(): void {
     this.logger.info('Setting up MCP server handlers...');
 
-    // Set up basic MCP protocol handlers
-    this.setupBasicHandlers();
+    // Note: 'initialize' and 'ping' are handled natively by the SDK Server/Protocol
+    // classes (capability + protocol-version negotiation, spec-compliant ping). We
+    // must NOT register our own handlers for them — doing so overrides the SDK's
+    // negotiation and drops tracked client capabilities.
 
     // Create and register tools, resources, and prompts
     const tools = createTools(this.atpClient);
@@ -147,49 +150,6 @@ export class AtpMcpServer {
       `Registered ${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
     );
     this.logger.info('MCP server handlers setup complete');
-  }
-
-  /**
-   * Set up basic MCP protocol handlers
-   *
-   * Note: While the MCP SDK Server class provides the infrastructure, we still need
-   * to explicitly register handlers for 'initialize' and 'ping' requests as per the
-   * MCP specification. The SDK uses setRequestHandler for all protocol methods.
-   */
-  private setupBasicHandlers(): void {
-    // Handle server info requests
-    this.server.setRequestHandler(z.object({ method: z.literal('initialize') }), async () => {
-      const config = this.configManager.getConfig();
-      return {
-        protocolVersion: '2024-11-05',
-        capabilities: {
-          tools: {
-            listChanged: true,
-          },
-          resources: {
-            subscribe: false,
-            listChanged: true,
-          },
-          prompts: {
-            listChanged: true,
-          },
-        },
-        serverInfo: {
-          name: config.name,
-          version: config.version,
-          // Note: 'description' field removed per MCP specification
-          // serverInfo should only contain 'name' and 'version'
-        },
-      };
-    });
-
-    // Handle ping requests
-    this.server.setRequestHandler(z.object({ method: z.literal('ping') }), async () => ({
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-    }));
-
-    this.logger.debug('Basic MCP handlers registered');
   }
 
   /**
@@ -210,86 +170,118 @@ export class AtpMcpServer {
       })
     );
 
-    // Register individual tool handlers
+    // Build a name -> tool lookup so a SINGLE tools/call handler can dispatch
+    // to every tool. The MCP SDK keys request handlers by method name only
+    // (see Protocol.setRequestHandler), so registering one handler per tool under
+    // the same 'tools/call' method would overwrite all but the last-registered
+    // tool, leaving every other tool uninvokable.
+    const toolsByName = new Map<string, IMcpTool>();
     for (const tool of tools) {
-      this.server.setRequestHandler(
-        z.object({
-          method: z.literal('tools/call'),
-          params: z.object({
-            name: z.literal(tool.schema.method),
-            arguments: z.any().optional(),
-          }),
-        }),
-        async request => {
-          try {
-            // Check if tool is available before execution
-            if ('isAvailable' in tool && typeof tool.isAvailable === 'function') {
-              if (!tool.isAvailable()) {
-                const availabilityMessage =
-                  'getAvailabilityMessage' in tool &&
-                  typeof tool.getAvailabilityMessage === 'function'
-                    ? tool.getAvailabilityMessage()
-                    : 'Tool not available';
-
-                throw new McpError(`Tool not available: ${availabilityMessage}`, -32603, {
-                  tool: tool.schema.method,
-                  availability: availabilityMessage,
-                });
-              }
-            }
-
-            const result = await tool.handler(request.params.arguments || {});
-
-            // DESIGN DECISION: Return results as formatted JSON text for LLM consumption
-            //
-            // This server intentionally returns all tool results as stringified JSON text
-            // rather than using MCP's structured content types. This is a deliberate
-            // architectural choice with the following rationale:
-            //
-            // 1. Consistency: All tools return the same format, making it easier for LLMs
-            //    to parse and understand responses without needing to handle multiple
-            //    content type variations.
-            //
-            // 2. Readability: Pretty-printed JSON (with 2-space indentation) is optimized
-            //    for LLM token processing and human readability during debugging.
-            //
-            // 3. Compatibility: Text content is universally supported across all MCP clients,
-            //    ensuring maximum compatibility without client-specific handling.
-            //
-            // 4. Debugging: Formatted JSON makes it easier to debug and inspect responses
-            //    in logs and during development.
-            //
-            // 5. LLM Processing: LLMs are highly effective at parsing JSON text and can
-            //    extract structured information from formatted JSON strings.
-            //
-            // Alternative Approach: MCP supports structured content types (e.g., JSON objects,
-            // arrays, etc.) which could be used instead. However, testing has shown that
-            // stringified JSON provides better results for LLM clients in practice.
-            //
-            // If you need structured content types for programmatic processing, consider
-            // parsing the JSON text in your client application.
-            return {
-              content: [
-                {
-                  type: 'text',
-                  text: JSON.stringify(result, null, 2),
-                },
-              ],
-            };
-          } catch (error) {
-            this.logger.error(`Tool ${tool.schema.method} execution failed`, error);
-            throw new McpError(
-              `Tool execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-              -32603,
-              {
-                tool: tool.schema.method,
-                error: error instanceof Error ? error.message : String(error),
-              }
-            );
-          }
-        }
-      );
+      toolsByName.set(tool.schema.method, tool);
     }
+
+    // Register a single tools/call handler that routes by params.name.
+    this.server.setRequestHandler(
+      z.object({
+        method: z.literal('tools/call'),
+        params: z.object({
+          name: z.string(),
+          arguments: z.any().optional(),
+        }),
+      }),
+      async request => {
+        const toolName = request.params.name;
+        const tool = toolsByName.get(toolName);
+
+        if (!tool) {
+          throw new McpError(ErrorCode.InvalidParams, `Unknown tool: ${toolName}`, {
+            tool: toolName,
+          });
+        }
+
+        try {
+          // Check if tool is available before execution
+          if ('isAvailable' in tool && typeof tool.isAvailable === 'function') {
+            if (!tool.isAvailable()) {
+              const availabilityMessage =
+                'getAvailabilityMessage' in tool &&
+                typeof tool.getAvailabilityMessage === 'function'
+                  ? tool.getAvailabilityMessage()
+                  : 'Tool not available';
+
+              throw new McpError(
+                ErrorCode.InternalError,
+                `Tool not available: ${availabilityMessage}`,
+                {
+                  tool: toolName,
+                  availability: availabilityMessage,
+                }
+              );
+            }
+          }
+
+          const result = await tool.handler(request.params.arguments || {});
+
+          // DESIGN DECISION: Return results as formatted JSON text for LLM consumption
+          //
+          // This server intentionally returns all tool results as stringified JSON text
+          // rather than using MCP's structured content types. This is a deliberate
+          // architectural choice with the following rationale:
+          //
+          // 1. Consistency: All tools return the same format, making it easier for LLMs
+          //    to parse and understand responses without needing to handle multiple
+          //    content type variations.
+          //
+          // 2. Readability: Pretty-printed JSON (with 2-space indentation) is optimized
+          //    for LLM token processing and human readability during debugging.
+          //
+          // 3. Compatibility: Text content is universally supported across all MCP clients,
+          //    ensuring maximum compatibility without client-specific handling.
+          //
+          // 4. Debugging: Formatted JSON makes it easier to debug and inspect responses
+          //    in logs and during development.
+          //
+          // 5. LLM Processing: LLMs are highly effective at parsing JSON text and can
+          //    extract structured information from formatted JSON strings.
+          //
+          // Alternative Approach: MCP supports structured content types (e.g., JSON objects,
+          // arrays, etc.) which could be used instead. However, testing has shown that
+          // stringified JSON provides better results for LLM clients in practice.
+          //
+          // If you need structured content types for programmatic processing, consider
+          // parsing the JSON text in your client application.
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(result, null, 2),
+              },
+            ],
+          };
+        } catch (error) {
+          this.logger.error(`Tool ${toolName} execution failed`, error);
+
+          // Re-throw protocol errors (unknown/unavailable tool) as-is so the
+          // client receives the accurate JSON-RPC code.
+          if (error instanceof McpError) {
+            throw error;
+          }
+
+          // Sanitize internal error details before returning to the client.
+          const sanitized = this.securityManager
+            .getErrorSanitizer()
+            .sanitizeError(error instanceof Error ? error : new Error(String(error)));
+
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Tool execution failed: ${sanitized.message}`,
+            {
+              tool: toolName,
+            }
+          );
+        }
+      }
+    );
 
     this.logger.info(`Registered ${tools.length} MCP tools`);
   }
@@ -321,17 +313,23 @@ export class AtpMcpServer {
           const resource = resources.find(r => r.uri === request.params.uri);
 
           if (!resource) {
-            throw new McpError(`Resource not found: ${request.params.uri}`, -32602, {
-              uri: request.params.uri,
-            });
+            throw new McpError(
+              ErrorCode.InvalidParams,
+              `Resource not found: ${request.params.uri}`,
+              {
+                uri: request.params.uri,
+              }
+            );
           }
 
           // Check if resource is available
           const isAvailable = await resource.isAvailable();
           if (!isAvailable) {
-            throw new McpError(`Resource not available: ${request.params.uri}`, -32603, {
-              uri: request.params.uri,
-            });
+            throw new McpError(
+              ErrorCode.InternalError,
+              `Resource not available: ${request.params.uri}`,
+              { uri: request.params.uri }
+            );
           }
 
           const content = await resource.read();
@@ -346,12 +344,17 @@ export class AtpMcpServer {
           };
         } catch (error) {
           this.logger.error(`Resource read failed`, error);
+          if (error instanceof McpError) {
+            throw error;
+          }
+          const sanitized = this.securityManager
+            .getErrorSanitizer()
+            .sanitizeError(error instanceof Error ? error : new Error(String(error)));
           throw new McpError(
-            `Resource read failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            -32603,
+            ErrorCode.InternalError,
+            `Resource read failed: ${sanitized.message}`,
             {
               uri: request.params.uri,
-              error: error instanceof Error ? error.message : String(error),
             }
           );
         }
@@ -388,30 +391,39 @@ export class AtpMcpServer {
           const prompt = prompts.find(p => p.name === request.params.name);
 
           if (!prompt) {
-            throw new McpError(`Prompt not found: ${request.params.name}`, -32602, {
-              name: request.params.name,
-            });
+            throw new McpError(
+              ErrorCode.InvalidParams,
+              `Prompt not found: ${request.params.name}`,
+              {
+                name: request.params.name,
+              }
+            );
           }
 
           // Check if prompt is available
           const isAvailable = prompt.isAvailable();
           if (!isAvailable) {
-            throw new McpError(`Prompt not available: ${request.params.name}`, -32603, {
-              name: request.params.name,
-            });
+            throw new McpError(
+              ErrorCode.InternalError,
+              `Prompt not available: ${request.params.name}`,
+              { name: request.params.name }
+            );
           }
 
           const messages = await prompt.get(request.params.arguments ?? {});
           return { messages };
         } catch (error) {
           this.logger.error(`Prompt generation failed`, error);
+          if (error instanceof McpError) {
+            throw error;
+          }
+          const sanitized = this.securityManager
+            .getErrorSanitizer()
+            .sanitizeError(error instanceof Error ? error : new Error(String(error)));
           throw new McpError(
-            `Prompt generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-            -32603,
-            {
-              name: request.params.name,
-              error: error instanceof Error ? error.message : String(error),
-            }
+            ErrorCode.InternalError,
+            `Prompt generation failed: ${sanitized.message}`,
+            { name: request.params.name }
           );
         }
       }
@@ -491,8 +503,8 @@ export class AtpMcpServer {
       }
 
       throw new McpError(
+        ErrorCode.InternalError,
         'Server startup failed',
-        -32000,
         error instanceof Error ? error.message : 'Unknown error'
       );
     }
@@ -581,6 +593,16 @@ export class AtpMcpServer {
    */
   public getAtpClient(): AtpClient {
     return this.atpClient;
+  }
+
+  /**
+   * Get the underlying MCP Server instance.
+   *
+   * Exposed for programmatic transport wiring (e.g. connecting an in-memory
+   * transport in tests, or an alternative transport for embedding).
+   */
+  public getServer(): Server {
+    return this.server;
   }
 
   /**

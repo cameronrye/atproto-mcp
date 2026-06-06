@@ -3,8 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AtpMcpServer } from '../index.js';
-import { ConfigurationError, McpError } from '../types/index.js';
+import { ConfigurationError } from '../types/index.js';
 import { mockConsole, expectToThrow, createMockServerConfig } from '../test/setup.js';
 
 // Mock dependencies
@@ -256,98 +257,42 @@ describe('AtpMcpServer', () => {
       });
     };
 
-    it('should handle initialize request', async () => {
+    // Note: 'initialize' and 'ping' are handled natively by the SDK Server/Protocol
+    // and are no longer registered by our code (see tool-dispatch.test.ts for the
+    // real handshake). Our code registers exactly six handlers: tools/list,
+    // tools/call, resources/list, resources/read, prompts/list, prompts/get.
+
+    it('should register a single tools/call handler that routes by name', async () => {
       const server = new AtpMcpServer();
+      void server;
 
-      // Get the initialize handler
-      const initializeCall = findHandlerByMethod('initialize');
-      expect(initializeCall).toBeDefined();
-
-      const handler = initializeCall![1];
-      const result = await handler();
-
-      expect(result).toEqual({
-        protocolVersion: '2024-11-05',
-        capabilities: {
-          tools: {
-            listChanged: true,
-          },
-          resources: {
-            subscribe: false,
-            listChanged: true,
-          },
-          prompts: {
-            listChanged: true,
-          },
-        },
-        serverInfo: {
-          name: expect.any(String),
-          version: expect.any(String),
-        },
-      });
-    });
-
-    it('should handle ping request', async () => {
-      const server = new AtpMcpServer();
-
-      // Get the ping handler
-      const pingCall = findHandlerByMethod('ping');
-      expect(pingCall).toBeDefined();
-
-      const handler = pingCall![1];
-      const result = await handler();
-
-      expect(result).toEqual({
-        status: 'ok',
-        timestamp: expect.any(String),
-      });
+      // Exactly one handler is registered per method (the dispatch bug was many
+      // tools/call handlers overwriting each other). Six handlers total.
+      expect(mockServer.setRequestHandler.mock.calls.length).toBe(6);
     });
 
     it('should register tools/list handler', async () => {
       const server = new AtpMcpServer();
+      void server;
 
-      // Check that tools/list handler was registered
       const toolsListCall = findHandlerByMethod('tools/list');
       expect(toolsListCall).toBeDefined();
     });
 
-    it('should register tools/call handler', async () => {
-      const server = new AtpMcpServer();
-
-      // Check that multiple handlers were registered (tools/call is one of them)
-      // We expect at least 8 handlers: initialize, ping, tools/list, tools/call,
-      // resources/list, resources/read, prompts/list, prompts/get
-      expect(mockServer.setRequestHandler.mock.calls.length).toBeGreaterThanOrEqual(8);
-    });
-
     it('should register resources/list handler', async () => {
       const server = new AtpMcpServer();
+      void server;
 
-      // Check that resources/list handler was registered
       const resourcesListCall = findHandlerByMethod('resources/list');
       expect(resourcesListCall).toBeDefined();
     });
 
-    it('should register resources/read handler', async () => {
-      const server = new AtpMcpServer();
-
-      // Check that multiple handlers were registered (resources/read is one of them)
-      expect(mockServer.setRequestHandler.mock.calls.length).toBeGreaterThanOrEqual(8);
-    });
-
     it('should register prompts/list handler', async () => {
       const server = new AtpMcpServer();
+      void server;
 
-      // Check that prompts/list handler was registered
       const promptsListCall = findHandlerByMethod('prompts/list');
       expect(promptsListCall).toBeDefined();
-    });
-
-    it('should register prompts/get handler', async () => {
-      const server = new AtpMcpServer();
-
-      // Check that multiple handlers were registered (prompts/get is one of them)
-      expect(mockServer.setRequestHandler.mock.calls.length).toBeGreaterThanOrEqual(8);
     });
   });
 
