@@ -103,13 +103,21 @@ export class LRUCache<T> {
   private logger: Logger;
   private hits = 0;
   private misses = 0;
+  private readonly cleanupTimer: NodeJS.Timeout;
 
   constructor(config: ICacheConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
 
-    // Start cleanup interval
-    setInterval(() => this.cleanup(), config.cleanupIntervalMs);
+    // Start cleanup interval. unref() so it never keeps the process alive on its own.
+    this.cleanupTimer = setInterval(() => this.cleanup(), config.cleanupIntervalMs);
+    this.cleanupTimer.unref();
+  }
+
+  /** Stop the background cleanup timer and empty the cache. */
+  destroy(): void {
+    clearInterval(this.cleanupTimer);
+    this.cache.clear();
   }
 
   get(key: string): T | undefined {
@@ -378,8 +386,11 @@ export class PerformanceMonitor {
   }
 
   startPeriodicLogging(intervalMs: number = 60000): NodeJS.Timeout {
-    return setInterval(() => {
+    const timer = setInterval(() => {
       this.logMetrics();
     }, intervalMs);
+    // Don't let periodic metrics logging keep the process alive on its own.
+    timer.unref();
+    return timer;
   }
 }

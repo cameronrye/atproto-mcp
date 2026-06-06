@@ -552,7 +552,7 @@ export class AtpMcpServer {
 
       // Cleanup performance components
       this.wsManager.disconnectAll();
-      this.cache.clear();
+      this.cache.destroy();
       this.connectionPool.cleanup();
 
       // Release security manager background timers (rate-limiter cleanup).

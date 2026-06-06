@@ -64,7 +64,10 @@ export class DiscoverTrendingTool extends BaseTool {
   public readonly schema = {
     method: 'discover_trending',
     description:
-      "Discover trending topics, hashtags, and posts in your network. Analyzes recent activity to identify what's popular and emerging. Requires authentication.",
+      'Surface frequently-used hashtags and notable posts from a sample of your own ' +
+      'home timeline (up to the most recent ~100 posts). This is NOT a network-wide ' +
+      "trending feed; 'growth' is a recency ratio within the sample, not real growth " +
+      'over time. Requires authentication.',
     params: DiscoverTrendingSchema,
   };
 
