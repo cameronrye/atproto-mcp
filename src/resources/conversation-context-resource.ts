@@ -57,7 +57,10 @@ export class ConversationContextResource extends BaseResource {
   public readonly uri = 'atproto://conversation-context';
   public readonly name = 'Conversation Context';
   public readonly description =
-    'Tracks conversation state including recently discussed posts, active threads, mentioned users, and recent actions. Helps maintain context across interactions.';
+    'Scratchpad for conversation state (recently discussed posts, active threads, mentioned ' +
+    'users, recent actions). NOTE: the server does not yet populate this automatically during ' +
+    'tool calls, so it is empty unless a client explicitly writes to it; treat empty arrays as ' +
+    '"not tracked", not "nothing happened".';
   public readonly mimeType = 'application/json';
 
   private static context: IConversationContext = {
