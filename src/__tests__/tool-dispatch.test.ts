@@ -81,8 +81,8 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
 
   it('returns a clear error for an unknown tool name', async () => {
     await connect();
-    await expect(client.callTool({ name: 'definitely_not_a_real_tool', arguments: {} })).rejects.toThrow(
-      /unknown tool|not found|definitely_not_a_real_tool/i
-    );
+    await expect(
+      client.callTool({ name: 'definitely_not_a_real_tool', arguments: {} })
+    ).rejects.toThrow(/unknown tool|not found|definitely_not_a_real_tool/i);
   });
 });
