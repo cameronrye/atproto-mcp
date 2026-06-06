@@ -32,6 +32,10 @@ describe('isBlockedAddress', () => {
       'fe80::1',
       '::ffff:127.0.0.1', // IPv4-mapped loopback
       '::ffff:10.0.0.1', // IPv4-mapped private
+      '::7f00:1', // IPv4-compatible 127.0.0.1
+      '::a00:1', // IPv4-compatible 10.0.0.1
+      '2002:7f00:1::1', // 6to4 wrapping 127.0.0.1
+      '2002:a00:1::1', // 6to4 wrapping 10.0.0.1
     ]) {
       expect(isBlockedAddress(ip), `${ip} should be blocked`).toBe(true);
     }
@@ -68,7 +72,9 @@ describe('parseSafeHttpUrl', () => {
       'http://[::1]/',
       'http://10.0.0.5/',
     ]) {
-      expect(() => parseSafeHttpUrl(url), `${url} should be rejected`).toThrow(/private|internal|blocked/i);
+      expect(() => parseSafeHttpUrl(url), `${url} should be rejected`).toThrow(
+        /private|internal|blocked/i
+      );
     }
   });
 });

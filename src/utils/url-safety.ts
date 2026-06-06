@@ -110,6 +110,15 @@ function isBlockedIPv6(ip: string): boolean {
   if (b.slice(0, 10).every(x => x === 0) && b[10] === 0xff && b[11] === 0xff) {
     return isBlockedIPv4(`${b[12]}.${b[13]}.${b[14]}.${b[15]}`);
   }
+  // IPv4-compatible ::a.b.c.d (first 12 bytes zero) — evaluate the embedded IPv4.
+  // Loopback (::1) and unspecified (::) are already handled above.
+  if (b.slice(0, 12).every(x => x === 0)) {
+    return isBlockedIPv4(`${b[12]}.${b[13]}.${b[14]}.${b[15]}`);
+  }
+  // 6to4 2002:<ipv4>::/48 — evaluate the embedded IPv4 (bytes 2..5).
+  if (b[0] === 0x20 && b[1] === 0x02) {
+    return isBlockedIPv4(`${b[2]}.${b[3]}.${b[4]}.${b[5]}`);
+  }
   return false;
 }
 
@@ -186,7 +195,11 @@ async function assertResolvedHostIsPublic(hostname: string): Promise<void> {
   }
 }
 
-async function readCapped(response: Response, maxBytes: number): Promise<Buffer> {
+async function readCapped(
+  response: Response,
+  maxBytes: number,
+  signal?: AbortSignal
+): Promise<Buffer> {
   const reader = response.body?.getReader();
   if (!reader) {
     const buf = Buffer.from(await response.arrayBuffer());
@@ -198,6 +211,13 @@ async function readCapped(response: Response, maxBytes: number): Promise<Buffer>
   const chunks: Buffer[] = [];
   let total = 0;
   for (;;) {
+    // The timeout signal also aborts the underlying fetch stream (so reader.read()
+    // rejects), but check here too in case the deadline lands between chunks — a
+    // slow-drip body must not hang past the timeout.
+    if (signal?.aborted) {
+      await reader.cancel();
+      throw new Error('Timed out while reading the response body');
+    }
     const { done, value } = await reader.read();
     if (done) break;
     if (value) {
@@ -244,32 +264,34 @@ export async function safeFetch(
   for (let redirect = 0; redirect <= maxRedirects; redirect++) {
     await assertResolvedHostIsPublic(current.hostname);
 
+    // One timeout per hop, spanning BOTH the request and the body read. Aborting
+    // the controller cancels the fetch and its response stream, so a server that
+    // sends headers fast and then drips the body cannot hang past timeoutMs.
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
-    let response: Response;
     try {
-      response = await fetch(current, {
+      const response = await fetch(current, {
         redirect: 'manual',
         signal: controller.signal,
         ...(options.headers ? { headers: options.headers } : {}),
       });
+
+      const location = response.headers.get('location');
+      if (response.status >= 300 && response.status < 400 && location) {
+        current = parseSafeHttpUrl(new URL(location, current).toString());
+        continue;
+      }
+
+      const body = await readCapped(response, maxBytes, controller.signal);
+      return {
+        url: current.toString(),
+        status: response.status,
+        contentType: response.headers.get('content-type'),
+        body,
+      };
     } finally {
       clearTimeout(timer);
     }
-
-    const location = response.headers.get('location');
-    if (response.status >= 300 && response.status < 400 && location) {
-      current = parseSafeHttpUrl(new URL(location, current).toString());
-      continue;
-    }
-
-    const body = await readCapped(response, maxBytes);
-    return {
-      url: current.toString(),
-      status: response.status,
-      contentType: response.headers.get('content-type'),
-      body,
-    };
   }
 
   throw new Error(`Too many redirects while fetching ${rawUrl}`);
