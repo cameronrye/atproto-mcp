@@ -147,13 +147,16 @@ export class AddToListTool extends BaseTool {
       this.validateAtUri(params.listUri);
       this.validateActor(params.actor);
 
+      // A list item's subject must be a DID, not a handle.
+      const subjectDid = await this.resolveDid(params.actor);
+
       const response = await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
           return await agent.app.bsky.graph.listitem.create(
             { repo: agent.session?.did || '' },
             {
-              subject: params.actor,
+              subject: subjectDid,
               list: params.listUri,
               createdAt: new Date().toISOString(),
             }

@@ -180,40 +180,42 @@ export class UpdateProfileTool extends BaseTool {
       // Get current profile to merge with updates
       const currentProfile = await this.getCurrentProfile();
 
-      // Build updated profile record
+      // Build updated profile record. Start from the EXISTING record so fields
+      // this tool does not manage (pinnedPost, createdAt, pronouns, labels, etc.)
+      // are preserved — putRecord replaces the whole record, so rebuilding it
+      // from scratch would silently delete them.
       const updatedProfile: any = {
+        ...currentProfile,
         $type: 'app.bsky.actor.profile',
-        displayName:
-          params.displayName !== undefined ? params.displayName : currentProfile.displayName,
-        description:
-          params.description !== undefined ? params.description : currentProfile.description,
       };
 
       const updatedFields: string[] = [];
 
-      // Handle avatar upload if provided
+      if (params.displayName !== undefined) {
+        updatedProfile.displayName = params.displayName;
+        updatedFields.push('displayName');
+      }
+      if (params.description !== undefined) {
+        updatedProfile.description = params.description;
+        updatedFields.push('description');
+      }
+
+      // Handle avatar upload if provided (otherwise the existing avatar, spread
+      // from currentProfile above, is kept).
       if (params.avatar) {
         this.logger.debug('Uploading new avatar');
         const avatarBlob = await this.uploadBlob(params.avatar);
         updatedProfile.avatar = avatarBlob.blob;
         updatedFields.push('avatar');
-      } else if (currentProfile.avatar) {
-        updatedProfile.avatar = currentProfile.avatar;
       }
 
-      // Handle banner upload if provided
+      // Handle banner upload if provided (otherwise the existing banner is kept).
       if (params.banner) {
         this.logger.debug('Uploading new banner');
         const bannerBlob = await this.uploadBlob(params.banner);
         updatedProfile.banner = bannerBlob.blob;
         updatedFields.push('banner');
-      } else if (currentProfile.banner) {
-        updatedProfile.banner = currentProfile.banner;
       }
-
-      // Track which fields were updated
-      if (params.displayName !== undefined) updatedFields.push('displayName');
-      if (params.description !== undefined) updatedFields.push('description');
 
       // Update the profile record
       await this.executeAtpOperation(

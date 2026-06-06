@@ -163,13 +163,16 @@ export class BlockUserTool extends BaseTool {
 
       this.validateActor(params.actor);
 
+      // A block record's subject must be a DID, not a handle.
+      const subjectDid = await this.resolveDid(params.actor);
+
       const response = await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
           return await agent.app.bsky.graph.block.create(
             { repo: agent.session?.did || '' },
             {
-              subject: params.actor,
+              subject: subjectDid,
               createdAt: new Date().toISOString(),
             }
           );
@@ -380,6 +383,9 @@ export class ReportUserTool extends BaseTool {
 
       this.validateActor(params.actor);
 
+      // A repoRef moderation subject must be a DID, not a handle.
+      const subjectDid = await this.resolveDid(params.actor);
+
       const response = await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
@@ -388,7 +394,7 @@ export class ReportUserTool extends BaseTool {
             reason: params.reason,
             subject: {
               $type: 'com.atproto.admin.defs#repoRef',
-              did: params.actor,
+              did: subjectDid,
             },
           });
         },
