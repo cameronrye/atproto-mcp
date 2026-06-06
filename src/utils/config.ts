@@ -104,6 +104,9 @@ const ENV_MAPPINGS = {
   ATPROTO_AUTH_METHOD: 'atproto.authMethod',
 } as const;
 
+/** Config paths whose env values should be coerced to a number (all others stay strings). */
+const NUMERIC_CONFIG_PATHS = new Set<string>(['port']);
+
 /**
  * Configuration manager class
  */
@@ -141,7 +144,7 @@ export class ConfigManager {
     for (const [envVar, configPath] of Object.entries(ENV_MAPPINGS)) {
       const value = process.env[envVar];
       if (value !== undefined) {
-        this.setNestedProperty(envConfig, configPath, this.parseEnvValue(value));
+        this.setNestedProperty(envConfig, configPath, this.parseEnvValue(value, configPath));
       }
     }
 
@@ -149,13 +152,19 @@ export class ConfigManager {
   }
 
   /**
-   * Parse environment variable value to appropriate type
+   * Parse an environment variable value to the appropriate type.
+   *
+   * Only fields that are genuinely numeric (the port) are coerced to a number.
+   * Everything else stays a string so that numeric-looking identifiers,
+   * passwords, and secrets (e.g. an all-digit app password) are preserved exactly
+   * and pass string validation.
    */
-  private parseEnvValue(value: string): string | number {
-    // Try to parse as number
-    const numValue = Number(value);
-    if (!isNaN(numValue) && isFinite(numValue)) {
-      return numValue;
+  private parseEnvValue(value: string, configPath: string): string | number {
+    if (NUMERIC_CONFIG_PATHS.has(configPath)) {
+      const numValue = Number(value);
+      if (!isNaN(numValue) && isFinite(numValue)) {
+        return numValue;
+      }
     }
     return value;
   }

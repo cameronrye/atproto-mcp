@@ -137,14 +137,9 @@ describe('MCP Integration Tests', () => {
   });
 
   describe('MCP Protocol Compliance', () => {
-    it('should register initialize handler', () => {
-      expect(mockHandlers.has('initialize')).toBe(true);
-    });
-
-    it('should register ping handler', () => {
-      expect(mockHandlers.has('ping')).toBe(true);
-    });
-
+    // Note: 'initialize' and 'ping' are handled natively by the SDK Server/Protocol
+    // (not registered by our code), and are exercised end-to-end via a real Client
+    // in tool-dispatch.test.ts. We only register list/call/read/get handlers.
     it('should register tools/list handler', () => {
       expect(mockHandlers.has('tools/list')).toBe(true);
     });
@@ -167,54 +162,6 @@ describe('MCP Integration Tests', () => {
 
     it('should register prompts/get handler', () => {
       expect(mockHandlers.has('prompts/get')).toBe(true);
-    });
-  });
-
-  describe('Initialize Handler', () => {
-    it('should return correct protocol version and capabilities', async () => {
-      const handler = mockHandlers.get('initialize');
-      expect(handler).toBeDefined();
-
-      const result = await handler!();
-
-      expect(result).toEqual({
-        protocolVersion: '2024-11-05',
-        capabilities: {
-          tools: {
-            listChanged: true,
-          },
-          resources: {
-            subscribe: false,
-            listChanged: true,
-          },
-          prompts: {
-            listChanged: true,
-          },
-        },
-        serverInfo: {
-          name: expect.any(String),
-          version: expect.any(String),
-          // Note: 'description' field removed per MCP specification
-          // serverInfo should only contain 'name' and 'version'
-        },
-      });
-    });
-  });
-
-  describe('Ping Handler', () => {
-    it('should return status ok with timestamp', async () => {
-      const handler = mockHandlers.get('ping');
-      expect(handler).toBeDefined();
-
-      const result = await handler!();
-
-      expect(result).toEqual({
-        status: 'ok',
-        timestamp: expect.any(String),
-      });
-
-      // Verify timestamp is valid ISO string
-      expect(() => new Date(result.timestamp)).not.toThrow();
     });
   });
 
@@ -304,7 +251,9 @@ describe('MCP Integration Tests', () => {
       const handler = mockHandlers.get('tools/call');
       expect(handler).toBeDefined();
 
-      // Test with invalid tool name
+      // Test with invalid tool name: the single tools/call router rejects unknown
+      // tools with a clear "Unknown tool" error (see real routing coverage in
+      // tool-dispatch.test.ts, which exercises the real SDK Server).
       try {
         await handler!({
           params: {
@@ -314,7 +263,7 @@ describe('MCP Integration Tests', () => {
         });
         expect.fail('Should have thrown an error');
       } catch (error: any) {
-        expect(error.message).toContain('Tool execution failed');
+        expect(error.message).toContain('Unknown tool');
       }
     });
 

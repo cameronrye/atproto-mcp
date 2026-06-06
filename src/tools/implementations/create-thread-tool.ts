@@ -99,12 +99,19 @@ export class CreateThreadTool extends BaseTool {
         // Determine language tags (post-specific or thread-wide)
         const langs = post.langs || params.langs;
 
+        // Detect richtext facets so mentions/links/hashtags are not inert text.
+        const { text, facets } = await this.buildRichText(post.text);
+
         // Build the post record
         const postRecord: any = {
           $type: 'app.bsky.feed.post',
-          text: post.text,
+          text,
           createdAt: new Date().toISOString(),
         };
+
+        if (facets) {
+          postRecord.facets = facets;
+        }
 
         // Add language tags if provided
         if (langs && langs.length > 0) {

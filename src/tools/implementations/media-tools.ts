@@ -7,6 +7,17 @@ import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import { readFile } from 'fs/promises';
 import { extname } from 'path';
+import { assertSafePath, safeFetch } from '../../utils/url-safety.js';
+
+/**
+ * Directory that tool-supplied media file paths must stay within. Defaults to
+ * the process working directory; override with ATPROTO_MEDIA_DIR. This prevents
+ * an MCP caller from reading arbitrary local files (e.g. /etc/passwd, SSH keys)
+ * and uploading them as blobs.
+ */
+function mediaBaseDir(): string {
+  return process.env['ATPROTO_MEDIA_DIR'] ?? process.cwd();
+}
 
 const UploadImageSchema = z.object({
   filePath: z.string().min(1, 'File path is required'),
@@ -50,17 +61,20 @@ const CreateRichTextPostSchema = z.object({
       images: z
         .array(
           z.object({
-            image: z.string(),
-            alt: z.string(),
+            // Local image file path (uploaded to obtain a valid blob reference).
+            filePath: z.string().min(1, 'Image file path is required'),
+            alt: z.string().max(1000),
           })
         )
+        .max(4, 'Cannot attach more than 4 images')
         .optional(),
       external: z
         .object({
           uri: z.string().url(),
           title: z.string(),
           description: z.string(),
-          thumb: z.string().optional(),
+          // Optional local thumbnail image file path.
+          thumbFilePath: z.string().optional(),
         })
         .optional(),
       record: z
@@ -112,9 +126,10 @@ export class UploadImageTool extends BaseTool {
         hasAltText: !!params.altText,
       });
 
-      // Read the image file
-      const imageData = await readFile(params.filePath);
-      const fileExtension = extname(params.filePath).toLowerCase();
+      // Read the image file (restricted to the allowed media directory)
+      const safePath = assertSafePath(params.filePath, mediaBaseDir());
+      const imageData = await readFile(safePath);
+      const fileExtension = extname(safePath).toLowerCase();
 
       // Determine MIME type
       const mimeTypeMap: Record<string, string> = {
@@ -220,9 +235,10 @@ export class UploadVideoTool extends BaseTool {
         captionCount: params.captions?.length || 0,
       });
 
-      // Read the video file
-      const videoData = await readFile(params.filePath);
-      const fileExtension = extname(params.filePath).toLowerCase();
+      // Read the video file (restricted to the allowed media directory)
+      const safePath = assertSafePath(params.filePath, mediaBaseDir());
+      const videoData = await readFile(safePath);
+      const fileExtension = extname(safePath).toLowerCase();
 
       // Determine MIME type
       const mimeTypeMap: Record<string, string> = {
@@ -258,7 +274,7 @@ export class UploadVideoTool extends BaseTool {
         processedCaptions = [];
         for (const caption of params.captions) {
           try {
-            const captionData = await readFile(caption.file);
+            const captionData = await readFile(assertSafePath(caption.file, mediaBaseDir()));
             const captionResponse = await this.executeAtpOperation(
               async () => {
                 const agent = this.atpClient.getAgent();
@@ -332,8 +348,8 @@ export class CreateRichTextPostTool extends BaseTool {
     }>;
     embed?: {
       type: string;
-      images?: Array<{ image: string; alt: string }>;
-      external?: { uri: string; title: string; description: string; thumb?: string };
+      images?: Array<{ filePath: string; alt: string }>;
+      external?: { uri: string; title: string; description: string; thumbFilePath?: string };
       record?: { uri: string; cid: string };
     };
   }): Promise<{
@@ -389,32 +405,37 @@ export class CreateRichTextPostTool extends BaseTool {
         }));
       }
 
-      // Add embed if provided
+      // Add embed if provided. Image/thumbnail blobs MUST be real uploaded
+      // BlobRef objects (from agent.uploadBlob) — a bare string is not a valid
+      // blob reference and the server would reject it.
       if (params.embed) {
         switch (params.embed.type) {
           case 'images':
-            if (params.embed.images) {
+            if (params.embed.images && params.embed.images.length > 0) {
+              const images = [];
+              for (const img of params.embed.images) {
+                const blob = await this.uploadImageFile(img.filePath);
+                images.push({ image: blob, alt: img.alt });
+              }
               postRecord.embed = {
                 $type: 'app.bsky.embed.images',
-                images: params.embed.images.map(img => ({
-                  image: { $type: 'blob', ref: img.image },
-                  alt: img.alt,
-                })),
+                images,
               };
             }
             break;
           case 'external':
             if (params.embed.external) {
+              const external: Record<string, unknown> = {
+                uri: params.embed.external.uri,
+                title: params.embed.external.title,
+                description: params.embed.external.description,
+              };
+              if (params.embed.external.thumbFilePath) {
+                external['thumb'] = await this.uploadImageFile(params.embed.external.thumbFilePath);
+              }
               postRecord.embed = {
                 $type: 'app.bsky.embed.external',
-                external: {
-                  uri: params.embed.external.uri,
-                  title: params.embed.external.title,
-                  description: params.embed.external.description,
-                  thumb: params.embed.external.thumb
-                    ? { $type: 'blob', ref: params.embed.external.thumb }
-                    : undefined,
-                },
+                external,
               };
             }
             break;
@@ -463,6 +484,40 @@ export class CreateRichTextPostTool extends BaseTool {
       this.formatError(error);
     }
   }
+
+  /**
+   * Upload a local image file and return its AT Protocol BlobRef, suitable for
+   * embedding in a post record.
+   */
+  private async uploadImageFile(filePath: string): Promise<unknown> {
+    const safePath = assertSafePath(filePath, mediaBaseDir());
+    const data = await readFile(safePath);
+    const ext = extname(safePath).toLowerCase();
+    const mimeTypeMap: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+    };
+    const mimeType = mimeTypeMap[ext];
+    if (!mimeType) {
+      throw new Error(`Unsupported image format: ${ext}`);
+    }
+    if (data.length > 1024 * 1024) {
+      throw new Error('Image file size cannot exceed 1MB');
+    }
+    const response = await this.executeAtpOperation(
+      async () => {
+        const agent = this.atpClient.getAgent();
+        return await agent.uploadBlob(data, { encoding: mimeType });
+      },
+      'uploadEmbedImage',
+      { filePath: safePath, size: data.length }
+    );
+    // response.data.blob is the BlobRef the embed needs.
+    return response.data.blob;
+  }
 }
 
 export class GenerateLinkPreviewTool extends BaseTool {
@@ -498,25 +553,20 @@ export class GenerateLinkPreviewTool extends BaseTool {
         url: params.url,
       });
 
-      // Validate URL
-      try {
-        new URL(params.url);
-      } catch {
-        throw new Error('Invalid URL provided');
-      }
-
-      // Fetch the webpage content
-      const response = await fetch(params.url, {
-        headers: {
-          'User-Agent': 'AT Protocol MCP Server/1.0',
-        },
+      // Fetch the webpage content with SSRF protection: http(s) only, DNS
+      // resolution checked against private/internal ranges, redirects
+      // re-validated, and response size/time capped.
+      const response = await safeFetch(params.url, {
+        headers: { 'User-Agent': 'AT Protocol MCP Server/1.0' },
+        maxBytes: 2 * 1024 * 1024,
+        timeoutMs: 10_000,
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`Failed to fetch URL: ${response.status}`);
       }
 
-      const html = await response.text();
+      const html = response.body.toString('utf8');
 
       // Extract metadata using simple regex patterns
       // In production, use a proper HTML parser like cheerio
@@ -535,20 +585,21 @@ export class GenerateLinkPreviewTool extends BaseTool {
       let thumbBlob;
       if (imageUrl) {
         try {
-          // Download and upload the thumbnail image
-          const imageResponse = await fetch(imageUrl, {
-            headers: {
-              'User-Agent': 'AT Protocol MCP Server/1.0',
-            },
+          // Resolve a possibly-relative og:image against the page URL, then
+          // download it through the same SSRF-safe fetch (size-capped to 1MB).
+          const resolvedImageUrl = new URL(imageUrl, response.url).toString();
+          const imageResponse = await safeFetch(resolvedImageUrl, {
+            headers: { 'User-Agent': 'AT Protocol MCP Server/1.0' },
+            maxBytes: 1024 * 1024,
+            timeoutMs: 10_000,
           });
 
-          if (imageResponse.ok) {
-            const imageData = await imageResponse.arrayBuffer();
-            const imageBuffer = Buffer.from(imageData);
+          if (imageResponse.status >= 200 && imageResponse.status < 300) {
+            const imageBuffer = imageResponse.body;
 
             // Check image size (max 1MB)
             if (imageBuffer.length <= 1024 * 1024) {
-              const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+              const contentType = imageResponse.contentType || 'image/jpeg';
 
               const uploadResponse = await this.executeAtpOperation(
                 async () => {

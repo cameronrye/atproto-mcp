@@ -134,13 +134,22 @@ export class RateLimiter {
   private requests: Map<string, number[]> = new Map();
   private config: IRateLimitConfig;
   private logger: Logger;
+  private readonly cleanupTimer: NodeJS.Timeout;
 
   constructor(config: IRateLimitConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
 
-    // Clean up old entries periodically
-    setInterval(() => this.cleanup(), this.config.windowMs);
+    // Clean up old entries periodically. unref() so the timer never keeps the
+    // process alive on its own.
+    this.cleanupTimer = setInterval(() => this.cleanup(), this.config.windowMs);
+    this.cleanupTimer.unref();
+  }
+
+  /** Stop the background cleanup timer and clear tracked state. */
+  destroy(): void {
+    clearInterval(this.cleanupTimer);
+    this.requests.clear();
   }
 
   /**
@@ -406,6 +415,22 @@ export class SecurityManager {
     );
     this.errorSanitizer = new ErrorSanitizer(logger, process.env['NODE_ENV'] === 'development');
     this.credentialManager = new CredentialManager(logger);
+  }
+
+  /**
+   * Check whether a request for the given identifier may proceed. Returns true
+   * (allowed) when rate limiting is disabled in config.
+   */
+  checkRateLimit(identifier: string): boolean {
+    if (!this.config.enableRateLimit) {
+      return true;
+    }
+    return this.rateLimiter.isAllowed(identifier);
+  }
+
+  /** Release background resources (rate-limiter cleanup timer). */
+  destroy(): void {
+    this.rateLimiter.destroy();
   }
 
   getInputSanitizer(): InputSanitizer {

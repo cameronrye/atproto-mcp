@@ -5,6 +5,7 @@
  */
 
 import { z } from 'zod';
+import { RichText } from '@atproto/api';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type { IMcpTool } from '../index.js';
 import { Logger } from '../../utils/logger.js';
@@ -221,6 +222,52 @@ export abstract class BaseTool implements IMcpTool {
     }
 
     return sanitized;
+  }
+
+  /**
+   * Detect AT Protocol richtext facets (mentions, links, hashtags) in post text.
+   *
+   * `agent.post()` does NOT auto-detect facets, so without this, @mentions,
+   * URLs, and #hashtags are stored as inert plain text (not clickable, mentions
+   * not resolved to DIDs). This resolves mentions to DIDs via the agent and
+   * returns the text plus any detected facets to attach to the record.
+   */
+  protected async buildRichText(
+    text: string
+  ): Promise<{ text: string; facets?: RichText['facets'] }> {
+    const rt = new RichText({ text });
+    try {
+      await rt.detectFacets(this.atpClient.getAgent());
+    } catch (error) {
+      // Facet detection requires network calls (handle resolution). If it fails,
+      // fall back to posting the plain text rather than failing the whole post.
+      this.logger.warn('Facet detection failed; posting without facets', error as Error);
+    }
+    return rt.facets && rt.facets.length > 0
+      ? { text: rt.text, facets: rt.facets }
+      : { text: rt.text };
+  }
+
+  /**
+   * Resolve an actor (DID or handle) to a DID.
+   *
+   * Many AT Protocol records (list items, moderation subjects, blocks) require a
+   * DID as the subject — passing a handle produces an invalid record. If the
+   * actor is already a DID it is returned as-is; otherwise the handle is resolved.
+   */
+  protected async resolveDid(actor: string): Promise<string> {
+    if (actor.startsWith('did:')) {
+      return actor;
+    }
+    const response = await this.executeAtpOperation(
+      async () => {
+        const agent = this.atpClient.getAgent();
+        return await agent.com.atproto.identity.resolveHandle({ handle: actor });
+      },
+      'resolveHandle',
+      { actor }
+    );
+    return response.data.did;
   }
 
   /**

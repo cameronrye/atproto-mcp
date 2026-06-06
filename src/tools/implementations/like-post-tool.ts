@@ -128,38 +128,20 @@ export class LikePostTool extends BaseTool {
    */
   private async checkExistingLike(postUri: string): Promise<{ uri: string; cid: string } | null> {
     try {
+      // Use the post's viewer.like (authoritative, single call) rather than
+      // scanning the first 100 like records — that scan missed likes on accounts
+      // with >100 likes and let duplicate like records be created.
       const response = await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          const userDid = agent.session?.did;
-
-          if (!userDid) {
-            throw new Error('User session not available');
-          }
-
-          // List existing likes to check for duplicates
-          return await agent.com.atproto.repo.listRecords({
-            repo: userDid,
-            collection: 'app.bsky.feed.like',
-            limit: 100, // Should be enough to find recent likes
-          });
+          return await agent.getPosts({ uris: [postUri] });
         },
-        'listLikes',
+        'getPostViewerState',
         { postUri }
       );
 
-      // Check if any of the likes match the target post
-      for (const record of response.data.records) {
-        const likeRecord = record.value as any;
-        if (likeRecord.subject?.uri === postUri) {
-          return {
-            uri: record.uri,
-            cid: record.cid,
-          };
-        }
-      }
-
-      return null;
+      const likeUri = response.data.posts[0]?.viewer?.like;
+      return likeUri ? { uri: likeUri, cid: '' } : null;
     } catch (error) {
       this.logger.warn('Could not check for existing like', error);
       return null;

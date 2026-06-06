@@ -45,7 +45,17 @@ export function validateATURI(value: string): ATURI {
   }
   const parts = value.slice(5).split('/'); // Remove 'at://' and split
   if (parts.length < 3) {
-    throw new Error(`Invalid ATURI format: ${value}. Must be 'at://did/collection/rkey'`);
+    throw new Error(`Invalid ATURI format: ${value}. Must be 'at://authority/collection/rkey'`);
+  }
+  const [authority, collection, rkey] = parts;
+  if (!authority || !collection || !rkey) {
+    throw new Error(
+      `Invalid ATURI format: ${value}. authority, collection, and rkey must all be non-empty`
+    );
+  }
+  // The authority must be a DID (did:...) or a handle (contains a dot).
+  if (!authority.startsWith('did:') && !authority.includes('.')) {
+    throw new Error(`Invalid ATURI authority: ${authority}. Must be a DID or handle`);
   }
   return value as ATURI;
 }

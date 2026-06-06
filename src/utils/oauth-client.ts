@@ -2,12 +2,26 @@
  * OAuth Client for AT Protocol authentication
  */
 
-// Note: @atproto/oauth-client-node doesn't exist yet, this is a mock implementation
-// In production, use the actual AT Protocol OAuth client when available
+// The authorization-code/token-exchange half of AT Protocol OAuth (token endpoint
+// discovery, DPoP-bound token exchange, refresh, and revocation) is not yet
+// implemented here. The authorization-request half (PKCE + authorization URL) is
+// real. Methods that would require a real token exchange fail loudly rather than
+// fabricating credentials — see OAUTH_NOT_IMPLEMENTED.
 import { AuthenticationError, type IAtpConfig } from '../types/index.js';
 import { Logger } from './logger.js';
 import crypto from 'crypto';
 import { EventEmitter } from 'events';
+
+/**
+ * Message used when an OAuth operation that requires a real token exchange is
+ * invoked. Returning fabricated tokens here would manufacture a "successful"
+ * session from any input (an auth-bypass hazard), so these paths fail loudly.
+ */
+const OAUTH_NOT_IMPLEMENTED =
+  'OAuth token exchange is not implemented. Use app-password authentication ' +
+  '(ATPROTO_IDENTIFIER + ATPROTO_PASSWORD), or complete the OAuth flow with a ' +
+  'real AT Protocol authorization server. This server can generate an authorization ' +
+  'URL (start_oauth_flow) but cannot yet exchange the authorization code for tokens.';
 
 export interface IOAuthSession {
   accessToken: string;
@@ -34,6 +48,7 @@ export class AtpOAuthClient extends EventEmitter {
       timestamp: number;
     }
   >();
+  private readonly cleanupInterval: NodeJS.Timeout;
 
   constructor(config: IAtpConfig) {
     super();
@@ -46,8 +61,19 @@ export class AtpOAuthClient extends EventEmitter {
       });
     }
 
-    // Clean up expired authorization requests every 10 minutes
-    setInterval(() => this.cleanupExpiredAuthorizations(), 10 * 60 * 1000);
+    // Clean up expired authorization requests every 10 minutes. unref() so the
+    // timer never keeps the Node process alive on its own.
+    this.cleanupInterval = setInterval(() => this.cleanupExpiredAuthorizations(), 10 * 60 * 1000);
+    this.cleanupInterval.unref();
+  }
+
+  /**
+   * Stop the background cleanup timer and clear pending authorizations.
+   * Call when discarding the client to avoid leaking the interval.
+   */
+  destroy(): void {
+    clearInterval(this.cleanupInterval);
+    this.pendingAuthorizations.clear();
   }
 
   /**
@@ -103,124 +129,46 @@ export class AtpOAuthClient extends EventEmitter {
    * Handle OAuth callback and exchange code for tokens
    */
   async handleCallback(code: string, state: string): Promise<IOAuthSession> {
-    try {
-      this.logger.info('Handling OAuth callback', {
-        state: `${state.substring(0, 8)}...`,
-        code: `${code.substring(0, 10)}...`,
-      });
+    this.logger.info('Handling OAuth callback', {
+      state: `${state.substring(0, 8)}...`,
+      code: `${code.substring(0, 10)}...`,
+    });
 
-      // Retrieve the stored code verifier
-      const pending = this.pendingAuthorizations.get(state);
-      if (!pending) {
-        throw new AuthenticationError('Invalid or expired OAuth state parameter', undefined, {
-          state: `${state.substring(0, 8)}...`,
-        });
-      }
-
-      // Clean up the pending authorization
-      this.pendingAuthorizations.delete(state);
-
-      // Exchange authorization code for tokens (mock implementation)
-      // In a real implementation, this would make an HTTP request to the token endpoint
-      const tokenResponse = {
-        accessJwt: `mock_access_token_${Date.now()}`,
-        refreshJwt: `mock_refresh_token_${Date.now()}`,
-        did: 'did:plc:mock123',
-        handle: 'mock.bsky.social',
-        expiresIn: 3600,
-      };
-
-      const session: IOAuthSession = {
-        accessToken: tokenResponse.accessJwt,
-        refreshToken: tokenResponse.refreshJwt,
-        did: tokenResponse.did,
-        handle: tokenResponse.handle,
-        expiresAt: new Date(Date.now() + (tokenResponse.expiresIn ?? 3600) * 1000),
-      };
-
-      this.logger.info('OAuth authentication successful', {
-        did: session.did,
-        handle: session.handle,
-        expiresAt: session.expiresAt.toISOString(),
-      });
-
-      // Emit session event
-      this.emit('session', session);
-
-      return session;
-    } catch (error) {
-      this.logger.error('OAuth callback failed', error);
-      throw new AuthenticationError('OAuth callback processing failed', error, {
-        code: `${code.substring(0, 10)}...`,
+    // Validate the state/PKCE binding established by startAuthorization.
+    if (!this.pendingAuthorizations.has(state)) {
+      throw new AuthenticationError('Invalid or expired OAuth state parameter', undefined, {
         state: `${state.substring(0, 8)}...`,
       });
     }
+    this.pendingAuthorizations.delete(state);
+
+    // Real token exchange is not implemented. Do NOT fabricate a session.
+    throw new AuthenticationError(OAUTH_NOT_IMPLEMENTED, undefined, {
+      state: `${state.substring(0, 8)}...`,
+    });
   }
 
   /**
    * Refresh OAuth tokens
    */
   async refreshTokens(refreshToken: string): Promise<IOAuthSession> {
-    try {
-      this.logger.info('Refreshing OAuth tokens');
-
-      // Refresh tokens (mock implementation)
-      const tokenResponse = {
-        accessJwt: `mock_refreshed_access_token_${Date.now()}`,
-        refreshJwt: `mock_refreshed_refresh_token_${Date.now()}`,
-        did: 'did:plc:mock123',
-        handle: 'mock.bsky.social',
-        expiresIn: 3600,
-      };
-
-      const session: IOAuthSession = {
-        accessToken: tokenResponse.accessJwt,
-        refreshToken: tokenResponse.refreshJwt ?? refreshToken, // Keep old refresh token if new one not provided
-        did: tokenResponse.did,
-        handle: tokenResponse.handle,
-        expiresAt: new Date(Date.now() + (tokenResponse.expiresIn ?? 3600) * 1000),
-      };
-
-      this.logger.info('OAuth tokens refreshed successfully', {
-        did: session.did,
-        handle: session.handle,
-        expiresAt: session.expiresAt.toISOString(),
-      });
-
-      // Emit session event
-      this.emit('session', session);
-
-      return session;
-    } catch (error) {
-      this.logger.error('OAuth token refresh failed', error);
-      throw new AuthenticationError('Failed to refresh OAuth tokens', error, {
-        refreshToken: `${refreshToken.substring(0, 10)}...`,
-      });
-    }
+    this.logger.info('OAuth token refresh requested', {
+      refreshToken: `${refreshToken.substring(0, 10)}...`,
+    });
+    // Real token refresh is not implemented. Do NOT fabricate a refreshed session.
+    throw new AuthenticationError(OAUTH_NOT_IMPLEMENTED);
   }
 
   /**
    * Revoke OAuth tokens
    */
   async revokeTokens(accessToken: string, refreshToken?: string): Promise<void> {
-    try {
-      this.logger.info('Revoking OAuth tokens');
-
-      // Revoke tokens (mock implementation)
-      // In a real implementation, this would make HTTP requests to revoke the tokens
-      this.logger.debug('Mock token revocation', {
-        accessToken: `${accessToken.substring(0, 10)}...`,
-        hasRefreshToken: !!refreshToken,
-      });
-
-      this.logger.info('OAuth tokens revoked successfully');
-
-      // Emit revocation event
-      this.emit('revoked');
-    } catch (error) {
-      this.logger.error('OAuth token revocation failed', error);
-      throw new AuthenticationError('Failed to revoke OAuth tokens', error);
-    }
+    this.logger.info('OAuth token revocation requested', {
+      accessToken: `${accessToken.substring(0, 10)}...`,
+      hasRefreshToken: !!refreshToken,
+    });
+    // Real token revocation is not implemented. Do NOT report success for a no-op.
+    throw new AuthenticationError(OAUTH_NOT_IMPLEMENTED);
   }
 
   /**

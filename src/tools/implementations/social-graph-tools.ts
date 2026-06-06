@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type {
   DID,
@@ -52,7 +52,8 @@ export class GetFollowersTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetFollowers');
+    // Public AppView data; works unauthenticated, richer (viewer state) with auth.
+    super(atpClient, 'GetFollowers', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: IGetFollowersParams): Promise<{
@@ -138,7 +139,8 @@ export class GetFollowsTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetFollows');
+    // Public AppView data; works unauthenticated, richer (viewer state) with auth.
+    super(atpClient, 'GetFollows', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: IGetFollowsParams): Promise<{

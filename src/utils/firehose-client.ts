@@ -41,6 +41,7 @@ export class FirehoseClient extends EventEmitter {
   private isShuttingDown = false;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private lastSeq: number | null = null;
+  private warnedParserNotImplemented = false;
 
   constructor(config: IAtpConfig) {
     super();
@@ -164,10 +165,15 @@ export class FirehoseClient extends EventEmitter {
   }
 
   /**
-   * Get firehose WebSocket URL
+   * Get firehose WebSocket URL.
+   *
+   * The repo firehose (com.atproto.sync.subscribeRepos) is served by a relay, not
+   * by the AppView/PDS service used for normal API calls. Default to the public
+   * Bluesky relay; override with ATPROTO_RELAY.
    */
   private getFirehoseUrl(): string {
-    const baseUrl = this.config.service.replace(/^https?:\/\//, '');
+    const relay = process.env['ATPROTO_RELAY'] ?? 'wss://bsky.network';
+    const baseUrl = relay.replace(/^(wss?|https?):\/\//, '');
     return `wss://${baseUrl}/xrpc/com.atproto.sync.subscribeRepos`;
   }
 
@@ -190,36 +196,23 @@ export class FirehoseClient extends EventEmitter {
   }
 
   /**
-   * Parse firehose message (simplified implementation)
+   * Parse a firehose frame.
+   *
+   * Firehose frames are DAG-CBOR headers followed by a CAR block; decoding them
+   * correctly requires a CAR/CBOR decoder (e.g. @atproto/repo + @ipld/car), which
+   * is not yet wired in here. This previously FABRICATED a fake post for every
+   * frame, surfacing made-up data as if it were real firehose activity. Until a
+   * real decoder is implemented, return null (emit nothing) rather than lie.
    */
   private parseFirehoseMessage(_data: Buffer): IFirehoseEvent | null {
-    try {
-      // This is a simplified parser for demonstration
-      // In production, use @atproto/lexicon and proper CAR parsing
-
-      // For now, create a mock event structure
-      const mockEvent: IFirehoseEvent = {
-        type: 'commit',
-        seq: Date.now(),
-        time: new Date().toISOString(),
-        repo: 'did:plc:example',
-        commit: {
-          rev: 'rev123',
-          operation: 'create',
-          collection: 'app.bsky.feed.post',
-          rkey: 'rkey123',
-          record: {
-            text: 'Example post from firehose',
-            createdAt: new Date().toISOString(),
-          },
-        },
-      };
-
-      return mockEvent;
-    } catch (error) {
-      this.logger.error('Failed to parse firehose message', error);
-      return null;
+    if (!this.warnedParserNotImplemented) {
+      this.warnedParserNotImplemented = true;
+      this.logger.warn(
+        'Firehose frame decoding is not implemented; real-time events will not be emitted. ' +
+          'No fabricated events are produced.'
+      );
     }
+    return null;
   }
 
   /**

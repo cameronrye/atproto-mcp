@@ -19,11 +19,13 @@ const AnalyzeImageSchema = z.object({
 /**
  * Analyze Image Tool - Analyze image metadata and provide optimization suggestions
  *
- * This tool analyzes uploaded images to provide:
- * - Image dimensions and aspect ratio
- * - File size and format information
+ * This tool analyzes an uploaded image's blob metadata to provide:
+ * - File size and format / MIME type information
  * - Optimization suggestions for better performance
  * - Accessibility recommendations
+ *
+ * Note: it does NOT decode the image, so it cannot report pixel dimensions or
+ * aspect ratio — only the blob's declared size and MIME type.
  *
  * AUTHENTICATION REQUIREMENT:
  * - Public mode (no authentication required)
@@ -33,7 +35,9 @@ export class AnalyzeImageTool extends BaseTool {
   public readonly schema = {
     method: 'analyze_image',
     description:
-      'Analyze image metadata and provide optimization suggestions. Returns dimensions, file size, format, and recommendations for better performance and accessibility.',
+      "Analyze an image blob's metadata (file size, format/MIME type) and provide optimization " +
+      'and accessibility suggestions. Does not decode the image, so it does not report pixel ' +
+      'dimensions or aspect ratio.',
     params: AnalyzeImageSchema,
   };
 

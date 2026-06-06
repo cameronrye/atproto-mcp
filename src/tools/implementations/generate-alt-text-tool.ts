@@ -42,7 +42,9 @@ export class GenerateAltTextTool extends BaseTool {
   public readonly schema = {
     method: 'generate_alt_text',
     description:
-      'Generate descriptive alt text for images to improve accessibility. Provide either an image URL or base64 encoded image data. Optionally include context about the image.',
+      'Provide best-practice guidelines and a template for writing accessible alt text. ' +
+      'This tool does NOT analyze image content (there is no vision model wired in) — it ' +
+      'returns guidance the caller should use to write the alt text themselves.',
     params: GenerateAltTextSchema,
   };
 
@@ -143,14 +145,14 @@ export class GenerateAltTextTool extends BaseTool {
   }): string {
     const maxLength = params.maxLength || 200;
 
-    let altText = '[AI-generated alt text would appear here] ';
+    let altText =
+      'No automated image analysis was performed (no vision model is configured). ' +
+      'Write the alt text yourself using the guidelines and suggestions in this response';
 
     if (params.context) {
-      altText += `Context: ${params.context}. `;
+      altText += `, taking the provided context into account: "${params.context}"`;
     }
-
-    altText +=
-      'To implement actual image analysis, integrate with a vision AI service like GPT-4 Vision, Claude Vision, or Google Cloud Vision API.';
+    altText += '.';
 
     // Truncate to max length
     if (altText.length > maxLength) {

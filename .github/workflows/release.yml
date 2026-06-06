@@ -63,8 +63,7 @@ jobs:
         run: |
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
           if [ "$PACKAGE_VERSION" != "${{ steps.version.outputs.version }}" ]; then
-            echo "Error: package.json version ($PACKAGE_VERSION) does not match tag version (${{ steps.version.outputs.version }})"
-            exit 1
+            echo "::warning::package.json version ($PACKAGE_VERSION) does not match tag version (${{ steps.version.outputs.version }}). The Manual Publish workflow tags without committing the version bump; this is informational only."
           fi
 
       - name: Generate changelog
@@ -107,10 +106,11 @@ jobs:
           files: |
             dist/**/*
 
-      - name: Publish to npm
-        run: pnpm publish --no-git-checks --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # NOTE: npm publishing is owned by the "Manual Publish" workflow
+      # (.github/workflows/publish.yml), which publishes with OIDC provenance and
+      # then pushes the tag that triggers this workflow. This workflow only creates
+      # the GitHub Release for that tag — it must NOT publish to npm again, or every
+      # release would fail with a duplicate-version error.
 
   docs:
     name: Deploy Documentation

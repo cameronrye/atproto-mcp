@@ -112,12 +112,11 @@ export class Logger {
     const entry = this.createLogEntry(level, message, data, error);
     const formatted = this.formatLogEntry(entry);
 
-    // Output to appropriate stream
-    if (level >= LogLevel.ERROR) {
-      console.error(formatted);
-    } else {
-      console.log(formatted);
-    }
+    // Always write logs to stderr. This server speaks MCP over stdio, where
+    // process.stdout is reserved for the JSON-RPC message stream; any log output
+    // on stdout would corrupt the protocol framing and break clients. stderr is
+    // safe for human-readable diagnostics at every level.
+    console.error(formatted);
   }
 
   /**

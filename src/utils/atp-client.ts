@@ -530,42 +530,25 @@ export class AtpClient {
    * Load stored OAuth session from secure storage
    */
   private async loadStoredOAuthSession(): Promise<IOAuthSession | null> {
-    try {
-      // In a real implementation, this would load from secure storage
-      // For now, we'll use environment variables or return null
-      const storedSession = process.env['OAUTH_STORED_SESSION'];
-      if (storedSession) {
-        const session = JSON.parse(storedSession);
-        return {
-          ...session,
-          expiresAt: new Date(session.expiresAt),
-        };
-      }
-      return null;
-    } catch (error) {
-      this.logger.warn('Failed to load stored OAuth session', error);
-      return null;
-    }
+    // No persistent OAuth session store is implemented. Tokens must never be
+    // read from process.env (an environment variable is plaintext, visible to
+    // child processes, and easily leaked). Return null until a real secure
+    // store (e.g. OS keychain / encrypted file) is wired in.
+    return null;
   }
 
   /**
-   * Store OAuth session to secure storage
+   * Persist an OAuth session to secure storage.
+   *
+   * Intentionally does NOT write tokens to process.env — that exposes access and
+   * refresh tokens as plaintext to the whole process tree. A real secure store
+   * is not yet implemented, so only non-sensitive metadata is logged.
    */
   private async storeOAuthSession(session: IOAuthSession): Promise<void> {
-    try {
-      // In a real implementation, this would store to secure storage
-      // For now, we'll log the session (without sensitive data)
-      this.logger.info('OAuth session stored', {
-        did: session.did,
-        handle: session.handle,
-        expiresAt: session.expiresAt.toISOString(),
-      });
-
-      // Store in environment variable for demo purposes
-      // In production, use proper secure storage
-      process.env['OAUTH_STORED_SESSION'] = JSON.stringify(session);
-    } catch (error) {
-      this.logger.warn('Failed to store OAuth session', error);
-    }
+    this.logger.info('OAuth session received (not persisted — no secure store configured)', {
+      did: session.did,
+      handle: session.handle,
+      expiresAt: session.expiresAt.toISOString(),
+    });
   }
 }
