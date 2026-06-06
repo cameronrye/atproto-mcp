@@ -192,18 +192,18 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
       (values.service != null && values.service !== '') ||
       (values.auth != null && values.auth !== '')
     ) {
-      config.atproto = {
-        service: 'https://bsky.social',
-        authMethod: 'app-password',
-      };
+      // Only carry the fields the user actually provided on the CLI. Do NOT seed
+      // a hardcoded service default here — otherwise passing --auth alone would
+      // clobber ATPROTO_SERVICE from the environment with bsky.social.
+      const atproto: Partial<IMcpServerConfig['atproto']> = {};
 
       if (values.service != null && values.service !== '') {
         try {
           new URL(values.service); // Validate URL
-          config.atproto.service = values.service;
         } catch {
           throw new ConfigurationError(`Invalid service URL: ${values.service}`);
         }
+        atproto.service = values.service;
       }
 
       if (values.auth != null && values.auth !== '') {
@@ -212,8 +212,10 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
             `Invalid auth method: ${values.auth}. Must be 'app-password' or 'oauth'`
           );
         }
-        config.atproto.authMethod = values.auth;
+        atproto.authMethod = values.auth;
       }
+
+      config.atproto = atproto as IMcpServerConfig['atproto'];
     }
 
     return config;

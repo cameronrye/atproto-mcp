@@ -76,11 +76,15 @@ describe('ATURI Validation', () => {
 
     it('should reject URIs with insufficient parts', () => {
       expect(() => validateATURI('at://did:plc:abc123')).toThrow(
-        "Must be 'at://did/collection/rkey'"
+        "Must be 'at://authority/collection/rkey'"
       );
       expect(() => validateATURI('at://did:plc:abc123/app.bsky.feed.post')).toThrow(
-        "Must be 'at://did/collection/rkey'"
+        "Must be 'at://authority/collection/rkey'"
       );
+    });
+
+    it('should reject URIs with empty segments', () => {
+      expect(() => validateATURI('at://did:plc:abc123//xyz789')).toThrow('must all be non-empty');
     });
   });
 
