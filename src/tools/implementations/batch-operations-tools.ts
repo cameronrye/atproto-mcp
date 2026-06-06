@@ -77,19 +77,18 @@ export class BatchFollowTool extends BaseTool {
           // Resolve the actor to get their DID and profile info
           const userProfile = await this.resolveActor(actor);
 
-          // Check if already following this user
-          const existingFollow = await this.checkExistingFollow(userProfile.did);
-          if (existingFollow) {
+          // Check if already following this user (authoritative viewer state).
+          if (userProfile.followingUri) {
             this.logger.debug('User is already being followed', {
               actor,
-              followUri: existingFollow.uri,
+              followUri: userProfile.followingUri,
             });
 
             results.push({
               actor,
               success: true,
-              uri: existingFollow.uri as ATURI,
-              cid: existingFollow.cid as CID,
+              uri: userProfile.followingUri as ATURI,
+              cid: '' as CID,
               did: userProfile.did,
               handle: userProfile.handle,
               alreadyFollowing: true,
@@ -166,7 +165,7 @@ export class BatchFollowTool extends BaseTool {
       });
 
       return {
-        success: failed === 0 || (params.continueOnError ?? true),
+        success: failed === 0,
         results,
         summary: {
           total: params.actors.length,
@@ -184,7 +183,9 @@ export class BatchFollowTool extends BaseTool {
   /**
    * Resolve actor identifier to DID and profile information
    */
-  private async resolveActor(actor: string): Promise<{ did: DID; handle?: string }> {
+  private async resolveActor(
+    actor: string
+  ): Promise<{ did: DID; handle?: string; followingUri?: string }> {
     const response = await this.executeAtpOperation(
       async () => {
         const agent = this.atpClient.getAgent();
@@ -197,50 +198,10 @@ export class BatchFollowTool extends BaseTool {
     return {
       did: response.data.did as DID,
       ...(response.data.handle && { handle: response.data.handle }),
+      // viewer.following is the authoritative "am I already following this user"
+      // signal (the follow record's URI), with no 100-record scan limit.
+      ...(response.data.viewer?.following && { followingUri: response.data.viewer.following }),
     };
-  }
-
-  /**
-   * Check if the user is already being followed
-   */
-  private async checkExistingFollow(
-    targetDid: string
-  ): Promise<{ uri: string; cid: string } | null> {
-    try {
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          const userDid = agent.session?.did;
-
-          if (!userDid) {
-            throw new Error('User session not available');
-          }
-
-          return await agent.com.atproto.repo.listRecords({
-            repo: userDid,
-            collection: 'app.bsky.graph.follow',
-            limit: 100,
-          });
-        },
-        'listFollows',
-        { targetDid }
-      );
-
-      for (const record of response.data.records) {
-        const followRecord = record.value as any;
-        if (followRecord.subject === targetDid) {
-          return {
-            uri: record.uri,
-            cid: record.cid,
-          };
-        }
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.warn('Could not check for existing follow', error);
-      return null;
-    }
   }
 }
 
@@ -397,7 +358,7 @@ export class BatchLikeTool extends BaseTool {
       });
 
       return {
-        success: failed === 0 || (params.continueOnError ?? true),
+        success: failed === 0,
         results,
         summary: {
           total: params.uris.length,
@@ -420,36 +381,20 @@ export class BatchLikeTool extends BaseTool {
     _postCid: string
   ): Promise<{ uri: string; cid: string } | null> {
     try {
+      // viewer.like is the authoritative "have I liked this post" signal, with
+      // no 100-record scan limit (the old listRecords scan missed likes on
+      // accounts with >100 likes, causing duplicate like records).
       const response = await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          const userDid = agent.session?.did;
-
-          if (!userDid) {
-            throw new Error('User session not available');
-          }
-
-          return await agent.com.atproto.repo.listRecords({
-            repo: userDid,
-            collection: 'app.bsky.feed.like',
-            limit: 100,
-          });
+          return await agent.getPosts({ uris: [postUri] });
         },
-        'listLikes',
+        'getPostViewerState',
         { postUri }
       );
 
-      for (const record of response.data.records) {
-        const likeRecord = record.value as any;
-        if (likeRecord.subject?.uri === postUri) {
-          return {
-            uri: record.uri,
-            cid: record.cid,
-          };
-        }
-      }
-
-      return null;
+      const likeUri = response.data.posts[0]?.viewer?.like;
+      return likeUri ? { uri: likeUri, cid: '' } : null;
     } catch (error) {
       this.logger.warn('Could not check for existing like', error);
       return null;
@@ -647,7 +592,7 @@ export class BatchRepostTool extends BaseTool {
       });
 
       return {
-        success: failed === 0 || (params.continueOnError ?? true),
+        success: failed === 0,
         results,
         summary: {
           total: params.uris.length,
@@ -670,36 +615,19 @@ export class BatchRepostTool extends BaseTool {
     _postCid: string
   ): Promise<{ uri: string; cid: string } | null> {
     try {
+      // viewer.repost is the authoritative "have I reposted this" signal, with
+      // no 100-record scan limit.
       const response = await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          const userDid = agent.session?.did;
-
-          if (!userDid) {
-            throw new Error('User session not available');
-          }
-
-          return await agent.com.atproto.repo.listRecords({
-            repo: userDid,
-            collection: 'app.bsky.feed.repost',
-            limit: 100,
-          });
+          return await agent.getPosts({ uris: [postUri] });
         },
-        'listReposts',
+        'getPostViewerState',
         { postUri }
       );
 
-      for (const record of response.data.records) {
-        const repostRecord = record.value as any;
-        if (repostRecord.subject?.uri === postUri) {
-          return {
-            uri: record.uri,
-            cid: record.cid,
-          };
-        }
-      }
-
-      return null;
+      const repostUri = response.data.posts[0]?.viewer?.repost;
+      return repostUri ? { uri: repostUri, cid: '' } : null;
     } catch (error) {
       this.logger.warn('Could not check for existing repost', error);
       return null;

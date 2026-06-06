@@ -144,7 +144,9 @@ describe('BatchFollowTool', () => {
       actors: ['user1.bsky.social', 'invalid.user', 'user3.bsky.social'],
     });
 
-    expect(result.success).toBe(true);
+    // A batch with any failed item reports top-level success: false (callers
+    // read summary/results for per-item detail).
+    expect(result.success).toBe(false);
     expect(result.summary.succeeded).toBe(2);
     expect(result.summary.failed).toBe(1);
     expect(result.results.filter((r: any) => !r.success)).toHaveLength(1);
@@ -202,7 +204,7 @@ describe('BatchLikeTool', () => {
       ],
     });
 
-    expect(result.success).toBe(true);
+    expect(result.success).toBe(false);
     expect(result.summary.succeeded).toBe(1);
     expect(result.summary.failed).toBe(1);
   });
