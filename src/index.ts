@@ -199,6 +199,20 @@ export class AtpMcpServer {
           });
         }
 
+        // Rate-limit tool invocations to guard against runaway loops / abuse.
+        // Note: tool arguments are intentionally NOT passed through the HTML/script
+        // input sanitizer — that sanitizer strips characters (`<`, `>`, collapses
+        // whitespace) that are legitimate in post content and would corrupt user
+        // data. Per-field validation is handled by each tool's zod schema, and
+        // outbound URLs/paths are guarded at their call sites (see url-safety).
+        if (!this.securityManager.checkRateLimit(`tool:${toolName}`)) {
+          throw new McpError(
+            ErrorCode.InternalError,
+            `Rate limit exceeded for tool "${toolName}". Please slow down and retry shortly.`,
+            { tool: toolName }
+          );
+        }
+
         try {
           // Check if tool is available before execution
           if ('isAvailable' in tool && typeof tool.isAvailable === 'function') {
@@ -540,6 +554,9 @@ export class AtpMcpServer {
       this.wsManager.disconnectAll();
       this.cache.clear();
       this.connectionPool.cleanup();
+
+      // Release security manager background timers (rate-limiter cleanup).
+      this.securityManager.destroy();
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
