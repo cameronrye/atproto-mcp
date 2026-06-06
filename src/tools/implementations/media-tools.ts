@@ -61,17 +61,20 @@ const CreateRichTextPostSchema = z.object({
       images: z
         .array(
           z.object({
-            image: z.string(),
-            alt: z.string(),
+            // Local image file path (uploaded to obtain a valid blob reference).
+            filePath: z.string().min(1, 'Image file path is required'),
+            alt: z.string().max(1000),
           })
         )
+        .max(4, 'Cannot attach more than 4 images')
         .optional(),
       external: z
         .object({
           uri: z.string().url(),
           title: z.string(),
           description: z.string(),
-          thumb: z.string().optional(),
+          // Optional local thumbnail image file path.
+          thumbFilePath: z.string().optional(),
         })
         .optional(),
       record: z
@@ -345,8 +348,8 @@ export class CreateRichTextPostTool extends BaseTool {
     }>;
     embed?: {
       type: string;
-      images?: Array<{ image: string; alt: string }>;
-      external?: { uri: string; title: string; description: string; thumb?: string };
+      images?: Array<{ filePath: string; alt: string }>;
+      external?: { uri: string; title: string; description: string; thumbFilePath?: string };
       record?: { uri: string; cid: string };
     };
   }): Promise<{
@@ -402,32 +405,37 @@ export class CreateRichTextPostTool extends BaseTool {
         }));
       }
 
-      // Add embed if provided
+      // Add embed if provided. Image/thumbnail blobs MUST be real uploaded
+      // BlobRef objects (from agent.uploadBlob) — a bare string is not a valid
+      // blob reference and the server would reject it.
       if (params.embed) {
         switch (params.embed.type) {
           case 'images':
-            if (params.embed.images) {
+            if (params.embed.images && params.embed.images.length > 0) {
+              const images = [];
+              for (const img of params.embed.images) {
+                const blob = await this.uploadImageFile(img.filePath);
+                images.push({ image: blob, alt: img.alt });
+              }
               postRecord.embed = {
                 $type: 'app.bsky.embed.images',
-                images: params.embed.images.map(img => ({
-                  image: { $type: 'blob', ref: img.image },
-                  alt: img.alt,
-                })),
+                images,
               };
             }
             break;
           case 'external':
             if (params.embed.external) {
+              const external: Record<string, unknown> = {
+                uri: params.embed.external.uri,
+                title: params.embed.external.title,
+                description: params.embed.external.description,
+              };
+              if (params.embed.external.thumbFilePath) {
+                external['thumb'] = await this.uploadImageFile(params.embed.external.thumbFilePath);
+              }
               postRecord.embed = {
                 $type: 'app.bsky.embed.external',
-                external: {
-                  uri: params.embed.external.uri,
-                  title: params.embed.external.title,
-                  description: params.embed.external.description,
-                  thumb: params.embed.external.thumb
-                    ? { $type: 'blob', ref: params.embed.external.thumb }
-                    : undefined,
-                },
+                external,
               };
             }
             break;
@@ -475,6 +483,40 @@ export class CreateRichTextPostTool extends BaseTool {
       this.logger.error('Failed to create rich text post', error);
       this.formatError(error);
     }
+  }
+
+  /**
+   * Upload a local image file and return its AT Protocol BlobRef, suitable for
+   * embedding in a post record.
+   */
+  private async uploadImageFile(filePath: string): Promise<unknown> {
+    const safePath = assertSafePath(filePath, mediaBaseDir());
+    const data = await readFile(safePath);
+    const ext = extname(safePath).toLowerCase();
+    const mimeTypeMap: Record<string, string> = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.webp': 'image/webp',
+    };
+    const mimeType = mimeTypeMap[ext];
+    if (!mimeType) {
+      throw new Error(`Unsupported image format: ${ext}`);
+    }
+    if (data.length > 1024 * 1024) {
+      throw new Error('Image file size cannot exceed 1MB');
+    }
+    const response = await this.executeAtpOperation(
+      async () => {
+        const agent = this.atpClient.getAgent();
+        return await agent.uploadBlob(data, { encoding: mimeType });
+      },
+      'uploadEmbedImage',
+      { filePath: safePath, size: data.length }
+    );
+    // response.data.blob is the BlobRef the embed needs.
+    return response.data.blob;
   }
 }
 

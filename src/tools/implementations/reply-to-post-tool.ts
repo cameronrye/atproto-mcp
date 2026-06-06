@@ -67,10 +67,13 @@ export class ReplyToPostTool extends BaseTool {
         this.getCidFromUri(params.parent),
       ]);
 
+      // Detect richtext facets so mentions/links/hashtags are not inert text.
+      const { text, facets } = await this.buildRichText(params.text);
+
       // Build the reply record
       const replyRecord = {
         $type: 'app.bsky.feed.post' as const,
-        text: params.text,
+        text,
         createdAt: new Date().toISOString(),
         reply: {
           root: {
@@ -83,6 +86,10 @@ export class ReplyToPostTool extends BaseTool {
           },
         },
       };
+
+      if (facets) {
+        (replyRecord as any).facets = facets;
+      }
 
       // Add language tags if provided
       if (params.langs && params.langs.length > 0) {
@@ -169,11 +176,14 @@ export class ReplyToPostTool extends BaseTool {
       return cid;
     } catch (error) {
       this.logger.error('Failed to resolve CID from URI', error);
-      // Fallback to extracting rkey as CID (not ideal but prevents failure)
-      const parts = uri.split('/');
-      const rkey = parts[parts.length - 1];
-      this.logger.warn('Using rkey as fallback CID', { uri, rkey });
-      return rkey || 'fallback-cid';
+      // A reply must reference the parent/root post by its real CID. Previously
+      // this fell back to the rkey (or the literal 'fallback-cid'), producing a
+      // structurally invalid reply record. Fail clearly instead.
+      throw new Error(
+        `Could not resolve the CID for ${uri}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }. A reply requires the real CID of the parent and root posts.`
+      );
     }
   }
 

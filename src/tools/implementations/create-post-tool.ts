@@ -89,12 +89,20 @@ export class CreatePostTool extends BaseTool {
         this.validateAtUri(params.reply.parent);
       }
 
+      // Detect richtext facets (mentions/links/hashtags) so they are not stored
+      // as inert plain text. agent.post() does not do this automatically.
+      const { text, facets } = await this.buildRichText(params.text);
+
       // Build the post record
       const postRecord: any = {
         $type: 'app.bsky.feed.post',
-        text: params.text,
+        text,
         createdAt: new Date().toISOString(),
       };
+
+      if (facets) {
+        postRecord.facets = facets;
+      }
 
       // Add reply information if this is a reply
       if (params.reply) {
