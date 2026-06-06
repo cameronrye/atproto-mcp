@@ -44,6 +44,7 @@ export class StartOAuthFlowTool extends BaseTool {
     instructions: string;
     expiresIn: number;
   }> {
+    let oauthClient: AtpOAuthClient | undefined;
     try {
       this.logger.info('Starting OAuth flow', { identifier: params.identifier });
 
@@ -51,7 +52,7 @@ export class StartOAuthFlowTool extends BaseTool {
 
       // Get OAuth configuration from ATP client
       const config = this.atpClient.getAgent().service;
-      const oauthClient = new AtpOAuthClient({
+      oauthClient = new AtpOAuthClient({
         service: config.toString(),
         authMethod: 'oauth',
         clientId: process.env['OAUTH_CLIENT_ID'],
@@ -76,7 +77,10 @@ export class StartOAuthFlowTool extends BaseTool {
       };
     } catch (error) {
       this.logger.error('Failed to start OAuth flow', error);
-      this.formatError(error);
+      return this.formatError(error);
+    } finally {
+      // Avoid leaking the per-call client's background cleanup interval.
+      oauthClient?.destroy();
     }
   }
 }
@@ -101,6 +105,7 @@ export class HandleOAuthCallbackTool extends BaseTool {
     };
     message: string;
   }> {
+    let oauthClient: AtpOAuthClient | undefined;
     try {
       this.logger.info('Handling OAuth callback', {
         code: `${params.code.substring(0, 10)}...`,
@@ -109,7 +114,7 @@ export class HandleOAuthCallbackTool extends BaseTool {
 
       // Get OAuth configuration from ATP client
       const config = this.atpClient.getAgent().service;
-      const oauthClient = new AtpOAuthClient({
+      oauthClient = new AtpOAuthClient({
         service: config.toString(),
         authMethod: 'oauth',
         clientId: process.env['OAUTH_CLIENT_ID'],
@@ -135,7 +140,9 @@ export class HandleOAuthCallbackTool extends BaseTool {
       };
     } catch (error) {
       this.logger.error('Failed to handle OAuth callback', error);
-      this.formatError(error);
+      return this.formatError(error);
+    } finally {
+      oauthClient?.destroy();
     }
   }
 }
@@ -160,12 +167,13 @@ export class RefreshOAuthTokensTool extends BaseTool {
     };
     message: string;
   }> {
+    let oauthClient: AtpOAuthClient | undefined;
     try {
       this.logger.info('Refreshing OAuth tokens');
 
       // Get OAuth configuration from ATP client
       const config = this.atpClient.getAgent().service;
-      const oauthClient = new AtpOAuthClient({
+      oauthClient = new AtpOAuthClient({
         service: config.toString(),
         authMethod: 'oauth',
         clientId: process.env['OAUTH_CLIENT_ID'],
@@ -191,7 +199,9 @@ export class RefreshOAuthTokensTool extends BaseTool {
       };
     } catch (error) {
       this.logger.error('Failed to refresh OAuth tokens', error);
-      this.formatError(error);
+      return this.formatError(error);
+    } finally {
+      oauthClient?.destroy();
     }
   }
 }
@@ -211,12 +221,13 @@ export class RevokeOAuthTokensTool extends BaseTool {
     success: boolean;
     message: string;
   }> {
+    let oauthClient: AtpOAuthClient | undefined;
     try {
       this.logger.info('Revoking OAuth tokens');
 
       // Get OAuth configuration from ATP client
       const config = this.atpClient.getAgent().service;
-      const oauthClient = new AtpOAuthClient({
+      oauthClient = new AtpOAuthClient({
         service: config.toString(),
         authMethod: 'oauth',
         clientId: process.env['OAUTH_CLIENT_ID'],
@@ -234,7 +245,9 @@ export class RevokeOAuthTokensTool extends BaseTool {
       };
     } catch (error) {
       this.logger.error('Failed to revoke OAuth tokens', error);
-      this.formatError(error);
+      return this.formatError(error);
+    } finally {
+      oauthClient?.destroy();
     }
   }
 }

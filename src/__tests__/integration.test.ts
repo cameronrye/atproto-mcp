@@ -300,7 +300,7 @@ describe('Phase 2 Integration Tests', () => {
       expect(authRequest.codeChallenge).toMatch(/^[A-Za-z0-9_-]+$/);
     });
 
-    it('should handle OAuth callback and return session', async () => {
+    it('rejects an OAuth callback for an unknown/expired state', async () => {
       const config = {
         service: 'https://bsky.social',
         authMethod: 'oauth' as const,
@@ -310,35 +310,36 @@ describe('Phase 2 Integration Tests', () => {
       };
 
       const oauthClient = new AtpOAuthClient(config);
+      try {
+        await expect(
+          oauthClient.handleCallback('auth-code-123', 'never-issued-state')
+        ).rejects.toThrow(/state parameter/i);
+      } finally {
+        oauthClient.destroy();
+      }
+    });
 
-      // Set up pending authorization
-      const state = 'test-state-123';
-      (oauthClient as any).pendingAuthorizations.set(state, {
-        codeVerifier: 'test-verifier',
-        timestamp: Date.now(),
-      });
+    it('fails loudly instead of fabricating a session (token exchange not implemented)', async () => {
+      const config = {
+        service: 'https://bsky.social',
+        authMethod: 'oauth' as const,
+        clientId: 'test-client-id',
+        clientSecret: 'test-client-secret',
+        redirectUri: 'http://localhost:3000/callback',
+      };
 
-      // Mock the OAuth client's callback method
-      const mockCallback = vi.fn().mockResolvedValue({
-        accessJwt: 'access-token-123',
-        refreshJwt: 'refresh-token-123',
-        did: 'did:plc:test123',
-        handle: 'test.bsky.social',
-        expiresIn: 3600,
-      });
-      (oauthClient as any).oauthClient = { callback: mockCallback };
+      const oauthClient = new AtpOAuthClient(config);
+      try {
+        // Establish a valid PKCE/state binding as startAuthorization would.
+        const { state } = await oauthClient.startAuthorization('test.bsky.social');
 
-      const session = await oauthClient.handleCallback('auth-code-123', state);
-
-      expect(session).toHaveProperty('accessToken');
-      expect(session).toHaveProperty('refreshToken');
-      expect(session).toHaveProperty('did');
-      expect(session.accessToken).toMatch(/^mock_access_token_/);
-      expect(session.refreshToken).toMatch(/^mock_refresh_token_/);
-      expect(session.did).toBe('did:plc:mock123');
-      expect(session).toHaveProperty('handle', 'mock.bsky.social');
-      expect(session).toHaveProperty('expiresAt');
-      expect(session.expiresAt).toBeInstanceOf(Date);
+        // The callback must NOT return a forged session; it must reject clearly.
+        await expect(oauthClient.handleCallback('auth-code-123', state)).rejects.toThrow(
+          /not implemented/i
+        );
+      } finally {
+        oauthClient.destroy();
+      }
     });
   });
 
