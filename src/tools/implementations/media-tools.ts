@@ -7,6 +7,17 @@ import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import { readFile } from 'fs/promises';
 import { extname } from 'path';
+import { assertSafePath, safeFetch } from '../../utils/url-safety.js';
+
+/**
+ * Directory that tool-supplied media file paths must stay within. Defaults to
+ * the process working directory; override with ATPROTO_MEDIA_DIR. This prevents
+ * an MCP caller from reading arbitrary local files (e.g. /etc/passwd, SSH keys)
+ * and uploading them as blobs.
+ */
+function mediaBaseDir(): string {
+  return process.env['ATPROTO_MEDIA_DIR'] ?? process.cwd();
+}
 
 const UploadImageSchema = z.object({
   filePath: z.string().min(1, 'File path is required'),
@@ -112,9 +123,10 @@ export class UploadImageTool extends BaseTool {
         hasAltText: !!params.altText,
       });
 
-      // Read the image file
-      const imageData = await readFile(params.filePath);
-      const fileExtension = extname(params.filePath).toLowerCase();
+      // Read the image file (restricted to the allowed media directory)
+      const safePath = assertSafePath(params.filePath, mediaBaseDir());
+      const imageData = await readFile(safePath);
+      const fileExtension = extname(safePath).toLowerCase();
 
       // Determine MIME type
       const mimeTypeMap: Record<string, string> = {
@@ -220,9 +232,10 @@ export class UploadVideoTool extends BaseTool {
         captionCount: params.captions?.length || 0,
       });
 
-      // Read the video file
-      const videoData = await readFile(params.filePath);
-      const fileExtension = extname(params.filePath).toLowerCase();
+      // Read the video file (restricted to the allowed media directory)
+      const safePath = assertSafePath(params.filePath, mediaBaseDir());
+      const videoData = await readFile(safePath);
+      const fileExtension = extname(safePath).toLowerCase();
 
       // Determine MIME type
       const mimeTypeMap: Record<string, string> = {
@@ -258,7 +271,7 @@ export class UploadVideoTool extends BaseTool {
         processedCaptions = [];
         for (const caption of params.captions) {
           try {
-            const captionData = await readFile(caption.file);
+            const captionData = await readFile(assertSafePath(caption.file, mediaBaseDir()));
             const captionResponse = await this.executeAtpOperation(
               async () => {
                 const agent = this.atpClient.getAgent();
@@ -498,25 +511,20 @@ export class GenerateLinkPreviewTool extends BaseTool {
         url: params.url,
       });
 
-      // Validate URL
-      try {
-        new URL(params.url);
-      } catch {
-        throw new Error('Invalid URL provided');
-      }
-
-      // Fetch the webpage content
-      const response = await fetch(params.url, {
-        headers: {
-          'User-Agent': 'AT Protocol MCP Server/1.0',
-        },
+      // Fetch the webpage content with SSRF protection: http(s) only, DNS
+      // resolution checked against private/internal ranges, redirects
+      // re-validated, and response size/time capped.
+      const response = await safeFetch(params.url, {
+        headers: { 'User-Agent': 'AT Protocol MCP Server/1.0' },
+        maxBytes: 2 * 1024 * 1024,
+        timeoutMs: 10_000,
       });
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch URL: ${response.status} ${response.statusText}`);
+      if (response.status < 200 || response.status >= 300) {
+        throw new Error(`Failed to fetch URL: ${response.status}`);
       }
 
-      const html = await response.text();
+      const html = response.body.toString('utf8');
 
       // Extract metadata using simple regex patterns
       // In production, use a proper HTML parser like cheerio
@@ -535,20 +543,21 @@ export class GenerateLinkPreviewTool extends BaseTool {
       let thumbBlob;
       if (imageUrl) {
         try {
-          // Download and upload the thumbnail image
-          const imageResponse = await fetch(imageUrl, {
-            headers: {
-              'User-Agent': 'AT Protocol MCP Server/1.0',
-            },
+          // Resolve a possibly-relative og:image against the page URL, then
+          // download it through the same SSRF-safe fetch (size-capped to 1MB).
+          const resolvedImageUrl = new URL(imageUrl, response.url).toString();
+          const imageResponse = await safeFetch(resolvedImageUrl, {
+            headers: { 'User-Agent': 'AT Protocol MCP Server/1.0' },
+            maxBytes: 1024 * 1024,
+            timeoutMs: 10_000,
           });
 
-          if (imageResponse.ok) {
-            const imageData = await imageResponse.arrayBuffer();
-            const imageBuffer = Buffer.from(imageData);
+          if (imageResponse.status >= 200 && imageResponse.status < 300) {
+            const imageBuffer = imageResponse.body;
 
             // Check image size (max 1MB)
             if (imageBuffer.length <= 1024 * 1024) {
-              const contentType = imageResponse.headers.get('content-type') || 'image/jpeg';
+              const contentType = imageResponse.contentType || 'image/jpeg';
 
               const uploadResponse = await this.executeAtpOperation(
                 async () => {
