@@ -13,7 +13,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
+import { ConfigurationError, type IMcpServerConfig, ValidationError } from './types/index.js';
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
@@ -37,6 +37,7 @@ export class AtpMcpServer {
   private metricsInterval?: NodeJS.Timeout;
   private transport: StdioServerTransport | null = null;
   private isRunning = false;
+  private isShuttingDown = false;
 
   constructor(configOverrides: Partial<IMcpServerConfig> = {}) {
     this.logger = new Logger('AtpMcpServer');
@@ -133,7 +134,12 @@ export class AtpMcpServer {
         tools: tools.map(tool => ({
           name: tool.schema.method,
           description: tool.schema.description || '',
-          inputSchema: tool.schema.params ? this.zodToJsonSchema(tool.schema.params) : undefined,
+          // MCP requires inputSchema to be a JSON Schema object. For param-less
+          // tools, emit an empty object schema rather than `undefined` (which
+          // violates the Tool shape).
+          inputSchema: tool.schema.params
+            ? this.zodToJsonSchema(tool.schema.params)
+            : { type: 'object', properties: {} },
         })),
       })
     );
@@ -247,6 +253,12 @@ export class AtpMcpServer {
           // client receives the accurate JSON-RPC code.
           if (error instanceof McpError) {
             throw error;
+          }
+
+          // Invalid input is a client-correctable condition: map it to the
+          // spec's InvalidParams (-32602) rather than InternalError (-32603).
+          if (error instanceof ValidationError) {
+            throw new McpError(ErrorCode.InvalidParams, error.message, { tool: toolName });
           }
 
           // Sanitize internal error details before returning to the client.
@@ -421,10 +433,14 @@ export class AtpMcpServer {
    * support for all Zod schema types and proper JSON Schema conversion.
    */
   private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
-    return zodToJsonSchema(schema, {
+    const json = zodToJsonSchema(schema, {
       target: 'jsonSchema7',
       $refStrategy: 'none',
     }) as Record<string, unknown>;
+    // The `$schema` meta key is not part of an MCP inputSchema and some clients
+    // are strict about it; drop it so we emit a clean JSON Schema object.
+    delete json['$schema'];
+    return json;
   }
 
   /**
@@ -435,6 +451,8 @@ export class AtpMcpServer {
       this.logger.warn('Server is already running');
       return;
     }
+
+    this.isShuttingDown = false;
 
     try {
       this.logger.info('Starting AT Protocol MCP Server...');
@@ -459,6 +477,19 @@ export class AtpMcpServer {
 
       // Create and connect transport
       this.transport = new StdioServerTransport();
+
+      // When the MCP client disconnects (stdin closes), the transport closes.
+      // Release resources so the server does not linger with open timers/sockets.
+      this.server.onclose = () => {
+        if (this.isShuttingDown) {
+          return;
+        }
+        this.logger.info('MCP transport closed (client disconnected); cleaning up');
+        void this.cleanup().catch(err =>
+          this.logger.error('Cleanup after transport close failed', err)
+        );
+      };
+
       await this.server.connect(this.transport);
 
       this.isRunning = true;
@@ -509,6 +540,14 @@ export class AtpMcpServer {
    * Cleanup server resources
    */
   private async cleanup(): Promise<void> {
+    // Guard against re-entrancy: cleanup() calls server.close(), which fires the
+    // onclose handler; without this flag a client disconnect during shutdown (or
+    // two concurrent signals) could run cleanup twice.
+    if (this.isShuttingDown) {
+      return;
+    }
+    this.isShuttingDown = true;
+
     const errors: Error[] = [];
 
     try {
