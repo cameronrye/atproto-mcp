@@ -113,14 +113,20 @@ export class AnalyzeNetworkTool extends BaseTool {
           { actor, limit: params.maxSampleSize }
         );
 
-        topFollowers = (followersResponse.data.followers as any[])
+        // getFollowers returns ProfileView entries WITHOUT followersCount, so we
+        // hydrate the sample via getProfiles to get real counts before ranking.
+        const hydrated = await this.hydrateProfiles(
+          agent,
+          followersResponse.data.followers as any[]
+        );
+        topFollowers = hydrated
           .sort((a: any, b: any) => (b.followersCount || 0) - (a.followersCount || 0))
           .slice(0, 10)
           .map((f: any) => ({
             did: f.did,
             handle: f.handle,
             displayName: f.displayName,
-            followersCount: f.followersCount || 0,
+            followersCount: f.followersCount ?? 0,
           }));
       }
 
@@ -131,14 +137,15 @@ export class AnalyzeNetworkTool extends BaseTool {
           { actor, limit: params.maxSampleSize }
         );
 
-        topFollows = (followsResponse.data.follows as any[])
+        const hydrated = await this.hydrateProfiles(agent, followsResponse.data.follows as any[]);
+        topFollows = hydrated
           .sort((a: any, b: any) => (b.followersCount || 0) - (a.followersCount || 0))
           .slice(0, 10)
           .map((f: any) => ({
             did: f.did,
             handle: f.handle,
             displayName: f.displayName,
-            followersCount: f.followersCount || 0,
+            followersCount: f.followersCount ?? 0,
           }));
 
         // Calculate mutual connections
@@ -175,6 +182,37 @@ export class AnalyzeNetworkTool extends BaseTool {
     } catch (error) {
       this.logger.error('Failed to analyze network', error);
       this.formatError(error);
+    }
+  }
+
+  /**
+   * Hydrate a sample of ProfileView entries (which lack followersCount) into
+   * ProfileViewDetailed via getProfiles, so ranking/scoring uses real counts.
+   *
+   * getProfiles accepts up to 25 actors per call; we hydrate the first 25 of the
+   * sample (one call) to keep cost bounded. Falls back to the raw entries if
+   * getProfiles is unavailable, so callers still get a best-effort result.
+   */
+  private async hydrateProfiles(agent: any, sample: any[]): Promise<any[]> {
+    const chunk = sample.slice(0, 25);
+    const dids = chunk.map(p => p.did).filter(Boolean);
+    if (dids.length === 0 || typeof agent.getProfiles !== 'function') {
+      return chunk;
+    }
+    try {
+      const resp = await this.executeAtpOperation(
+        async () => agent.getProfiles({ actors: dids }),
+        'getProfiles',
+        { count: dids.length }
+      );
+      const byDid = new Map<string, any>();
+      for (const profile of (resp.data.profiles as any[]) ?? []) {
+        byDid.set(profile.did, profile);
+      }
+      return chunk.map(p => byDid.get(p.did) ?? p);
+    } catch (error) {
+      this.logger.warn('Profile hydration failed; ranking on unhydrated sample', error as Error);
+      return chunk;
     }
   }
 
