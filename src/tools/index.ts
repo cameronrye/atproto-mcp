@@ -88,101 +88,108 @@ export interface IMcpTool {
 export function createTools(atpClient: AtpClient): IMcpTool[] {
   const logger = new Logger('ToolsFactory');
 
-  try {
-    const tools = [
-      // Core social operations
-      new CreatePostTool(atpClient),
-      new CreateThreadTool(atpClient),
-      new ReplyToPostTool(atpClient),
-      new LikePostTool(atpClient),
-      new UnlikePostTool(atpClient),
-      new RepostTool(atpClient),
-      new UnrepostTool(atpClient),
+  const toolFactories: Array<() => IMcpTool> = [
+    // Core social operations
+    () => new CreatePostTool(atpClient),
+    () => new CreateThreadTool(atpClient),
+    () => new ReplyToPostTool(atpClient),
+    () => new LikePostTool(atpClient),
+    () => new UnlikePostTool(atpClient),
+    () => new RepostTool(atpClient),
+    () => new UnrepostTool(atpClient),
 
-      // User operations
-      new FollowUserTool(atpClient),
-      new UnfollowUserTool(atpClient),
-      new GetUserProfileTool(atpClient),
+    // User operations
+    () => new FollowUserTool(atpClient),
+    () => new UnfollowUserTool(atpClient),
+    () => new GetUserProfileTool(atpClient),
 
-      // Data retrieval
-      new SearchPostsTool(atpClient),
-      new GetTimelineTool(atpClient),
-      new GetFollowersTool(atpClient),
-      new GetFollowsTool(atpClient),
-      new GetNotificationsTool(atpClient),
+    // Data retrieval
+    () => new SearchPostsTool(atpClient),
+    () => new GetTimelineTool(atpClient),
+    () => new GetFollowersTool(atpClient),
+    () => new GetFollowsTool(atpClient),
+    () => new GetNotificationsTool(atpClient),
 
-      // Content management
-      new DeletePostTool(atpClient),
-      new UpdateProfileTool(atpClient),
+    // Content management
+    () => new DeletePostTool(atpClient),
+    () => new UpdateProfileTool(atpClient),
 
-      // OAuth authentication
-      new StartOAuthFlowTool(atpClient),
-      new HandleOAuthCallbackTool(atpClient),
-      new RefreshOAuthTokensTool(atpClient),
-      new RevokeOAuthTokensTool(atpClient),
+    // OAuth authentication
+    () => new StartOAuthFlowTool(atpClient),
+    () => new HandleOAuthCallbackTool(atpClient),
+    () => new RefreshOAuthTokensTool(atpClient),
+    () => new RevokeOAuthTokensTool(atpClient),
 
-      // Content moderation
-      new MuteUserTool(atpClient),
-      new UnmuteUserTool(atpClient),
-      new BlockUserTool(atpClient),
-      new UnblockUserTool(atpClient),
-      new ReportContentTool(atpClient),
-      new ReportUserTool(atpClient),
-      new AnalyzeModerationStatusTool(atpClient),
+    // Content moderation
+    () => new MuteUserTool(atpClient),
+    () => new UnmuteUserTool(atpClient),
+    () => new BlockUserTool(atpClient),
+    () => new UnblockUserTool(atpClient),
+    () => new ReportContentTool(atpClient),
+    () => new ReportUserTool(atpClient),
+    () => new AnalyzeModerationStatusTool(atpClient),
 
-      // Real-time streaming
-      new StartStreamingTool(atpClient),
-      new StopStreamingTool(atpClient),
-      new GetStreamingStatusTool(atpClient),
-      new GetRecentEventsTool(atpClient),
-      new MonitorKeywordsTool(atpClient),
-      new TrackUsersTool(atpClient),
+    // Real-time streaming
+    () => new StartStreamingTool(atpClient),
+    () => new StopStreamingTool(atpClient),
+    () => new GetStreamingStatusTool(atpClient),
+    () => new GetRecentEventsTool(atpClient),
+    () => new MonitorKeywordsTool(atpClient),
+    () => new TrackUsersTool(atpClient),
 
-      // Advanced social features
-      new CreateListTool(atpClient),
-      new AddToListTool(atpClient),
-      new RemoveFromListTool(atpClient),
-      new GetListTool(atpClient),
-      new GetThreadTool(atpClient),
-      new GetCustomFeedTool(atpClient),
+    // Advanced social features
+    () => new CreateListTool(atpClient),
+    () => new AddToListTool(atpClient),
+    () => new RemoveFromListTool(atpClient),
+    () => new GetListTool(atpClient),
+    () => new GetThreadTool(atpClient),
+    () => new GetCustomFeedTool(atpClient),
 
-      // Enhanced media support
-      new UploadImageTool(atpClient),
-      new UploadVideoTool(atpClient),
-      new CreateRichTextPostTool(atpClient),
-      new GenerateLinkPreviewTool(atpClient),
-      new GenerateAltTextTool(atpClient),
+    // Enhanced media support
+    () => new UploadImageTool(atpClient),
+    () => new UploadVideoTool(atpClient),
+    () => new CreateRichTextPostTool(atpClient),
+    () => new GenerateLinkPreviewTool(atpClient),
+    () => new GenerateAltTextTool(atpClient),
 
-      // Analytics and insights
-      new AnalyzeEngagementTool(atpClient),
-      new AnalyzeNetworkTool(atpClient),
-      new SuggestContentStrategyTool(atpClient),
-      new FindInfluentialUsersTool(atpClient),
+    // Analytics and insights
+    () => new AnalyzeEngagementTool(atpClient),
+    () => new AnalyzeNetworkTool(atpClient),
+    () => new SuggestContentStrategyTool(atpClient),
+    () => new FindInfluentialUsersTool(atpClient),
 
-      // Content discovery
-      new DiscoverTrendingTool(atpClient),
-      new FindSimilarUsersTool(atpClient),
-      new RecommendContentTool(atpClient),
-      new DiscoverCommunitiesTool(atpClient),
+    // Content discovery
+    () => new DiscoverTrendingTool(atpClient),
+    () => new FindSimilarUsersTool(atpClient),
+    () => new RecommendContentTool(atpClient),
+    () => new DiscoverCommunitiesTool(atpClient),
 
-      // Batch operations
-      new BatchFollowTool(atpClient),
-      new BatchLikeTool(atpClient),
-      new BatchRepostTool(atpClient),
+    // Batch operations
+    () => new BatchFollowTool(atpClient),
+    () => new BatchLikeTool(atpClient),
+    () => new BatchRepostTool(atpClient),
 
-      // Composite operations
-      new GetUserSummaryTool(atpClient),
-      new GetPostContextTool(atpClient),
+    // Composite operations
+    () => new GetUserSummaryTool(atpClient),
+    () => new GetPostContextTool(atpClient),
 
-      // Rich media
-      new AnalyzeImageTool(atpClient),
-      new ExtractMediaFromPostTool(atpClient),
-    ];
+    // Rich media
+    () => new AnalyzeImageTool(atpClient),
+    () => new ExtractMediaFromPostTool(atpClient),
+  ];
 
-    logger.info(`Created ${tools.length} AT Protocol MCP tools`);
-    return tools;
-  } catch (error) {
-    logger.error('Failed to create MCP tools', error);
-    return [];
+  // Construct each tool defensively: a single failing constructor must not wipe
+  // out the entire toolset (the previous single try/catch returned []). Skip and
+  // log any tool that throws so the rest remain available.
+  const tools: IMcpTool[] = [];
+  for (const make of toolFactories) {
+    try {
+      tools.push(make());
+    } catch (error) {
+      logger.error('Failed to construct an MCP tool; skipping it', error);
+    }
   }
+
+  logger.info(`Created ${tools.length} AT Protocol MCP tools`);
+  return tools;
 }

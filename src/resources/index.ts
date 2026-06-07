@@ -216,18 +216,24 @@ export { ConversationContextResource };
 export function createResources(atpClient: AtpClient): BaseResource[] {
   const logger = new Logger('ResourcesFactory');
 
-  try {
-    const resources = [
-      new TimelineResource(atpClient),
-      new ProfileResource(atpClient),
-      new NotificationsResource(atpClient),
-      new ConversationContextResource(atpClient),
-    ];
+  // Construct each resource defensively so one failing constructor does not
+  // disable the entire resource set.
+  const factories: Array<() => BaseResource> = [
+    () => new TimelineResource(atpClient),
+    () => new ProfileResource(atpClient),
+    () => new NotificationsResource(atpClient),
+    () => new ConversationContextResource(atpClient),
+  ];
 
-    logger.info(`Created ${resources.length} AT Protocol MCP resources`);
-    return resources;
-  } catch (error) {
-    logger.error('Failed to create MCP resources', error);
-    return [];
+  const resources: BaseResource[] = [];
+  for (const make of factories) {
+    try {
+      resources.push(make());
+    } catch (error) {
+      logger.error('Failed to construct an MCP resource; skipping it', error);
+    }
   }
+
+  logger.info(`Created ${resources.length} AT Protocol MCP resources`);
+  return resources;
 }
