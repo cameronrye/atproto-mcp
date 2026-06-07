@@ -21,15 +21,7 @@ import { type IMcpTool, createTools } from './tools/index.js';
 import { StartStreamingTool } from './tools/implementations/streaming-tools.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
-import {
-  ConnectionPool,
-  type ICacheConfig,
-  type IConnectionPoolConfig,
-  type IPerformanceMetrics,
-  LRUCache,
-  PerformanceMonitor,
-  WebSocketManager,
-} from './utils/performance.js';
+import { type IPerformanceMetrics, PerformanceMonitor } from './utils/performance.js';
 import { type ISecurityConfig, SecurityManager } from './utils/security.js';
 
 /**
@@ -40,9 +32,6 @@ export class AtpMcpServer {
   private atpClient: AtpClient;
   private logger: Logger;
   private configManager: ConfigManager;
-  private connectionPool: ConnectionPool;
-  private cache: LRUCache<unknown>;
-  private wsManager: WebSocketManager;
   private performanceMonitor: PerformanceMonitor;
   private securityManager: SecurityManager;
   private metricsInterval?: NodeJS.Timeout;
@@ -75,24 +64,7 @@ export class AtpMcpServer {
       // Initialize AT Protocol client
       this.atpClient = new AtpClient(this.configManager.getAtpConfig());
 
-      // Initialize performance components
-      const connectionPoolConfig: IConnectionPoolConfig = {
-        maxConnections: 10,
-        minConnections: 2,
-        acquireTimeoutMs: 5000,
-        idleTimeoutMs: 300000, // 5 minutes
-        maxRetries: 3,
-      };
-
-      const cacheConfig: ICacheConfig = {
-        maxSize: 1000,
-        ttlMs: 300000, // 5 minutes
-        cleanupIntervalMs: 60000, // 1 minute
-      };
-
-      this.connectionPool = new ConnectionPool(connectionPoolConfig, this.logger);
-      this.cache = new LRUCache(cacheConfig, this.logger);
-      this.wsManager = new WebSocketManager(this.logger);
+      // Initialize performance monitoring (process-level memory/uptime metrics)
       this.performanceMonitor = new PerformanceMonitor(this.logger);
 
       // Initialize security manager
@@ -106,11 +78,6 @@ export class AtpMcpServer {
       };
 
       this.securityManager = new SecurityManager(securityConfig, this.logger);
-
-      // Configure performance monitor
-      this.performanceMonitor.setConnectionPool(this.connectionPool);
-      this.performanceMonitor.setCache(this.cache);
-      this.performanceMonitor.setWebSocketManager(this.wsManager);
 
       // Setup server handlers
       this.setupServer();
@@ -551,11 +518,6 @@ export class AtpMcpServer {
         this.metricsInterval = undefined;
       }
 
-      // Cleanup performance components
-      this.wsManager.disconnectAll();
-      this.cache.destroy();
-      this.connectionPool.cleanup();
-
       // Release security manager background timers (rate-limiter cleanup).
       this.securityManager.destroy();
 
@@ -639,27 +601,6 @@ export class AtpMcpServer {
    */
   public getPerformanceMetrics(): IPerformanceMetrics {
     return this.performanceMonitor.getMetrics();
-  }
-
-  /**
-   * Get cache instance for external use
-   */
-  public getCache(): LRUCache<unknown> {
-    return this.cache;
-  }
-
-  /**
-   * Get connection pool instance for external use
-   */
-  public getConnectionPool(): ConnectionPool {
-    return this.connectionPool;
-  }
-
-  /**
-   * Get WebSocket manager instance for external use
-   */
-  public getWebSocketManager(): WebSocketManager {
-    return this.wsManager;
   }
 
   /**

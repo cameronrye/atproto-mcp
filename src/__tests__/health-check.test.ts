@@ -48,12 +48,10 @@ describe('Health Check - Real-world Usage', () => {
       expect(output).toContain('unauthenticated');
     });
 
-    it('should include performance metrics', async () => {
+    it('should include process memory metrics', async () => {
       const { output, exitCode } = await runHealthCheck();
 
-      expect(output).toContain('uptime');
       expect(output).toContain('memoryUsage');
-      expect(output).toContain('cacheSize');
       expect(exitCode).toBe(0);
     });
 
@@ -94,22 +92,22 @@ describe('Health Check - Real-world Usage', () => {
   });
 
   describe('Metrics Validation', () => {
-    it('should report cache size', async () => {
+    it('should report process memory usage', async () => {
       const { output } = await runHealthCheck();
 
-      expect(output).toContain('cacheSize');
+      expect(output).toContain('memoryUsage');
     });
 
-    it('should report active connections', async () => {
+    it('should report the auth mode', async () => {
       const { output } = await runHealthCheck();
 
-      expect(output).toContain('activeConnections');
+      expect(output).toContain('authMode');
     });
 
-    it('should report uptime', async () => {
+    it('should disclose that it is a smoke check, not a live-server probe', async () => {
       const { output } = await runHealthCheck();
 
-      expect(output).toContain('uptime');
+      expect(output).toContain('smoke check');
     });
   });
 
