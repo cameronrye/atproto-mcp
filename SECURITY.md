@@ -109,7 +109,9 @@ because no HTTP transport consumes it. Do not rely on it as a security control.
 - **Per-tool rate limiting** (100 requests per minute per tool) to prevent abuse
 - **Error sanitization** to prevent information leakage (active when
   `NODE_ENV=production`)
-- Credential redaction in logs
+- Credentials (password and client secret) are redacted as `[REDACTED]` when the
+  loaded configuration is logged; log fields are also sanitized to prevent log
+  injection
 - Non-root Docker container
 - HTTPS used for AT Protocol service connections
 

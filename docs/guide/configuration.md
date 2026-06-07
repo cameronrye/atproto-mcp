@@ -176,7 +176,8 @@ LOG_LEVEL=debug
 
 ### Docker Compose
 
-Configure via `docker-compose.yml`:
+The repository does not ship a Compose file, but you can define a service of
+your own — for example:
 
 ```yaml
 services:
