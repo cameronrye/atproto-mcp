@@ -9,10 +9,12 @@ Like a post on AT Protocol.
 ## Parameters
 
 ### `uri` (required)
+
 - **Type:** `string`
 - **Description:** AT Protocol URI of the post to like
 
 ### `cid` (required)
+
 - **Type:** `string`
 - **Description:** Content identifier (CID) of the post
 
@@ -20,13 +22,13 @@ Like a post on AT Protocol.
 
 ```typescript
 {
-  uri: string;        // URI of the like record
-  cid: string;        // CID of the like record
-  success: boolean;   // Operation success status
-  message: string;    // Success message
+  uri: string; // URI of the like record
+  cid: string; // CID of the like record
+  success: boolean; // Operation success status
+  message: string; // Success message
   likedPost: {
-    uri: string;      // URI of the liked post
-    cid: string;      // CID of the liked post
+    uri: string; // URI of the liked post
+    cid: string; // CID of the liked post
   }
 }
 ```
@@ -43,6 +45,7 @@ Like a post on AT Protocol.
 ```
 
 **Response:**
+
 ```json
 {
   "uri": "at://did:plc:myuser/app.bsky.feed.like/like123",
@@ -78,6 +81,7 @@ If the post is already liked, the tool returns the existing like record:
 ### Common Errors
 
 #### Invalid URI
+
 ```json
 {
   "error": "Invalid AT Protocol URI format",
@@ -86,6 +90,7 @@ If the post is already liked, the tool returns the existing like record:
 ```
 
 #### Post Not Found
+
 ```json
 {
   "error": "Post not found",
@@ -95,7 +100,8 @@ If the post is already liked, the tool returns the existing like record:
 
 ## Best Practices
 
-- Check if a post is already liked before calling this tool to avoid unnecessary operations
+- Check if a post is already liked before calling this tool to avoid unnecessary
+  operations
 - Store the like URI if you need to unlike the post later
 - Respect rate limits when liking multiple posts
 
@@ -107,4 +113,3 @@ If the post is already liked, the tool returns the existing like record:
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

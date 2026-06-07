@@ -20,25 +20,36 @@ interface IMcpServerConfig {
 **Description:** Main server configuration.
 
 **Fields:**
-- `port` - Server port number (default: 3000)
-- `host` - Server host (default: "localhost")
+
+- `port` - Reserved. The server uses the stdio transport and binds no port; this
+  value is accepted but ignored.
+- `host` - Reserved. Accepted but ignored under the stdio transport.
 - `name` - Server name
 - `version` - Server version
 - `description` - Server description
 - `atproto` - AT Protocol configuration
 
+::: tip stdio transport
+
+This server communicates over stdio (`StdioServerTransport`). `port` and `host`
+are kept on the config for forward compatibility but are not used — there is no
+HTTP listener.
+
+:::
+
 **Example:**
+
 ```typescript
 const config: IMcpServerConfig = {
-  port: 3000,
-  host: "0.0.0.0",
-  name: "AT Protocol MCP Server",
-  version: "1.0.0",
-  description: "MCP server for AT Protocol",
+  port: 3000, // reserved/ignored under stdio
+  host: 'localhost', // reserved/ignored under stdio
+  name: 'AT Protocol MCP Server',
+  version: '0.2.1',
+  description: 'MCP server for AT Protocol',
   atproto: {
-    service: "https://bsky.social",
-    authMethod: "app-password"
-  }
+    service: 'https://bsky.social',
+    authMethod: 'app-password',
+  },
 };
 ```
 
@@ -61,6 +72,7 @@ interface IAtpConfig {
 **Description:** AT Protocol connection and authentication configuration.
 
 **Fields:**
+
 - `service` - AT Protocol service URL (required)
 - `identifier` - User handle or DID (for app password)
 - `password` - App password (for app password auth)
@@ -72,30 +84,42 @@ interface IAtpConfig {
 **Authentication Methods:**
 
 #### App Password
+
 ```typescript
 const config: IAtpConfig = {
-  service: "https://bsky.social",
-  identifier: "user.bsky.social",
-  password: "app-password-here",
-  authMethod: "app-password"
+  service: 'https://bsky.social',
+  identifier: 'user.bsky.social',
+  password: 'app-password-here',
+  authMethod: 'app-password',
 };
 ```
 
-#### OAuth
+#### OAuth (experimental)
+
 ```typescript
 const config: IAtpConfig = {
-  service: "https://bsky.social",
-  clientId: "your-client-id",
-  clientSecret: "your-client-secret",
-  redirectUri: "https://your-app.com/callback",
-  authMethod: "oauth"
+  service: 'https://bsky.social',
+  clientId: 'your-client-id',
+  clientSecret: 'your-client-secret',
+  redirectUri: 'https://your-app.com/callback',
+  authMethod: 'oauth',
 };
 ```
+
+::: warning Experimental
+
+OAuth is experimental. `start_oauth_flow` only builds a heuristic PKCE URL, and
+the callback-exchange tools are not implemented, so the OAuth path is currently
+a dead end. Use app passwords for working authentication. See
+[Experimental & Roadmap](../../guide/experimental.md).
+
+:::
 
 #### Unauthenticated
+
 ```typescript
 const config: IAtpConfig = {
-  service: "https://bsky.social"
+  service: 'https://bsky.social',
   // No authMethod - works for public data only
 };
 ```
@@ -116,18 +140,20 @@ interface IOAuthConfig {
 **Description:** OAuth-specific configuration.
 
 **Fields:**
+
 - `clientId` - OAuth client identifier
 - `clientSecret` - OAuth client secret
 - `redirectUri` - Callback URL after authorization
 - `scope` - Requested OAuth scopes
 
 **Example:**
+
 ```typescript
 const oauthConfig: IOAuthConfig = {
-  clientId: "your-client-id",
-  clientSecret: "your-client-secret",
-  redirectUri: "https://your-app.com/oauth/callback",
-  scope: ["atproto", "transition:generic"]
+  clientId: 'your-client-id',
+  clientSecret: 'your-client-secret',
+  redirectUri: 'https://your-app.com/oauth/callback',
+  scope: ['atproto', 'transition:generic'],
 };
 ```
 
@@ -143,14 +169,16 @@ interface IAppPasswordConfig {
 **Description:** App password authentication configuration.
 
 **Fields:**
+
 - `identifier` - User handle or DID
 - `password` - App password (not main account password)
 
 **Example:**
+
 ```typescript
 const appPasswordConfig: IAppPasswordConfig = {
-  identifier: "user.bsky.social",
-  password: "xxxx-xxxx-xxxx-xxxx"
+  identifier: 'user.bsky.social',
+  password: 'xxxx-xxxx-xxxx-xxxx',
 };
 ```
 
@@ -164,82 +192,91 @@ ATPROTO_IDENTIFIER=your-handle.bsky.social
 ATPROTO_PASSWORD=your-app-password
 ```
 
-### Required for OAuth
+### Required for OAuth (experimental)
 
 ```bash
 ATPROTO_SERVICE=https://bsky.social
-OAUTH_CLIENT_ID=your-client-id
-OAUTH_CLIENT_SECRET=your-client-secret
-OAUTH_REDIRECT_URI=https://your-app.com/callback
+ATPROTO_CLIENT_ID=your-client-id
+ATPROTO_CLIENT_SECRET=your-client-secret
+ATPROTO_AUTH_METHOD=oauth
+
+# Optional redirect URI (defaults to http://localhost:3000/oauth/callback).
+# The legacy OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET / OAUTH_REDIRECT_URI names
+# are also accepted as fallbacks.
+ATPROTO_OAUTH_REDIRECT_URI=http://localhost:3000/oauth/callback
 ```
 
 ### Optional
 
 ```bash
-PORT=3000
-HOST=localhost
+MCP_SERVER_NAME=AT Protocol MCP Server
 LOG_LEVEL=info
-NODE_ENV=production
 ```
 
+::: tip Recognized variables
+
+The `ConfigManager` reads the `MCP_SERVER_*` and `ATPROTO_*` variables
+documented in the [Configuration Guide](../../guide/configuration.md), plus
+`LOG_LEVEL` and `NODE_ENV`. A few additional variables are read directly by
+specific subsystems: `ATPROTO_MEDIA_DIR` (base directory for tool-supplied media
+paths) and `ATPROTO_RELAY` (firehose relay URL), and — for the experimental
+OAuth tools — the legacy `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` fallbacks
+plus the redirect URI via `ATPROTO_OAUTH_REDIRECT_URI` (falling back to
+`OAUTH_REDIRECT_URI`). `MCP_SERVER_PORT`/`MCP_SERVER_HOST` are accepted but
+ignored under the stdio transport.
+
+:::
+
 ## Configuration Loading
+
+Configuration is built and validated by the `ConfigManager` class (the only
+configuration export besides the `createConfig` factory). There are no
+standalone `loadConfig()`/`validateConfig()` functions; the snippets below are
+illustrative of `ConfigManager`'s behavior.
 
 ### From Environment
 
 ```typescript
-import { loadConfig } from './config';
+import { ConfigManager } from './utils/config';
 
-const config = loadConfig();
-// Loads from environment variables
+// Reads recognized environment variables and validates on construction
+const manager = new ConfigManager();
+const config = manager.getConfig();
 ```
 
-### From File
+### Programmatic Overrides
 
 ```typescript
-import { readFileSync } from 'fs';
+import { createConfig } from './utils/config';
 
-const configFile = readFileSync('config.json', 'utf-8');
-const config: IMcpServerConfig = JSON.parse(configFile);
-```
-
-### Programmatic
-
-```typescript
-const config: IMcpServerConfig = {
-  port: parseInt(process.env.PORT || '3000'),
-  host: process.env.HOST || 'localhost',
+// Apply partial overrides on top of environment/defaults
+const manager = createConfig({
   name: 'My MCP Server',
-  version: '1.0.0',
-  description: 'Custom MCP server',
   atproto: {
-    service: process.env.ATPROTO_SERVICE || 'https://bsky.social',
-    identifier: process.env.ATPROTO_IDENTIFIER,
-    password: process.env.ATPROTO_PASSWORD,
-    authMethod: 'app-password'
-  }
-};
+    service: 'https://bsky.social',
+    authMethod: 'app-password',
+  },
+});
 ```
 
 ## Validation
 
-### Configuration Validation
+`ConfigManager` validates configuration when it is constructed and throws a
+[`ConfigurationError`](./errors.md#configurationerror) on invalid input — for
+example a missing `service` URL, or missing credentials for the selected
+`authMethod`. The illustrative logic is roughly:
 
 ```typescript
-function validateConfig(config: IMcpServerConfig): void {
-  if (!config.atproto.service) {
-    throw new Error('AT Protocol service URL is required');
-  }
+// Illustrative — actual validation lives inside ConfigManager
+if (!config.atproto.service) {
+  throw new ConfigurationError('AT Protocol service URL is required');
+}
 
-  if (config.atproto.authMethod === 'app-password') {
-    if (!config.atproto.identifier || !config.atproto.password) {
-      throw new Error('Identifier and password required for app password auth');
-    }
-  }
-
-  if (config.atproto.authMethod === 'oauth') {
-    if (!config.atproto.clientId || !config.atproto.clientSecret) {
-      throw new Error('Client ID and secret required for OAuth');
-    }
+if (config.atproto.authMethod === 'app-password') {
+  if (!config.atproto.identifier || !config.atproto.password) {
+    throw new ConfigurationError(
+      'Identifier and password required for app password auth'
+    );
   }
 }
 ```
@@ -247,22 +284,16 @@ function validateConfig(config: IMcpServerConfig): void {
 ## Best Practices
 
 ### Security
+
 - Never commit credentials to version control
 - Use environment variables for sensitive data
 - Rotate app passwords regularly
-- Use OAuth for production applications
 
 ### Configuration Management
+
 - Validate configuration on startup
 - Provide sensible defaults
 - Document all configuration options
-- Support multiple configuration sources
-
-### Environment-Specific
-- Use different configs for dev/staging/prod
-- Override defaults with environment variables
-- Validate required fields
-- Log configuration (redact secrets)
 
 ## See Also
 
@@ -270,4 +301,3 @@ function validateConfig(config: IMcpServerConfig): void {
 - [Error Types](./errors.md)
 - [Configuration Guide](../../guide/configuration.md)
 - [Authentication Guide](../../guide/authentication.md)
-

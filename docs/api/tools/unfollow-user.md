@@ -9,17 +9,19 @@ Unfollow a user on AT Protocol.
 ## Parameters
 
 ### `followUri` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the follow record to delete (returned from `follow_user`)
+- **Description:** AT Protocol URI of the follow record to delete (returned from
+  `follow_user`)
 
 ## Response
 
 ```typescript
 {
-  success: boolean;   // Operation success status
-  message: string;    // Success message
+  success: boolean; // Operation success status
+  message: string; // Success message
   deletedFollow: {
-    uri: string;      // URI of the deleted follow record
+    uri: string; // URI of the deleted follow record
   }
 }
 ```
@@ -35,6 +37,7 @@ Unfollow a user on AT Protocol.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -50,6 +53,7 @@ Unfollow a user on AT Protocol.
 ### Common Errors
 
 #### Invalid Follow URI
+
 ```json
 {
   "error": "Invalid AT Protocol URI format",
@@ -58,6 +62,7 @@ Unfollow a user on AT Protocol.
 ```
 
 #### Follow Not Found
+
 ```json
 {
   "error": "Follow record not found",
@@ -65,23 +70,18 @@ Unfollow a user on AT Protocol.
 }
 ```
 
-#### Not Authorized
-```json
-{
-  "error": "Not authorized to delete this follow record",
-  "code": "UNAUTHORIZED"
-}
-```
-
 ## Best Practices
 
 ### Tracking Follows
+
 - Store the follow URI when you follow a user
 - The follow URI is different from the user's DID or handle
 - The follow URI is returned by the `follow_user` tool
 
 ### Finding Follow URIs
+
 If you don't have the follow URI stored:
+
 1. Use `get_follows` to list users you follow
 2. Find the target user in the list
 3. Extract the follow URI from the response
@@ -89,9 +89,9 @@ If you don't have the follow URI stored:
 ## Related Tools
 
 - **[follow_user](./follow-user.md)** - Follow a user
-- **[get_follows](./get-follows.md)** - Get users you follow (includes follow URIs)
+- **[get_follows](./get-follows.md)** - Get users you follow (includes follow
+  URIs)
 
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

@@ -9,34 +9,44 @@ Update the authenticated user's profile information.
 ## Parameters
 
 ### `displayName` (optional)
+
 - **Type:** `string`
+- **Constraints:** Maximum 64 characters
 - **Description:** Display name to show on profile
 
 ### `description` (optional)
+
 - **Type:** `string`
+- **Constraints:** Maximum 256 characters
 - **Description:** Bio/description text
 
 ### `avatar` (optional)
+
 - **Type:** `Blob`
 - **Description:** Avatar image file
 
 ### `banner` (optional)
+
 - **Type:** `Blob`
 - **Description:** Banner image file
 
 ## Response
 
+Only the fields you pass are changed; other profile fields (pinned post, labels,
+etc.) are preserved. The response lists which fields were updated.
+`avatar`/`banner` appear as the marker string `"updated"` when a new image was
+uploaded, not as a URL.
+
 ```typescript
 {
   success: boolean;
   message: string;
+  updatedFields: string[];   // e.g. ["displayName", "avatar"]
   profile: {
-    did: string;
-    handle: string;
     displayName?: string;
     description?: string;
-    avatar?: string;
-    banner?: string;
+    avatar?: string;         // "updated" when a new avatar was set
+    banner?: string;         // "updated" when a new banner was set
   }
 }
 ```
@@ -76,6 +86,7 @@ Update the authenticated user's profile information.
 ### Common Errors
 
 #### Authentication Required
+
 ```json
 {
   "error": "Authentication required",
@@ -83,46 +94,36 @@ Update the authenticated user's profile information.
 }
 ```
 
-#### Invalid Image Format
+#### Display Name Too Long
+
 ```json
 {
-  "error": "Invalid image format. Supported: JPEG, PNG, WebP",
+  "error": "Display name cannot exceed 64 characters",
   "code": "VALIDATION_ERROR"
 }
 ```
 
-#### Image Too Large
+#### Description Too Long
+
 ```json
 {
-  "error": "Image size exceeds maximum allowed (1MB)",
+  "error": "Description cannot exceed 256 characters",
   "code": "VALIDATION_ERROR"
 }
 ```
 
 ## Best Practices
 
-### Display Name
-- Keep it concise and recognizable
-- Use proper capitalization
-- Avoid special characters that may not render well
+### Text Fields
 
-### Description
-- Keep under 256 characters for best display
-- Use emojis sparingly
-- Include relevant links or hashtags
+- `displayName` is capped at 64 characters; `description` at 256 characters
+- Use the marker in `updatedFields` to confirm which fields changed
 
 ### Images
-- **Avatar**: Square images work best (recommended: 400x400px)
-- **Banner**: Wide images (recommended: 1500x500px)
-- **Format**: JPEG, PNG, or WebP
-- **Size**: Keep under 1MB for best performance
-- **Optimization**: Compress images before uploading
 
-### Update Strategy
-- Update fields individually or in batches
-- Validate images before uploading
-- Provide preview before saving
-- Cache profile data after updates
+- Avatars render best as square images; banners as wide images
+- Image format and size limits are enforced by the Bluesky platform, not by this
+  server
 
 ## Related Tools
 
@@ -132,4 +133,3 @@ Update the authenticated user's profile information.
 ## See Also
 
 - [Content Management Examples](../../examples/content-management.md)
-

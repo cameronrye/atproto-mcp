@@ -9,62 +9,58 @@ Retrieve the authenticated user's personalized timeline feed.
 ## Parameters
 
 ### `algorithm` (optional)
+
 - **Type:** `string`
 - **Description:** Feed algorithm to use (e.g., "reverse-chronological")
 
 ### `limit` (optional)
+
 - **Type:** `number`
 - **Default:** `50`
 - **Constraints:** 1-100
 - **Description:** Maximum number of posts to return
 
 ### `cursor` (optional)
+
 - **Type:** `string`
 - **Description:** Pagination cursor from previous response
 
 ## Response
 
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
+
 ```typescript
 {
   success: boolean;
-  feed: Array<{
-    post: {
-      uri: string;
-      cid: string;
-      author: {
-        did: string;
-        handle: string;
-        displayName?: string;
-        avatar?: string;
-      };
-      record: {
-        text: string;
-        createdAt: string;
-        reply?: any;
-        embed?: any;
-        langs?: string[];
-      };
-      replyCount?: number;
-      repostCount?: number;
-      likeCount?: number;
-      indexedAt: string;
-      viewer?: {
-        repost?: string;
-        like?: string;
-      };
+  posts: Array<{
+    uri: string;
+    cid: string;
+    author: {
+      did: string;
+      handle: string;
+      displayName?: string;
+      avatar?: string;
     };
-    reply?: {
-      root: any;
-      parent: any;
+    record: {
+      text: string;
+      createdAt: string;
+      reply?: any;
+      embed?: any;
+      langs?: string[];      // BCP-47 language tags
     };
-    reason?: {
-      $type: string;
-      by: any;
-      indexedAt: string;
+    replyCount?: number;
+    repostCount?: number;
+    likeCount?: number;
+    indexedAt: string;
+    viewer?: {
+      repost?: string;
+      like?: string;
     };
   }>;
   cursor?: string;
   hasMore: boolean;
+  algorithm?: string;        // echoes the requested algorithm, if any
 }
 ```
 
@@ -101,6 +97,7 @@ Retrieve the authenticated user's personalized timeline feed.
 ### Common Errors
 
 #### Authentication Required
+
 ```json
 {
   "error": "Authentication required",
@@ -109,6 +106,7 @@ Retrieve the authenticated user's personalized timeline feed.
 ```
 
 #### Invalid Limit
+
 ```json
 {
   "error": "Limit must be between 1 and 100",
@@ -116,22 +114,11 @@ Retrieve the authenticated user's personalized timeline feed.
 }
 ```
 
-## Best Practices
+## Pagination
 
-### Pagination
-- Use reasonable page sizes (30-50 posts)
-- Store cursor for next page
-- Check `hasMore` before requesting more
-
-### Refresh Strategy
-- Poll timeline every 30-60 seconds for updates
-- Use cursor-based pagination for infinite scroll
-- Implement pull-to-refresh for mobile
-
-### Performance
-- Cache timeline data for short periods
-- Prefetch next page for smooth scrolling
-- Implement virtual scrolling for large feeds
+- Pass the `cursor` from the previous response to fetch the next page.
+- Check `hasMore` before requesting another page.
+- `limit` accepts 1-100 (default 50).
 
 ## Related Tools
 
@@ -142,4 +129,3 @@ Retrieve the authenticated user's personalized timeline feed.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

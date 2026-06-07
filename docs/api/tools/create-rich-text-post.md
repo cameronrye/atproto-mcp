@@ -9,81 +9,68 @@ Create a post with rich text formatting including mentions, links, and hashtags.
 ## Parameters
 
 ### `text` (required)
+
 - **Type:** `string`
 - **Constraints:** 1-300 characters
 - **Description:** Post text with rich formatting
 
 ### `facets` (optional)
-- **Type:** `Array<Facet>`
-- **Description:** Rich text facets (mentions, links, tags)
 
-### `reply` (optional)
-- **Type:** `object`
-- **Description:** Reply information
-- **Properties:**
-  - `root`: Root post URI
-  - `parent`: Parent post URI
+- **Type:** `Array<Facet>`
+- **Description:** Rich text facets (mentions, links, hashtags). The server maps
+  these into the AT Protocol `app.bsky.richtext.facet` shape before posting.
 
 ### `embed` (optional)
+
 - **Type:** `object`
-- **Description:** Embedded content
+- **Description:** Embedded content. Has a `type` discriminator (`"images"`,
+  `"external"`, or `"record"`) plus the matching field:
+  - `type: "images"` with `images`: array (max 4) of
+    `{ filePath: string, alt: string }`. `filePath` is a local image path the
+    server uploads to obtain a blob.
+  - `type: "external"` with `external`:
+    `{ uri: string, title: string, description: string, thumbFilePath?: string }`.
+  - `type: "record"` with `record`: `{ uri: string, cid: string }` to quote
+    another record.
 
-### `langs` (optional)
-- **Type:** `string[]`
-- **Description:** Language codes
+## Facet Shape
 
-## Facet Types
+Each facet has a UTF-8 byte range and one or more features. A feature is
+`{ type, value }` where `type` is one of `"mention"`, `"link"`, or `"hashtag"`:
 
-### Mention
+- **mention** — `value` is the target DID
+- **link** — `value` is the URL
+- **hashtag** — `value` is the tag text (without the `#`)
+
 ```typescript
 {
   index: {
-    byteStart: number;
-    byteEnd: number;
-  };
-  features: [{
-    $type: "app.bsky.richtext.facet#mention";
-    did: string;
-  }];
-}
-```
-
-### Link
-```typescript
-{
-  index: {
-    byteStart: number;
-    byteEnd: number;
-  };
-  features: [{
-    $type: "app.bsky.richtext.facet#link";
-    uri: string;
-  }];
-}
-```
-
-### Tag (Hashtag)
-```typescript
-{
-  index: {
-    byteStart: number;
-    byteEnd: number;
-  };
-  features: [{
-    $type: "app.bsky.richtext.facet#tag";
-    tag: string;
-  }];
+    byteStart: number; // UTF-8 byte offset, inclusive
+    byteEnd: number; // UTF-8 byte offset, exclusive
+  }
+  features: Array<{
+    type: 'mention' | 'link' | 'hashtag';
+    value: string;
+  }>;
 }
 ```
 
 ## Response
 
+Returned as stringified JSON text content (shape illustrative):
+
 ```typescript
 {
-  uri: string;
-  cid: string;
   success: boolean;
   message: string;
+  post: {
+    uri: string;
+    cid: string;
+    text: string;
+    facets?: unknown[];   // mapped into app.bsky.richtext.facet form
+    embed?: unknown;
+    createdAt: string;
+  };
 }
 ```
 
@@ -102,8 +89,8 @@ Create a post with rich text formatting including mentions, links, and hashtags.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#mention",
-          "did": "did:plc:abc123"
+          "type": "mention",
+          "value": "did:plc:abc123"
         }
       ]
     }
@@ -124,8 +111,8 @@ Create a post with rich text formatting including mentions, links, and hashtags.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#link",
-          "uri": "https://example.com"
+          "type": "link",
+          "value": "https://example.com"
         }
       ]
     }
@@ -146,8 +133,8 @@ Create a post with rich text formatting including mentions, links, and hashtags.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#tag",
-          "tag": "atproto"
+          "type": "hashtag",
+          "value": "atproto"
         }
       ]
     }
@@ -163,24 +150,30 @@ Create a post with rich text formatting including mentions, links, and hashtags.
   "facets": [
     {
       "index": { "byteStart": 4, "byteEnd": 10 },
-      "features": [{
-        "$type": "app.bsky.richtext.facet#mention",
-        "did": "did:plc:abc123"
-      }]
+      "features": [
+        {
+          "type": "mention",
+          "value": "did:plc:abc123"
+        }
+      ]
     },
     {
       "index": { "byteStart": 21, "byteEnd": 29 },
-      "features": [{
-        "$type": "app.bsky.richtext.facet#tag",
-        "tag": "atproto"
-      }]
+      "features": [
+        {
+          "type": "hashtag",
+          "value": "atproto"
+        }
+      ]
     },
     {
       "index": { "byteStart": 33, "byteEnd": 53 },
-      "features": [{
-        "$type": "app.bsky.richtext.facet#link",
-        "uri": "https://atproto.com"
-      }]
+      "features": [
+        {
+          "type": "link",
+          "value": "https://atproto.com"
+        }
+      ]
     }
   ]
 }
@@ -191,6 +184,7 @@ Create a post with rich text formatting including mentions, links, and hashtags.
 ### Common Errors
 
 #### Invalid Byte Indices
+
 ```json
 {
   "error": "Facet byte indices are invalid",
@@ -199,6 +193,7 @@ Create a post with rich text formatting including mentions, links, and hashtags.
 ```
 
 #### Invalid DID
+
 ```json
 {
   "error": "Invalid DID format for mention",
@@ -209,21 +204,25 @@ Create a post with rich text formatting including mentions, links, and hashtags.
 ## Best Practices
 
 ### Byte Indices
+
 - Use UTF-8 byte positions, not character positions
 - Ensure indices don't overlap
 - Validate indices before submission
 
 ### Mentions
+
 - Resolve handles to DIDs before creating facets
 - Verify user exists before mentioning
 - Limit mentions to avoid spam
 
 ### Links
+
 - Use full URLs with protocol (https://)
 - Validate URLs before creating facets
 - Consider using link previews
 
 ### Hashtags
+
 - Use lowercase for tags
 - Remove # symbol from tag value
 - Keep tags relevant and specific
@@ -231,10 +230,10 @@ Create a post with rich text formatting including mentions, links, and hashtags.
 ## Related Tools
 
 - **[create_post](./create-post.md)** - Create simple posts
-- **[generate_link_preview](./generate-link-preview.md)** - Generate link previews
+- **[generate_link_preview](./generate-link-preview.md)** - Generate link
+  previews
 
 ## See Also
 
 - [Content Management Examples](../../examples/content-management.md)
-- [Rich Text Guide](../../guide/tools-resources.md#rich-text)
-
+- [Tools & Resources Guide](../../guide/tools-resources.md#content-management)

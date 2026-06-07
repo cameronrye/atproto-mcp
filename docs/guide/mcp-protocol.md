@@ -1,10 +1,13 @@
 # MCP Protocol
 
-Understanding the Model Context Protocol and how it works with the AT Protocol MCP Server.
+Understanding the Model Context Protocol and how it works with the AT Protocol
+MCP Server.
 
 ## What is MCP?
 
-The **Model Context Protocol (MCP)** is an open protocol that standardizes how applications provide context to Large Language Models (LLMs). It enables LLMs to securely access data and tools from external systems.
+The **Model Context Protocol (MCP)** is an open protocol that standardizes how
+applications provide context to Large Language Models (LLMs). It enables LLMs to
+securely access data and tools from external systems.
 
 ### Key Concepts
 
@@ -23,7 +26,7 @@ MCP defines three main primitives:
 └──────────────┬──────────────────────┘
                │
                │ JSON-RPC 2.0
-               │ over stdio/HTTP
+               │ over stdio
                │
 ┌──────────────▼──────────────────────┐
 │      MCP Server                     │
@@ -37,6 +40,7 @@ MCP defines three main primitives:
 │  │  Resources                   │  │
 │  │  - atproto://timeline        │  │
 │  │  - atproto://profile         │  │
+│  │  - atproto://notifications   │  │
 │  └──────────────────────────────┘  │
 │  ┌──────────────────────────────┐  │
 │  │  Prompts                     │  │
@@ -119,16 +123,23 @@ Each tool has:
 
 ### Available Tools
 
-The AT Protocol MCP Server provides 30+ tools across categories:
+The AT Protocol MCP Server provides 60 tools across categories:
 
 - **Social Operations**: create_post, like_post, repost, follow_user
 - **Data Retrieval**: search_posts, get_user_profile, get_timeline
 - **Content Management**: delete_post, update_profile, upload_image
 - **Moderation**: mute_user, block_user, report_content
-- **OAuth**: start_oauth_flow, refresh_oauth_tokens
-- **Streaming**: start_streaming, get_recent_events
+- **OAuth (experimental)**: start_oauth_flow builds a PKCE URL only;
+  refresh_oauth_tokens and the other callback tools are registered but **not
+  implemented** (they throw)
+- **Streaming (not implemented)**: start_streaming, get_recent_events and the
+  other streaming tools are registered but **not functional** — firehose
+  decoding is gated off, so they open no socket and return no events
 
-See [API Reference](../api/tools.md) for complete list.
+The not-implemented tools are described on the
+[Experimental & Roadmap](./experimental.md) page.
+
+See the [API Reference](../api/index.md) for the complete list.
 
 ## MCP Resources
 
@@ -138,10 +149,10 @@ Resources are data sources that LLMs can read to get context.
 
 ```typescript
 {
-  uri: string;           // Unique resource identifier
-  name: string;          // Human-readable name
-  description: string;   // What data it provides
-  mimeType: string;      // Content type
+  uri: string; // Unique resource identifier
+  name: string; // Human-readable name
+  description: string; // What data it provides
+  mimeType: string; // Content type
 }
 ```
 
@@ -193,8 +204,10 @@ Resources are data sources that LLMs can read to get context.
 - **atproto://timeline** - User's personalized timeline
 - **atproto://profile** - User's profile information
 - **atproto://notifications** - Recent notifications
+- **atproto://conversation-context** - Placeholder resource (registered and
+  readable, but the server does not auto-populate it)
 
-See [API Reference](../api/resources.md) for details.
+See the [API Reference](../api/index.md) for details.
 
 ## MCP Prompts
 
@@ -223,8 +236,8 @@ Prompts are templates that help LLMs perform common tasks.
   arguments: [
     {
       name: "topic",
-      description: "Topic to write about",
-      required: false
+      description: "The main topic or subject for the post",
+      required: true
     },
     {
       name: "tone",
@@ -279,19 +292,25 @@ Prompts are templates that help LLMs perform common tasks.
 - **content_composition** - Help write engaging posts
 - **reply_template** - Generate thoughtful replies
 
-See [API Reference](../api/prompts.md) for details.
+Both prompts require authentication to be available.
+
+See the [API Reference](../api/index.md) for details.
 
 ## Transport Protocols
 
-The AT Protocol MCP Server uses the **stdio (Standard Input/Output)** transport mechanism for local integrations:
+The AT Protocol MCP Server uses the **stdio (Standard Input/Output)** transport
+mechanism for local integrations:
 
 ```bash
 atproto-mcp
 ```
 
-Communication occurs via stdin/stdout using JSON-RPC 2.0, which is the standard transport for MCP servers integrated with LLM clients like Claude Desktop.
+Communication occurs via stdin/stdout using JSON-RPC 2.0, which is the standard
+transport for MCP servers integrated with LLM clients like Claude Desktop.
 
-**Note:** HTTP/SSE transport is not currently implemented. The stdio transport is recommended for all MCP server integrations as it provides secure, local communication between the LLM client and the server.
+**Note:** HTTP/SSE transport is not currently implemented. The stdio transport
+is recommended for all MCP server integrations as it provides secure, local
+communication between the LLM client and the server.
 
 ## Message Format
 
@@ -320,10 +339,12 @@ All MCP messages use JSON-RPC 2.0:
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "content": [{
-      "type": "text",
-      "text": "Post created successfully"
-    }]
+    "content": [
+      {
+        "type": "text",
+        "text": "Post created successfully"
+      }
+    ]
   }
 }
 ```
@@ -348,13 +369,13 @@ All MCP messages use JSON-RPC 2.0:
 
 Standard JSON-RPC 2.0 error codes:
 
-| Code | Meaning | Description |
-|------|---------|-------------|
-| -32700 | Parse error | Invalid JSON |
-| -32600 | Invalid request | Invalid JSON-RPC |
-| -32601 | Method not found | Unknown method |
-| -32602 | Invalid params | Invalid parameters |
-| -32603 | Internal error | Server error |
+| Code   | Meaning          | Description        |
+| ------ | ---------------- | ------------------ |
+| -32700 | Parse error      | Invalid JSON       |
+| -32600 | Invalid request  | Invalid JSON-RPC   |
+| -32601 | Method not found | Unknown method     |
+| -32602 | Invalid params   | Invalid parameters |
+| -32603 | Internal error   | Server error       |
 
 ## Capabilities
 
@@ -363,19 +384,15 @@ The server advertises its capabilities:
 ```json
 {
   "capabilities": {
-    "tools": {
-      "listChanged": true
-    },
-    "resources": {
-      "subscribe": false,
-      "listChanged": true
-    },
-    "prompts": {
-      "listChanged": true
-    }
+    "tools": {},
+    "resources": {},
+    "prompts": {}
   }
 }
 ```
+
+The server advertises empty capability objects — it does not declare
+`listChanged` or `subscribe` flags.
 
 ## Best Practices
 
@@ -407,9 +424,9 @@ The server advertises its capabilities:
 
 - **[AT Protocol](./at-protocol.md)** - Learn about AT Protocol
 - **[Tools & Resources](./tools-resources.md)** - Explore available tools
-- **[API Reference](../api/tools.md)** - Detailed API documentation
+- **[API Reference](../api/index.md)** - Detailed API documentation
 
 ---
 
-**Previous**: [Authentication](./authentication.md) ← | **Next**: [AT Protocol](./at-protocol.md) →
-
+**Previous**: [Authentication](./authentication.md) ← | **Next**:
+[AT Protocol](./at-protocol.md) →

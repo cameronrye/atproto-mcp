@@ -225,23 +225,21 @@ export class UnblockUserTool extends BaseTool {
 
       this.validateActor(params.actor);
 
-      // First, find the block record
+      // getProfile returns viewer.blocking — the AT-URI of the block record —
+      // in a single call when the authenticated user is blocking the subject.
+      // This is O(1) and (unlike paging getBlocks) has no upper bound on how
+      // many accounts the user blocks.
       const agent = this.atpClient.getAgent();
-      const blocksResponse = await this.executeAtpOperation(
-        async () =>
-          await agent.app.bsky.graph.getBlocks({
-            limit: 100,
-          }),
-        'getBlocks',
+      const resolvedDid = await this.resolveDid(params.actor);
+
+      const profileResponse = await this.executeAtpOperation(
+        async () => agent.getProfile({ actor: resolvedDid }),
+        'getProfile',
         { actor: params.actor }
       );
+      const blockUri = profileResponse.data.viewer?.blocking;
 
-      const blockRecord = blocksResponse.data.blocks.find(
-        (block: any) =>
-          block.subject?.did === params.actor || block.subject?.handle === params.actor
-      ) as any;
-
-      if (!blockRecord) {
+      if (!blockUri) {
         return {
           success: false,
           message: `User ${params.actor} is not currently blocked.`,
@@ -251,12 +249,23 @@ export class UnblockUserTool extends BaseTool {
         };
       }
 
-      // Delete the block record
+      const rkey = blockUri.split('/').pop();
+      if (!rkey) {
+        return {
+          success: false,
+          message: `Could not determine the block record for ${params.actor}.`,
+          unblockedUser: {
+            actor: params.actor,
+          },
+        };
+      }
+
+      // The block record lives in the authenticated user's repo.
       await this.executeAtpOperation(
         async () =>
           await agent.app.bsky.graph.block.delete({
-            repo: agent.session?.did || '',
-            rkey: blockRecord?.uri?.split('/').pop() || blockRecord?.rkey || '',
+            repo: agent.session?.did ?? resolvedDid,
+            rkey,
           }),
         'unblockUser',
         { actor: params.actor }
@@ -511,12 +520,16 @@ export class AnalyzeModerationStatusTool extends BaseTool {
         const profile = profileResponse.data;
 
         moderation = {
-          blocked: profile.viewer?.blocking,
+          // `blocking` is the AT-URI of your block record (you block them);
+          // `blockedBy` (bool) means they block you; `blockingByList` is a
+          // list-based block you apply. AT Protocol's ViewerState has no
+          // `blockedByList`, so we do not invent one.
+          blocked: !!profile.viewer?.blocking,
           muted: profile.viewer?.muted,
           blockedBy: profile.viewer?.blockedBy,
           blocking: profile.viewer?.blocking,
           mutedByList: profile.viewer?.mutedByList,
-          blockedByList: profile.viewer?.blockingByList,
+          blockingByList: profile.viewer?.blockingByList,
         };
 
         if (params.includeLabels && profile.labels) {
@@ -597,8 +610,8 @@ export class AnalyzeModerationStatusTool extends BaseTool {
     let isSpam = false;
     let safetyLevel: 'safe' | 'warning' | 'restricted' | 'blocked' = 'safe';
 
-    // Check if blocked
-    if (moderation.blocked || moderation.blockedBy || moderation.blockedByList) {
+    // Check if blocked (you block them directly or via a list, or they block you)
+    if (moderation.blocked || moderation.blockedBy || moderation.blockingByList) {
       safetyLevel = 'blocked';
       return { hasContentWarnings: true, isNSFW, isSpam, requiresWarning: true, safetyLevel };
     }

@@ -1,75 +1,71 @@
 # Configuration
 
-This guide covers all configuration options for the AT Protocol MCP Server.
+This guide covers the configuration options for the AT Protocol MCP Server.
 
 ## Configuration Methods
 
 The server can be configured through:
 
-1. **Environment Variables** - Recommended for production
+1. **Environment Variables** - Recommended, especially for MCP client setups
 2. **Command Line Arguments** - Quick overrides
-3. **Configuration Files** - Advanced customization
-4. **MCP Client Configuration** - Client-specific settings
+3. **`.env` File** - Convenient for local development
+4. **MCP Client Configuration** - Client-specific settings (e.g. Claude Desktop)
+
+::: tip Transport
+
+The server communicates over **stdio** only (for MCP clients such as Claude
+Desktop). It does **not** listen on a TCP port and exposes no HTTP endpoints.
+
+:::
 
 ## Environment Variables
 
+The `ConfigManager` reads the variables defined in `ENV_MAPPINGS` in
+`src/utils/config.ts` (listed below), plus `LOG_LEVEL` (read by the logger) and
+`NODE_ENV` (used to relax validation under `test`). A few additional variables
+are read directly by specific subsystems: `ATPROTO_MEDIA_DIR` (base directory
+that tool-supplied media file paths must stay within; defaults to the working
+directory), `ATPROTO_RELAY` (firehose relay WebSocket URL; defaults to
+`wss://bsky.network`), and — for the experimental OAuth tools — the OAuth client
+credentials, which accept the `ATPROTO_CLIENT_ID` / `ATPROTO_CLIENT_SECRET`
+names as well as the legacy `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` fallbacks,
+plus a redirect URI via `ATPROTO_OAUTH_REDIRECT_URI` (falling back to
+`OAUTH_REDIRECT_URI`). Other variables are ignored.
+
 ### Authentication
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `ATPROTO_IDENTIFIER` | Your AT Protocol handle or DID | No* | - |
-| `ATPROTO_PASSWORD` | App password for authentication | No* | - |
-| `ATPROTO_CLIENT_ID` | OAuth client ID | No* | - |
-| `ATPROTO_CLIENT_SECRET` | OAuth client secret | No* | - |
-| `ATPROTO_SERVICE` | AT Protocol service URL | No | `https://bsky.social` |
+| Variable                | Description                                                                | Required | Default               |
+| ----------------------- | -------------------------------------------------------------------------- | -------- | --------------------- |
+| `ATPROTO_IDENTIFIER`    | Your AT Protocol handle or DID                                             | No\*     | -                     |
+| `ATPROTO_PASSWORD`      | App password for authentication                                            | No\*     | -                     |
+| `ATPROTO_SERVICE`       | AT Protocol service URL                                                    | No       | `https://bsky.social` |
+| `ATPROTO_AUTH_METHOD`   | Authentication method (`app-password` or `oauth`)                          | No       | `app-password`        |
+| `ATPROTO_CLIENT_ID`     | OAuth client ID (experimental — see [Authentication](./authentication.md)) | No       | -                     |
+| `ATPROTO_CLIENT_SECRET` | OAuth client secret (experimental)                                         | No       | -                     |
 
-*Required only for authenticated operations
+\* Required only for authenticated operations. App passwords are the supported
+auth path; see [Authentication](./authentication.md). Without credentials the
+server runs in unauthenticated mode (only public/enhanced tools such as
+`get_user_profile` work; tools like `search_posts` require authentication, since
+the AT Protocol search API changed in 2025 to require auth).
 
-### Server Configuration
+### Server
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `NODE_ENV` | Environment mode (`development`, `production`, `test`) | `production` |
-| `LOG_LEVEL` | Logging level (`debug`, `info`, `warn`, `error`) | `info` |
-| `SERVER_PORT` | Server port number | `3000` |
-| `SERVER_HOST` | Server host address | `localhost` |
-| `MCP_SERVER_NAME` | Server name for MCP protocol | `atproto-mcp` |
+| Variable          | Description                                      | Default       |
+| ----------------- | ------------------------------------------------ | ------------- |
+| `MCP_SERVER_NAME` | Server name advertised over the MCP protocol     | `atproto-mcp` |
+| `MCP_SERVER_PORT` | Reserved; **ignored** under the stdio transport  | `3000`        |
+| `MCP_SERVER_HOST` | Reserved; **ignored** under the stdio transport  | `localhost`   |
+| `LOG_LEVEL`       | Logging level (`debug`, `info`, `warn`, `error`) | `info`        |
 
-### Performance & Caching
+::: warning Reserved variables
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CACHE_ENABLED` | Enable response caching | `true` |
-| `CACHE_TTL` | Cache time-to-live in seconds | `300` |
-| `CACHE_MAX_SIZE` | Maximum cache size in MB | `100` |
-| `CONNECTION_POOL_SIZE` | HTTP connection pool size | `10` |
-| `REQUEST_TIMEOUT` | Request timeout in milliseconds | `30000` |
+`MCP_SERVER_PORT` and `MCP_SERVER_HOST` are accepted for forward compatibility
+but have **no effect**: the stdio transport binds no port and no host. There is
+no HTTP server, no `http://localhost:3000`, and no `/health` or `/metrics`
+endpoint.
 
-### Rate Limiting
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `RATE_LIMIT_ENABLED` | Enable rate limiting | `true` |
-| `RATE_LIMIT_MAX_REQUESTS` | Max requests per window | `100` |
-| `RATE_LIMIT_WINDOW_MS` | Rate limit window in milliseconds | `60000` |
-
-### Security
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `CORS_ORIGINS` | Allowed CORS origins (comma-separated) | `*` |
-| `TRUSTED_PROXIES` | Trusted proxy IPs (comma-separated) | - |
-| `SECURITY_SECRET_KEY` | Secret key for encryption | Auto-generated |
-| `OAUTH_MOCK_MODE` | Enable OAuth mock mode (dev only) | `false` |
-
-### Monitoring & Observability
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `METRICS_ENABLED` | Enable Prometheus metrics | `true` |
-| `METRICS_PORT` | Metrics endpoint port | `9090` |
-| `HEALTH_CHECK_ENABLED` | Enable health check endpoint | `true` |
-| `HEALTH_CHECK_PATH` | Health check endpoint path | `/health` |
+:::
 
 ## Command Line Arguments
 
@@ -81,96 +77,29 @@ atproto-mcp [options]
 
 ### Available Options
 
+These are the only flags the CLI accepts (defined in `src/cli.ts`):
+
 ```bash
---port <number>           Server port (default: 3000)
---host <string>           Server host (default: localhost)
---service <url>           AT Protocol service URL
---auth <method>           Authentication method: app-password|oauth
---log-level <level>       Log level: debug|info|warn|error
---no-cache                Disable caching
---no-rate-limit           Disable rate limiting
---no-metrics              Disable metrics collection
---help                    Show help message
---version                 Show version number
+-p, --port <number>        Server port (reserved; stdio transport ignores it)
+-h, --host <string>        Server host (reserved; stdio transport ignores it)
+-s, --service <url>        AT Protocol service URL (default: https://bsky.social)
+-a, --auth <method>        Authentication method: app-password|oauth
+-l, --log-level <level>    Log level: debug|info|warn|error (default: info)
+    --help                 Show help message
+-v, --version              Show version information
 ```
 
 ### Examples
 
 ```bash
-# Start with custom port and debug logging
-atproto-mcp --port 8080 --log-level debug
+# Start with debug logging
+atproto-mcp --log-level debug
 
-# Disable caching and rate limiting
-atproto-mcp --no-cache --no-rate-limit
-
-# Use custom AT Protocol service
+# Use a custom AT Protocol service (e.g. a self-hosted PDS)
 atproto-mcp --service https://custom-pds.example.com
 
-# Enable OAuth authentication
-atproto-mcp --auth oauth
-```
-
-## Configuration Files
-
-### Production Configuration
-
-The server uses `config/production.json` for production settings:
-
-```json
-{
-  "server": {
-    "name": "atproto-mcp",
-    "version": "0.1.0",
-    "environment": "production"
-  },
-  "performance": {
-    "caching": {
-      "enabled": true,
-      "ttl": 300,
-      "maxSize": 100
-    },
-    "connectionPool": {
-      "maxConnections": 10,
-      "timeout": 30000
-    }
-  },
-  "security": {
-    "cors": {
-      "enabled": true,
-      "origins": ["*"]
-    },
-    "rateLimit": {
-      "enabled": true,
-      "maxRequests": 100,
-      "windowMs": 60000
-    }
-  },
-  "monitoring": {
-    "metrics": {
-      "enabled": true,
-      "port": 9090
-    },
-    "healthCheck": {
-      "enabled": true,
-      "path": "/health"
-    }
-  }
-}
-```
-
-### Custom Configuration
-
-Create a custom configuration file:
-
-```bash
-# Create custom config
-cp config/production.json config/custom.json
-
-# Edit configuration
-nano config/custom.json
-
-# Use custom config
-NODE_CONFIG=custom atproto-mcp
+# Select the authentication method explicitly
+atproto-mcp --auth app-password
 ```
 
 ## MCP Client Configuration
@@ -197,7 +126,7 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ### Other MCP Clients
 
-Generic MCP client configuration:
+Generic MCP client configuration (the server always uses the stdio transport):
 
 ```json
 {
@@ -224,29 +153,23 @@ For local development, create a `.env` file:
 cp .env.example .env
 ```
 
-Example `.env` file:
+Example `.env` file (only the variables the server actually reads):
 
 ```bash
-# Authentication (optional)
+# Authentication (optional — required for authenticated operations)
 ATPROTO_IDENTIFIER=your-handle.bsky.social
 ATPROTO_PASSWORD=your-app-password
 ATPROTO_SERVICE=https://bsky.social
+ATPROTO_AUTH_METHOD=app-password
 
-# Server Configuration
-NODE_ENV=development
+# Server
+MCP_SERVER_NAME=atproto-mcp
 LOG_LEVEL=debug
-SERVER_PORT=3000
 
-# Performance
-CACHE_ENABLED=true
-CACHE_TTL=300
-
-# Security
-CORS_ORIGINS=http://localhost:3000,http://localhost:8080
-
-# Monitoring
-METRICS_ENABLED=true
-HEALTH_CHECK_ENABLED=true
+# MCP_SERVER_PORT / MCP_SERVER_HOST are reserved and ignored by the
+# stdio transport; they are listed here only for completeness.
+# MCP_SERVER_PORT=3000
+# MCP_SERVER_HOST=localhost
 ```
 
 ## Docker Configuration
@@ -256,24 +179,23 @@ HEALTH_CHECK_ENABLED=true
 Configure via `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   atproto-mcp:
     image: atproto-mcp:latest
-    ports:
-      - "3000:3000"
     environment:
       - ATPROTO_IDENTIFIER=${ATPROTO_IDENTIFIER}
       - ATPROTO_PASSWORD=${ATPROTO_PASSWORD}
-      - NODE_ENV=production
+      - ATPROTO_SERVICE=https://bsky.social
       - LOG_LEVEL=info
-      - CACHE_ENABLED=true
-      - METRICS_ENABLED=true
-    volumes:
-      - ./config:/app/config:ro
     restart: unless-stopped
 ```
+
+::: tip
+
+The server speaks stdio, so there is nothing to publish with `ports:`. The
+`EXPOSE 3000` line in the image's Dockerfile is vestigial and binds nothing.
+
+:::
 
 ### Docker Environment File
 
@@ -282,73 +204,34 @@ Create `.env` for Docker Compose:
 ```bash
 ATPROTO_IDENTIFIER=your-handle.bsky.social
 ATPROTO_PASSWORD=your-app-password
-NODE_ENV=production
+ATPROTO_SERVICE=https://bsky.social
 LOG_LEVEL=info
 ```
 
-## Configuration Best Practices
+## Rate Limiting
 
-### Development
-
-```bash
-# Enable debug logging
-LOG_LEVEL=debug
-
-# Disable caching for testing
-CACHE_ENABLED=false
-
-# Use mock OAuth
-OAUTH_MOCK_MODE=true
-```
-
-### Production
-
-```bash
-# Use info or warn level
-LOG_LEVEL=info
-
-# Enable all performance features
-CACHE_ENABLED=true
-CONNECTION_POOL_SIZE=20
-
-# Secure CORS
-CORS_ORIGINS=https://yourdomain.com
-
-# Enable monitoring
-METRICS_ENABLED=true
-HEALTH_CHECK_ENABLED=true
-```
-
-### Security Hardening
-
-```bash
-# Change default passwords
-GRAFANA_ADMIN_PASSWORD=strong-random-password
-
-# Restrict CORS
-CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com
-
-# Set trusted proxies
-TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12
-
-# Use strong secret key
-SECURITY_SECRET_KEY=$(openssl rand -hex 32)
-```
+The server applies a built-in per-tool rate limit of **100 requests per minute
+per tool** (a 60-second window enforced by the `SecurityManager`). This is not
+configurable via environment variables or CLI flags. Bluesky may apply its own
+platform-level limits independently.
 
 ## Validation
 
-Validate your configuration:
+Validate your setup:
 
 ```bash
-# Check configuration
+# Show available flags
 atproto-mcp --help
 
-# Test with dry run
+# Start with debug logging to confirm configuration is loaded
 atproto-mcp --log-level debug
 
-# Verify environment variables
+# Verify the environment variables you've set
 env | grep ATPROTO
 ```
+
+The `ConfigManager` class (`src/utils/config.ts`) builds and validates the
+configuration from defaults, environment variables, and overrides at startup.
 
 ## Troubleshooting
 
@@ -358,22 +241,17 @@ env | grep ATPROTO
 # Check environment variables
 echo $ATPROTO_IDENTIFIER
 
-# Verify .env file
+# Verify .env file contents
 cat .env
 
 # Check file permissions
 ls -la .env
 ```
 
-### Invalid Configuration
+### Authentication Issues
 
-```bash
-# Validate JSON config
-cat config/production.json | jq .
-
-# Check for syntax errors
-node -c config/production.json
-```
+See [Authentication](./authentication.md) for app-password setup and common auth
+errors.
 
 ## Next Steps
 
@@ -383,5 +261,5 @@ node -c config/production.json
 
 ---
 
-**Previous**: [Installation](./installation.md) ← | **Next**: [Authentication](./authentication.md) →
-
+**Previous**: [Installation](./installation.md) ← | **Next**:
+[Authentication](./authentication.md) →

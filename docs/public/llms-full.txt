@@ -2,24 +2,25 @@
 
 > A comprehensive Model Context Protocol (MCP) server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem including Bluesky and other decentralized social networks.
 
-This MCP server provides a complete bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, manage content, and stream real-time updates from the decentralized social web.
+This MCP server provides a bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, and manage content on the decentralized social web. It exposes 60 tools, 4 resources, and 2 prompts over the stdio transport.
 
 Key capabilities:
 - Full AT Protocol integration using official @atproto/api
 - MCP-compliant server implementation with @modelcontextprotocol/sdk
 - Type-safe TypeScript implementation with comprehensive validation
-- OAuth and app password authentication support
-- Real-time data streaming and notifications
+- App password authentication (recommended); OAuth support is experimental — `start_oauth_flow` builds an authorization URL, but the callback/refresh/revoke completion steps are not yet implemented
 - Extensive social operations (posts, likes, reposts, follows)
 - Content management (images, videos, rich text)
-- User profile and timeline management
+- User profile, timeline, and notification access
+- Analytics and discovery tools (engagement, network, trending, recommendations)
+- Real-time firehose streaming is on the roadmap (currently a non-functional stub — see Experimental & Roadmap)
 
 ## Getting Started
 
 - [Installation Guide](https://cameronrye.github.io/atproto-mcp/guide/installation.html): How to install and set up the MCP server
 - [Quick Start](https://cameronrye.github.io/atproto-mcp/guide/getting-started.html): Get up and running in minutes
 - [Configuration](https://cameronrye.github.io/atproto-mcp/guide/configuration.html): Configure the server for your needs
-- [Authentication](https://cameronrye.github.io/atproto-mcp/guide/authentication.html): Set up OAuth or app password authentication
+- [Authentication](https://cameronrye.github.io/atproto-mcp/guide/authentication.html): Set up app password authentication (OAuth is experimental)
 - [Introduction](https://cameronrye.github.io/atproto-mcp/guide/introduction.html): Overview of the project and its goals
 
 ## Core Concepts
@@ -33,14 +34,22 @@ Key capabilities:
 
 - [API Overview](https://cameronrye.github.io/atproto-mcp/api/): Complete API documentation
 
+The server registers **60 tools**. Most require authentication; a small number of public/enhanced tools (notably `get_user_profile`, `get_followers`, and `get_follows`) also work in unauthenticated mode. `search_posts` requires authentication — the AT Protocol search API changed in 2025 to require auth. A few tools are stubs/placeholders and are flagged below.
+
 ### Social Operations
 - [Create Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-post.html): Create text posts on AT Protocol
-- [Create Rich Text Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-rich-text-post.html): Create posts with rich formatting
+- [Create Rich Text Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-rich-text-post.html): Create posts with rich formatting (mentions, links, hashtags)
+- [Create Thread](https://cameronrye.github.io/atproto-mcp/api/tools/create-thread.html): Create a multi-post thread
 - [Reply to Post](https://cameronrye.github.io/atproto-mcp/api/tools/reply-to-post.html): Reply to existing posts
 - [Like Post](https://cameronrye.github.io/atproto-mcp/api/tools/like-post.html): Like posts
 - [Unlike Post](https://cameronrye.github.io/atproto-mcp/api/tools/unlike-post.html): Remove likes from posts
 - [Repost](https://cameronrye.github.io/atproto-mcp/api/tools/repost.html): Repost content
 - [Unrepost](https://cameronrye.github.io/atproto-mcp/api/tools/unrepost.html): Remove reposts
+
+### Batch Operations
+- [Batch Follow](https://cameronrye.github.io/atproto-mcp/api/tools/batch-follow.html): Follow multiple users in one call
+- [Batch Like](https://cameronrye.github.io/atproto-mcp/api/tools/batch-like.html): Like multiple posts in one call
+- [Batch Repost](https://cameronrye.github.io/atproto-mcp/api/tools/batch-repost.html): Repost multiple posts in one call
 
 ### User Management
 - [Follow User](https://cameronrye.github.io/atproto-mcp/api/tools/follow-user.html): Follow users
@@ -66,22 +75,41 @@ Key capabilities:
 - [Upload Image](https://cameronrye.github.io/atproto-mcp/api/tools/upload-image.html): Upload images
 - [Upload Video](https://cameronrye.github.io/atproto-mcp/api/tools/upload-video.html): Upload videos
 - [Generate Link Preview](https://cameronrye.github.io/atproto-mcp/api/tools/generate-link-preview.html): Generate link previews
+- [Extract Media from Post](https://cameronrye.github.io/atproto-mcp/api/tools/extract-media-from-post.html): Extract embedded media references from a post
+- [Analyze Image](https://cameronrye.github.io/atproto-mcp/api/tools/analyze-image.html): Report a blob's declared size and MIME type (does not decode pixels — no dimensions/aspect ratio)
+- [Generate Alt Text](https://cameronrye.github.io/atproto-mcp/api/tools/generate-alt-text.html): **Placeholder** — returns alt-text writing guidance/templates; does not analyze image pixels
 
-### OAuth Authentication
-- [Start OAuth Flow](https://cameronrye.github.io/atproto-mcp/api/tools/start-oauth-flow.html): Initiate OAuth authentication
-- [Handle OAuth Callback](https://cameronrye.github.io/atproto-mcp/api/tools/handle-oauth-callback.html): Handle OAuth callbacks
-- [Refresh OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/refresh-oauth-tokens.html): Refresh authentication tokens
-- [Revoke OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/revoke-oauth-tokens.html): Revoke authentication tokens
+### Analytics & Discovery
+- [Analyze Engagement](https://cameronrye.github.io/atproto-mcp/api/tools/analyze-engagement.html): Engagement metrics for a post (rate = engagement / hours since post)
+- [Analyze Network](https://cameronrye.github.io/atproto-mcp/api/tools/analyze-network.html): Analyze a user's follow graph
+- [Suggest Content Strategy](https://cameronrye.github.io/atproto-mcp/api/tools/suggest-content-strategy.html): Suggest a posting strategy from account data
+- [Find Influential Users](https://cameronrye.github.io/atproto-mcp/api/tools/find-influential-users.html): Identify influential accounts in a network
+- [Find Similar Users](https://cameronrye.github.io/atproto-mcp/api/tools/find-similar-users.html): Find similar users by shared follows/followers (graph-only; not content-based)
+- [Discover Trending](https://cameronrye.github.io/atproto-mcp/api/tools/discover-trending.html): Surface trending topics from the caller's own home timeline sample (not network-wide)
+- [Recommend Content](https://cameronrye.github.io/atproto-mcp/api/tools/recommend-content.html): Recommend content for a user
+- [Discover Communities](https://cameronrye.github.io/atproto-mcp/api/tools/discover-communities.html): Discover communities/clusters in a network
+- [Get User Summary](https://cameronrye.github.io/atproto-mcp/api/tools/get-user-summary.html): Summarize a user's profile and activity
+- [Get Post Context](https://cameronrye.github.io/atproto-mcp/api/tools/get-post-context.html): Gather surrounding context for a post
+
+### OAuth Authentication (experimental)
+- [Start OAuth Flow](https://cameronrye.github.io/atproto-mcp/api/tools/start-oauth-flow.html): **Experimental** — builds a heuristic PKCE authorization URL only (no AS-metadata discovery/PAR); the flow is a dead end because callback exchange is not implemented
+- [Handle OAuth Callback](https://cameronrye.github.io/atproto-mcp/api/tools/handle-oauth-callback.html): **Not implemented** — always fails with an `AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is not implemented (reaching the client as JSON-RPC `-32603` Internal Error)
+- [Refresh OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/refresh-oauth-tokens.html): **Not implemented** — always fails with an `AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is not implemented (reaching the client as JSON-RPC `-32603` Internal Error)
+- [Revoke OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/revoke-oauth-tokens.html): **Not implemented** — always fails with an `AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is not implemented (reaching the client as JSON-RPC `-32603` Internal Error)
 
 ### Moderation
 - [Report Content](https://cameronrye.github.io/atproto-mcp/api/tools/report-content.html): Report inappropriate content
 - [Report User](https://cameronrye.github.io/atproto-mcp/api/tools/report-user.html): Report users
+- [Analyze Moderation Status](https://cameronrye.github.io/atproto-mcp/api/tools/analyze-moderation-status.html): Inspect moderation labels/status for content or a user
 
-### Real-time Streaming
-- [Start Streaming](https://cameronrye.github.io/atproto-mcp/api/tools/start-streaming.html): Start real-time data streaming
-- [Stop Streaming](https://cameronrye.github.io/atproto-mcp/api/tools/stop-streaming.html): Stop data streaming
-- [Get Streaming Status](https://cameronrye.github.io/atproto-mcp/api/tools/get-streaming-status.html): Check streaming status
-- [Get Recent Events](https://cameronrye.github.io/atproto-mcp/api/tools/get-recent-events.html): Retrieve recent streaming events
+### Real-time Streaming (not implemented)
+These tools are registered and visible to MCP clients but are **not functional**: firehose decoding is gated off (`FIREHOSE_DECODING_IMPLEMENTED = false`). `start_streaming` returns `success: false` and opens no socket; the buffer-scanning tools always return an empty event buffer. See [Experimental & Roadmap](https://cameronrye.github.io/atproto-mcp/guide/experimental.html).
+- [Start Streaming](https://cameronrye.github.io/atproto-mcp/api/tools/start-streaming.html): Start firehose streaming (stub)
+- [Stop Streaming](https://cameronrye.github.io/atproto-mcp/api/tools/stop-streaming.html): Stop streaming (stub)
+- [Get Streaming Status](https://cameronrye.github.io/atproto-mcp/api/tools/get-streaming-status.html): Check streaming status (stub)
+- [Get Recent Events](https://cameronrye.github.io/atproto-mcp/api/tools/get-recent-events.html): Retrieve recent streaming events (always empty)
+- [Monitor Keywords](https://cameronrye.github.io/atproto-mcp/api/tools/monitor-keywords.html): Monitor keywords in the firehose (stub; always empty)
+- [Track Users](https://cameronrye.github.io/atproto-mcp/api/tools/track-users.html): Track users in the firehose (stub; always empty)
 
 ### Lists Management
 - [Create List](https://cameronrye.github.io/atproto-mcp/api/tools/create-list.html): Create user lists
@@ -90,9 +118,16 @@ Key capabilities:
 - [Get List](https://cameronrye.github.io/atproto-mcp/api/tools/get-list.html): Retrieve list information
 
 ### Resources
-- [Timeline Resource](https://cameronrye.github.io/atproto-mcp/api/resources/timeline.html): Timeline resource documentation
-- [Profile Resource](https://cameronrye.github.io/atproto-mcp/api/resources/profile.html): Profile resource documentation
-- [Notifications Resource](https://cameronrye.github.io/atproto-mcp/api/resources/notifications.html): Notifications resource documentation
+Four resources are registered. Three are functional (and require authentication); `atproto://conversation-context` is a placeholder.
+- [Timeline Resource](https://cameronrye.github.io/atproto-mcp/api/resources/timeline.html): `atproto://timeline` — authenticated timeline data
+- [Profile Resource](https://cameronrye.github.io/atproto-mcp/api/resources/profile.html): `atproto://profile` — authenticated profile data
+- [Notifications Resource](https://cameronrye.github.io/atproto-mcp/api/resources/notifications.html): `atproto://notifications` — authenticated notification data
+- Conversation Context (`atproto://conversation-context`): **Placeholder** — registered and readable, but the server never auto-populates it (returns empty/near-empty); no dedicated doc page
+
+### Prompts
+Two prompts are available once authenticated:
+- `content_composition` (args: `topic`, `tone`, `length`, `include_hashtags`)
+- `reply_template` (args: `original_post`, `reply_type`, `relationship`)
 
 ### Types
 - [Core Types](https://cameronrye.github.io/atproto-mcp/api/types/core.html): Core type definitions
@@ -106,17 +141,15 @@ Key capabilities:
 - [Basic Usage](https://cameronrye.github.io/atproto-mcp/examples/basic-usage.html): Simple examples to get started
 - [Social Operations](https://cameronrye.github.io/atproto-mcp/examples/social-operations.html): Working with posts, likes, and follows
 - [Content Management](https://cameronrye.github.io/atproto-mcp/examples/content-management.html): Managing images, videos, and rich content
-- [Real-time Data](https://cameronrye.github.io/atproto-mcp/examples/real-time-data.html): Streaming and notifications
 - [Custom Integration](https://cameronrye.github.io/atproto-mcp/examples/custom-integration.html): Building custom integrations
 
 ## Diagrams
 
 - [Architecture](https://cameronrye.github.io/atproto-mcp/diagrams/architecture.html): System architecture diagrams
-- [Flows](https://cameronrye.github.io/atproto-mcp/diagrams/flows.html): Data flow diagrams
-- [Sequences](https://cameronrye.github.io/atproto-mcp/diagrams/sequences.html): Sequence diagrams
 
 ## Optional
 
+- [Experimental & Roadmap](https://cameronrye.github.io/atproto-mcp/guide/experimental.html): Streaming, OAuth completion, and other not-yet-functional features
 - [Deployment Guide](https://cameronrye.github.io/atproto-mcp/guide/deployment.html): Deploy the server to production
 - [Troubleshooting](https://cameronrye.github.io/atproto-mcp/guide/troubleshooting.html): Common issues and solutions
 - [FAQ](https://cameronrye.github.io/atproto-mcp/FAQ.html): Frequently asked questions

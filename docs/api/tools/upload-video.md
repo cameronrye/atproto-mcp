@@ -8,17 +8,25 @@ Upload a video to AT Protocol for use in posts.
 
 ## Parameters
 
-### `video` (required)
-- **Type:** `Blob`
-- **Description:** Video file data
+### `filePath` (required)
 
-### `alt` (optional)
 - **Type:** `string`
-- **Description:** Alt text for accessibility
+- **Description:** Path to the local video file to upload. Must resolve within
+  the allowed media directory (defaults to the process working directory;
+  override with `ATPROTO_MEDIA_DIR`).
+
+### `altText` (optional)
+
+- **Type:** `string`
+- **Description:** Alt text for accessibility. Maximum 1000 characters.
 
 ### `captions` (optional)
-- **Type:** `Array<{ lang: string; file: Blob }>`
-- **Description:** Caption/subtitle files
+
+- **Type:** `Array<{ lang: string; file: string }>`
+- **Description:** Caption/subtitle files. Each entry has a `lang` (BCP-47
+  language code, at least 2 characters) and a `file` that is a path to the local
+  caption file (e.g. a `.vtt` file within `ATPROTO_MEDIA_DIR` / the working
+  directory).
 
 ## Response
 
@@ -26,17 +34,34 @@ Upload a video to AT Protocol for use in posts.
 {
   success: boolean;
   message: string;
-  blob: {
-    $type: string;
-    ref: {
-      $link: string;
+  video: {
+    blob: {
+      type: string;        // value: 'blob'
+      ref: string;         // stringified CID, e.g. 'bafkrei...'
+      mimeType: string;
+      size: number;
     };
-    mimeType: string;
-    size: number;
+    alt: string;
+    aspectRatio?: {
+      width: number;
+      height: number;
+    };
+    captions?: Array<{
+      lang: string;
+      file: string;        // stringified CID ref of the uploaded VTT blob
+    }>;
   };
-  alt?: string;
 }
 ```
+
+::: tip
+
+`type` is the literal `'blob'`, `ref` is the stringified CID (e.g.
+`bafkrei...`), and each caption `file` is the stringified CID ref of the
+uploaded caption blob. `aspectRatio` is declared optional but is intentionally
+omitted at runtime, since the video is not decoded.
+
+:::
 
 ## Examples
 
@@ -44,8 +69,8 @@ Upload a video to AT Protocol for use in posts.
 
 ```json
 {
-  "video": "<Blob data>",
-  "alt": "Tutorial on using AT Protocol"
+  "filePath": "./videos/tutorial.mp4",
+  "altText": "Tutorial on using AT Protocol"
 }
 ```
 
@@ -53,12 +78,12 @@ Upload a video to AT Protocol for use in posts.
 
 ```json
 {
-  "video": "<Blob data>",
-  "alt": "Conference talk",
+  "filePath": "./videos/talk.mp4",
+  "altText": "Conference talk",
   "captions": [
     {
       "lang": "en",
-      "file": "<VTT Blob data>"
+      "file": "./captions/en.vtt"
     }
   ]
 }
@@ -72,50 +97,40 @@ Upload a video to AT Protocol for use in posts.
 
 ## Size Limits
 
-- **Maximum file size:** 50MB
-- **Maximum duration:** 60 seconds
-- **Recommended resolution:** 1080p or lower
-- **Recommended bitrate:** 5 Mbps or lower
+- **Maximum file size:** 50MB — enforced by the tool; files larger than
+  `50 * 1024 * 1024` bytes are rejected before upload.
+
+The tool reads a local file path and uploads the bytes as-is. It does **not**
+inspect duration, resolution, or bitrate, so it does not enforce a maximum
+duration. Bluesky's own platform limits (around 60 seconds and recommended
+resolutions/bitrates) still apply at the service, but they are not checked by
+this tool.
 
 ## Error Handling
 
 ### Common Errors
 
-#### Invalid Format
-```json
-{
-  "error": "Unsupported video format",
-  "code": "VALIDATION_ERROR"
-}
+The tool surfaces errors as messages (returned as stringified JSON text
+content). The exact text:
+
+#### Unsupported Format
+
+```text
+Unsupported video format: <extension>
 ```
+
+Only `.mp4`, `.mov`, and `.webm` are accepted.
 
 #### File Too Large
-```json
-{
-  "error": "Video size exceeds 50MB limit",
-  "code": "VALIDATION_ERROR"
-}
-```
 
-#### Video Too Long
-```json
-{
-  "error": "Video duration exceeds 60 seconds",
-  "code": "VALIDATION_ERROR"
-}
-```
-
-#### Upload Failed
-```json
-{
-  "error": "Failed to upload video",
-  "code": "UPLOAD_ERROR"
-}
+```text
+Video file size cannot exceed 50MB
 ```
 
 ## Best Practices
 
 ### Video Optimization
+
 - Compress videos before uploading
 - Use H.264 codec for MP4
 - Keep duration under 60 seconds
@@ -123,18 +138,21 @@ Upload a video to AT Protocol for use in posts.
 - Optimize bitrate for file size
 
 ### Accessibility
+
 - Always provide descriptive alt text
 - Include captions when possible
 - Describe audio content in alt text
 - Consider users with hearing impairments
 
 ### Performance
+
 - Show upload progress
 - Implement chunked uploads for large files
 - Provide retry logic for failed uploads
 - Validate video before uploading
 
 ### User Experience
+
 - Show video preview before upload
 - Display file size and duration
 - Warn about size/duration limits
@@ -149,4 +167,3 @@ Upload a video to AT Protocol for use in posts.
 
 - [Content Management Examples](../../examples/content-management.md)
 - [Media Best Practices](../../guide/tools-resources.md#media)
-

@@ -26,7 +26,7 @@ describe('Zod to JSON Schema Conversion', () => {
       const result = zodToJsonSchema(schema);
 
       expect(result).toMatchObject({ type: 'string' });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should convert ZodNumber to JSON Schema', () => {
@@ -34,7 +34,7 @@ describe('Zod to JSON Schema Conversion', () => {
       const result = zodToJsonSchema(schema);
 
       expect(result).toMatchObject({ type: 'number' });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should convert ZodBoolean to JSON Schema', () => {
@@ -42,7 +42,7 @@ describe('Zod to JSON Schema Conversion', () => {
       const result = zodToJsonSchema(schema);
 
       expect(result).toMatchObject({ type: 'boolean' });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should convert ZodArray to JSON Schema', () => {
@@ -53,7 +53,7 @@ describe('Zod to JSON Schema Conversion', () => {
         type: 'array',
         items: { type: 'string' },
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
   });
 
@@ -76,7 +76,7 @@ describe('Zod to JSON Schema Conversion', () => {
         },
         required: ['name', 'age', 'active'],
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should handle optional properties', () => {
@@ -95,7 +95,7 @@ describe('Zod to JSON Schema Conversion', () => {
         },
         required: ['name'],
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should handle nested objects', () => {
@@ -134,7 +134,7 @@ describe('Zod to JSON Schema Conversion', () => {
         },
         required: ['user'],
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
   });
 
@@ -148,7 +148,7 @@ describe('Zod to JSON Schema Conversion', () => {
         minLength: 5,
         maxLength: 100,
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should handle string regex pattern', () => {
@@ -159,7 +159,7 @@ describe('Zod to JSON Schema Conversion', () => {
         type: 'string',
         pattern: '^[a-z]+$',
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
   });
 
@@ -173,7 +173,7 @@ describe('Zod to JSON Schema Conversion', () => {
         minimum: 0,
         maximum: 100,
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should handle integer type', () => {
@@ -183,7 +183,7 @@ describe('Zod to JSON Schema Conversion', () => {
       expect(result).toMatchObject({
         type: 'integer',
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
   });
 
@@ -196,7 +196,7 @@ describe('Zod to JSON Schema Conversion', () => {
         type: 'string',
         enum: ['red', 'green', 'blue'],
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
   });
 
@@ -209,7 +209,7 @@ describe('Zod to JSON Schema Conversion', () => {
         type: 'array',
         items: { type: 'string' },
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
 
     it('should handle array of objects', () => {
@@ -233,7 +233,7 @@ describe('Zod to JSON Schema Conversion', () => {
           required: ['id', 'name'],
         },
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
   });
 
@@ -244,7 +244,7 @@ describe('Zod to JSON Schema Conversion', () => {
 
       // The library may convert unions to anyOf or type array
       // Check that it has the right structure
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
       // Accept either anyOf format or type array format
       if ('anyOf' in result) {
         expect(result.anyOf).toEqual([{ type: 'string' }, { type: 'number' }]);
@@ -338,7 +338,7 @@ describe('Zod to JSON Schema Conversion', () => {
         },
         required: ['text'],
       });
-      expect(result.$schema).toBeDefined();
+      expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
   });
 });

@@ -2,6 +2,15 @@
 
 Tool parameter schemas and interfaces.
 
+::: tip Partial reference
+
+These 16 interfaces are the TypeScript parameter shapes exported from
+`src/types/index.ts`. They cover roughly 16 of the server's 60 tools — the
+analytics, discovery, media, streaming, and OAuth tools define their input
+schemas elsewhere and are not listed here.
+
+:::
+
 ## Post Operations
 
 ### ICreatePostParams
@@ -184,23 +193,32 @@ interface IGetNotificationsParams {
 ### Constraints
 
 #### Text Fields
+
 - Post text: 1-300 characters
 - Alt text: max 1000 characters
 - Display name: max 64 characters
 - Description: max 256 characters
 
 #### Numeric Fields
+
 - Limit: 1-100 (default varies by tool)
 - Pagination cursor: string
 
 #### Arrays
-- Images: max 4 per post
-- Language codes: 2 characters each
+
+- Images: max 4 per post (Bluesky platform limit)
+- Language codes (`langs`): BCP-47 tags such as `en`, `en-US`, or `pt-BR` — not
+  restricted to two-letter codes
 
 ### Validation Examples
 
+The snippets below are illustrative. Identifier validation is performed at
+runtime by the exported
+[`validateATURI` / `validateDID`](./core.md#validators-and-type-guards) helpers,
+which throw on invalid input.
+
 ```typescript
-// Validate post text
+// Illustrative: post text length check
 function validatePostText(text: string): void {
   if (text.length < 1) {
     throw new Error('Post text cannot be empty');
@@ -210,9 +228,9 @@ function validatePostText(text: string): void {
   }
 }
 
-// Validate actor identifier
+// Illustrative: actor must be a DID or a handle (contains a dot)
 function validateActor(actor: string): void {
-  if (!actor || actor.length === 0) {
+  if (!actor) {
     throw new Error('Actor is required');
   }
   if (!actor.startsWith('did:') && !actor.includes('.')) {
@@ -220,22 +238,21 @@ function validateActor(actor: string): void {
   }
 }
 
-// Validate AT URI
-function validateAtUri(uri: string): void {
-  if (!uri.startsWith('at://')) {
-    throw new Error('Invalid AT Protocol URI format');
-  }
-}
+// Prefer the exported validator for AT URIs
+import { validateATURI } from './types';
+const uri = validateATURI(input); // throws if invalid
 ```
 
 ## Optional vs Required
 
 ### Required Parameters
+
 - Always must be provided
 - Validation fails if missing
 - No default value
 
 ### Optional Parameters
+
 - Can be omitted
 - May have default values
 - Validation only if provided
@@ -246,26 +263,29 @@ function validateAtUri(uri: string): void {
 // Required: text
 // Optional: reply, embed, langs
 const params: ICreatePostParams = {
-  text: "Hello world!", // Required
-  langs: ["en"]         // Optional
+  text: 'Hello world!', // Required
+  langs: ['en'], // Optional
 };
 ```
 
 ## Best Practices
 
 ### Parameter Construction
+
 - Validate before passing to tools
 - Use TypeScript for type safety
 - Provide sensible defaults
 - Document constraints
 
 ### Error Handling
+
 - Validate early
 - Provide clear error messages
 - Include field names in errors
 - Log validation failures
 
 ### Type Safety
+
 - Use interfaces for all parameters
 - Don't use `any` types
 - Implement type guards
@@ -275,5 +295,4 @@ const params: ICreatePostParams = {
 
 - [Core Types](./core.md)
 - [Error Types](./errors.md)
-- [Tool Documentation](../tools/)
-
+- [Tool Documentation](../index)

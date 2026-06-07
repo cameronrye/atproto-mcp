@@ -6,16 +6,18 @@ We release patches for security vulnerabilities in the following versions:
 
 | Version | Supported |
 | ------- | --------- |
-| 0.1.x   | Yes       |
+| 0.2.x   | Yes       |
 
 ## Reporting a Vulnerability
 
-We take the security of AT Protocol MCP Server seriously. If you believe you have found a security vulnerability, please report it to us as described below.
+We take the security of AT Protocol MCP Server seriously. If you believe you
+have found a security vulnerability, please report it to us as described below.
 
 ### Please Do Not
 
 - **Do not** open a public GitHub issue for security vulnerabilities
-- **Do not** disclose the vulnerability publicly until we've had a chance to address it
+- **Do not** disclose the vulnerability publicly until we've had a chance to
+  address it
 
 ### Please Do
 
@@ -32,11 +34,15 @@ Please include the following information in your report:
 
 ### What to Expect
 
-- **Acknowledgment:** We will acknowledge receipt of your vulnerability report within 48 hours
-- **Updates:** We will send you regular updates about our progress (at least every 5 business days)
-- **Verification:** We will work with you to understand and verify the vulnerability
+- **Acknowledgment:** We will acknowledge receipt of your vulnerability report
+  within 48 hours
+- **Updates:** We will send you regular updates about our progress (at least
+  every 5 business days)
+- **Verification:** We will work with you to understand and verify the
+  vulnerability
 - **Fix Timeline:** We aim to release a fix within 90 days of the initial report
-- **Credit:** We will credit you in the security advisory (unless you prefer to remain anonymous)
+- **Credit:** We will credit you in the security advisory (unless you prefer to
+  remain anonymous)
 
 ### Security Update Process
 
@@ -57,55 +63,55 @@ Please include the following information in your report:
 
 ### Deployment
 
-- **Change default passwords** in docker-compose.yml (especially Grafana)
-- Configure **specific CORS origins** instead of using wildcards (`*`)
-- Use **HTTPS** in production environments
+- Run the server with an **app password**, never your main account password
 - Keep dependencies up to date with `pnpm audit` and `pnpm update`
-- Run the application as a **non-root user** (Dockerfile already does this)
+- Run the application as a **non-root user** (the Dockerfile already does this)
+- Prefer `NODE_ENV=production`, which sanitizes error messages returned to
+  clients
+
+The server speaks MCP over **stdio** and binds no network port, so it is not
+directly reachable over the network. There is no HTTP server, CORS layer, or
+reverse-proxy surface to harden for this process. Network exposure (if any) is a
+property of how the MCP client itself is deployed, not of this server.
 
 ### Environment Variables
 
 - Store sensitive configuration in environment variables, not in code
 - Use `.env` files for local development (never commit these)
-- Use secure secret management in production (e.g., AWS Secrets Manager, HashiCorp Vault)
+- Use secure secret management in production (e.g., AWS Secrets Manager,
+  HashiCorp Vault)
+- The credential variables read by the server are `ATPROTO_IDENTIFIER` and
+  `ATPROTO_PASSWORD` (app-password auth). Treat them as secrets.
 
-### Network Security
+### Operational Hygiene
 
-- Configure `TRUSTED_PROXIES` if running behind a reverse proxy
-- Set appropriate `allowedOrigins` in security configuration
-- Enable rate limiting in production
-- Use a firewall to restrict access to internal services (Redis, Prometheus, etc.)
-
-### Monitoring
-
-- Enable health checks and monitoring
-- Review logs regularly for suspicious activity
-- Set up alerts for unusual patterns
-- Monitor rate limit violations
+- Review logs regularly for suspicious activity (logs are written to stderr)
+- Rotate app passwords periodically and revoke any that are no longer needed
+- Watch for rate-limit rejections, which can indicate runaway clients or abuse
 
 ## Known Security Considerations
 
-### OAuth Mock Mode
+### OAuth Is Incomplete
 
-The OAuth implementation includes a mock mode for development. **Ensure `OAUTH_MOCK_MODE=false` in production** or use app passwords instead.
+App passwords are the supported authentication method. OAuth is **experimental
+and incomplete** — the token-exchange step is not implemented, so an OAuth login
+cannot complete. Use app passwords and store them as secrets.
 
-### Credential Storage
+### CORS / Network Exposure
 
-Credentials are stored in memory with basic obfuscation. For production deployments requiring persistent credential storage, consider integrating with a proper secret management system.
-
-### CORS Configuration
-
-The default configuration allows all origins (`*`). **Configure specific origins for production** by setting appropriate values in your configuration.
+This server does not run an HTTP listener, so there is no CORS configuration to
+set. The internal `allowedOrigins` value is hardcoded to `['*']` but is inert
+because no HTTP transport consumes it. Do not rely on it as a security control.
 
 ## Security Features
 
-- Input validation using Zod schemas
-- Rate limiting to prevent abuse
-- Input sanitization to prevent injection attacks
-- Error sanitization to prevent information leakage
-- Non-root Docker container
+- Input validation using **Zod schemas** on every tool's parameters
+- **Per-tool rate limiting** (100 requests per minute per tool) to prevent abuse
+- **Error sanitization** to prevent information leakage (active when
+  `NODE_ENV=production`)
 - Credential redaction in logs
-- HTTPS support for AT Protocol connections
+- Non-root Docker container
+- HTTPS used for AT Protocol service connections
 
 ## Disclosure Policy
 
@@ -119,9 +125,10 @@ When we receive a security bug report, we will:
 
 ## Comments on This Policy
 
-If you have suggestions on how this process could be improved, please submit a pull request or open an issue to discuss.
+If you have suggestions on how this process could be improved, please submit a
+pull request or open an issue to discuss.
 
 ## Attribution
 
-This security policy is adapted from the [Electron Security Policy](https://github.com/electron/electron/blob/main/SECURITY.md).
-
+This security policy is adapted from the
+[Electron Security Policy](https://github.com/electron/electron/blob/main/SECURITY.md).

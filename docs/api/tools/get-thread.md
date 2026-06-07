@@ -4,29 +4,58 @@ View a complete post thread with all replies and context.
 
 ## Authentication
 
-**Optional:** Public tool (works without authentication)
+**Required:** Yes (Private tool)
 
 ## Parameters
 
 ### `uri` (required)
+
 - **Type:** `string`
 - **Description:** AT Protocol URI of any post in the thread
 
 ### `depth` (optional)
+
 - **Type:** `number`
 - **Default:** `6`
-- **Description:** Maximum depth of replies to fetch
+- **Constraints:** 1-10
+- **Description:** Maximum depth of reply levels to fetch below the requested
+  post
+
+### `parentHeight` (optional)
+
+- **Type:** `number`
+- **Default:** `80`
+- **Constraints:** 0-10
+- **Description:** Maximum number of parent posts to walk up from the requested
+  post
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
   success: boolean;
   thread: {
-    post: Post;           // The requested post
-    parent?: Thread;      // Parent post (if reply)
-    replies?: Thread[];   // Reply threads
-  }
+    post: {
+      uri: string;
+      cid: string;
+      author: {
+        did: string;
+        handle: string;
+        displayName?: string;
+        avatar?: string;
+      };
+      text: string;
+      createdAt: string;
+      replyCount: number;
+      repostCount: number;
+      likeCount: number;
+    };
+    parent?: any;          // raw parent thread node (if the post is a reply)
+    replies?: any[];       // raw reply thread nodes
+  };
 }
 ```
 
@@ -49,41 +78,18 @@ View a complete post thread with all replies and context.
 }
 ```
 
-## Thread Structure
+## Thread Depth
 
-### Root Post
-- The first post in the conversation
-- Has no parent
-- May have many replies
+The `uri` may point to any post in a thread; the response is anchored on that
+post. `depth` controls how many reply levels are returned below it, and
+`parentHeight` controls how many ancestor posts are walked up toward the root.
 
-### Reply Post
-- Has a parent post
-- May have its own replies
-- Part of a thread chain
+- **Depth 1**: The requested post plus its direct replies
+- **Depth 6**: Default; surfaces several levels of nested conversation
+- **Depth 10**: Maximum
 
-### Thread Depth
-- **Depth 0**: Just the requested post
-- **Depth 1**: Post + direct replies
-- **Depth 6**: Default, shows deep conversations
-
-## Use Cases
-
-### Conversation View
-- Display full conversation context
-- Show reply chains
-- Navigate thread hierarchy
-
-### Content Analysis
-- Analyze conversation patterns
-- Track discussion topics
-- Measure engagement depth
-
-## Best Practices
-
-- Use appropriate depth for UI
-- Cache threads for performance
-- Handle deleted posts gracefully
-- Show thread structure clearly
+Deleted or blocked posts may appear as placeholder nodes in `parent`/`replies`
+rather than full post objects.
 
 ## Related Tools
 
@@ -93,4 +99,3 @@ View a complete post thread with all replies and context.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

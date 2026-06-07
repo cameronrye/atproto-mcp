@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { IAtpPost, ISearchPostsParams } from '../../types/index.js';
+import { type IAtpPost, type ISearchPostsParams, ValidationError } from '../../types/index.js';
 
 /**
  * Zod schema for search posts parameters
@@ -22,7 +22,13 @@ const SearchPostsSchema = z.object({
   until: z.string().optional(),
   mentions: z.string().optional(),
   author: z.string().optional(),
-  lang: z.string().length(2, 'Language code must be 2 characters').optional(),
+  lang: z
+    .string()
+    .regex(
+      /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
+      'Language code must be a valid BCP-47 tag (e.g. en, en-US, pt-BR)'
+    )
+    .optional(),
   domain: z.string().optional(),
   url: z.string().url().optional(),
 });
@@ -247,8 +253,19 @@ export class SearchPostsTool extends BaseTool {
     try {
       this.validateActor(author);
 
+      // AT Protocol search requires a non-empty query term and has no match-all
+      // wildcard ('*' would be searched literally and match nothing). To list an
+      // author's posts without a search term, use get_timeline / an author feed.
+      if (!query || query.trim() === '') {
+        throw new ValidationError(
+          "searchByAuthor requires a non-empty query term (AT Protocol search has no match-all wildcard). To list all of an author's posts, use an author-feed tool instead.",
+          'query',
+          query
+        );
+      }
+
       const result = await this.execute({
-        q: query || '*', // Use wildcard if no specific query
+        q: query,
         author,
         limit: options?.limit || 25,
         cursor: options?.cursor,

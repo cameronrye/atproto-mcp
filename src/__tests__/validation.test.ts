@@ -40,7 +40,9 @@ describe('Phase 1 Validation - MCP Server Functionality', () => {
 
     expect(status.config).toBeDefined();
     expect(status.config.name).toBe('atproto-mcp');
-    expect(status.config.version).toBe('0.1.0');
+    // Version is sourced from package.json; assert it is a valid semver string
+    // rather than pinning a value that drifts from the published package.
+    expect(status.config.version).toMatch(/^\d+\.\d+\.\d+/);
   });
 
   it('should have AT Protocol client initialized', () => {

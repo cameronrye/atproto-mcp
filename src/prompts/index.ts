@@ -225,13 +225,22 @@ Please provide a ready-to-post reply that feels natural and engaging.`,
 export function createPrompts(atpClient: AtpClient): BasePrompt[] {
   const logger = new Logger('PromptsFactory');
 
-  try {
-    const prompts = [new ContentCompositionPrompt(atpClient), new ReplyTemplatePrompt(atpClient)];
+  // Construct each prompt defensively so one failing constructor does not
+  // disable the entire prompt set.
+  const factories: Array<() => BasePrompt> = [
+    () => new ContentCompositionPrompt(atpClient),
+    () => new ReplyTemplatePrompt(atpClient),
+  ];
 
-    logger.info(`Created ${prompts.length} AT Protocol MCP prompts`);
-    return prompts;
-  } catch (error) {
-    logger.error('Failed to create MCP prompts', error);
-    return [];
+  const prompts: BasePrompt[] = [];
+  for (const make of factories) {
+    try {
+      prompts.push(make());
+    } catch (error) {
+      logger.error('Failed to construct an MCP prompt; skipping it', error);
+    }
   }
+
+  logger.info(`Created ${prompts.length} AT Protocol MCP prompts`);
+  return prompts;
 }

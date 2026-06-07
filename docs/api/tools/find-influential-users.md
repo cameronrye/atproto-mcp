@@ -1,24 +1,29 @@
 # find_influential_users
 
-Find influential users in a topic or network. Search by topic/query and filter by follower count. Returns users sorted by followers, engagement, or relevance.
+Find influential users in a topic or network. Search by topic/query and filter
+by follower count. Returns users sorted by followers, engagement, or relevance.
 
 ## Authentication
 
-**Enhanced** - This tool works without authentication but provides better results when authenticated.
+**Enhanced** - This tool works without authentication but provides better
+results when authenticated.
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `topic` | `string` | No* | - | Topic to search for influential users. Either `topic` or `searchQuery` must be provided. |
-| `searchQuery` | `string` | No* | - | Custom search query. Either `topic` or `searchQuery` must be provided. |
-| `minFollowers` | `number` | No | `100` | Minimum follower count to be considered influential. Must be 0 or greater. |
-| `maxResults` | `number` | No | `20` | Maximum number of users to return. Must be between 1 and 50. |
-| `sortBy` | `string` | No | `followers` | Sort order: `followers`, `engagement`, or `relevance`. |
+| Parameter      | Type     | Required | Default     | Description                                                                              |
+| -------------- | -------- | -------- | ----------- | ---------------------------------------------------------------------------------------- |
+| `topic`        | `string` | No\*     | -           | Topic to search for influential users. Either `topic` or `searchQuery` must be provided. |
+| `searchQuery`  | `string` | No\*     | -           | Custom search query. Either `topic` or `searchQuery` must be provided.                   |
+| `minFollowers` | `number` | No       | `100`       | Minimum follower count to be considered influential. Must be 0 or greater.               |
+| `maxResults`   | `number` | No       | `20`        | Maximum number of users to return. Must be between 1 and 50.                             |
+| `sortBy`       | `string` | No       | `followers` | Sort order: `followers`, `engagement`, or `relevance`.                                   |
 
-*At least one of `topic` or `searchQuery` must be provided.
+\*At least one of `topic` or `searchQuery` must be provided.
 
 ## Response
+
+Tool results are returned as stringified JSON text content. The shape below is
+illustrative:
 
 ```typescript
 {
@@ -77,46 +82,56 @@ Find influential users in a topic or network. Search by topic/query and filter b
 
 Common errors:
 
-- **`InvalidRequest`**: Neither topic nor searchQuery provided, or invalid parameters
+- **`InvalidRequest`**: Neither topic nor searchQuery provided, or invalid
+  parameters
 - **`RateLimitExceeded`**: Too many requests in a short period
 - **`NoResultsFound`**: No users found matching the criteria
 
-## Best Practices
+## How It Works
 
-1. **Be Specific**: Use specific topics or queries for better results
-2. **Adjust Follower Threshold**: Lower `minFollowers` for niche topics, raise for mainstream topics
-3. **Sort Appropriately**: Use `relevance` for topic-specific influencers, `followers` for reach
-4. **Engagement Matters**: High follower count doesn't always mean high engagement
-5. **Verify Relevance**: Review user descriptions to ensure they match your needs
-6. **Build Relationships**: Engage authentically with influencers you discover
-7. **Track Over Time**: Re-run searches periodically to find new influencers
+The tool runs a `searchPosts` query for your topic, collects the unique post
+authors, fetches each author's profile, and keeps those at or above
+`minFollowers`. Results are therefore drawn from accounts that have recently
+posted about the topic, not from a global directory.
 
 ## Sort Options
 
-- **`followers`**: Sort by follower count (highest first) - best for maximum reach
-- **`engagement`**: Sort by engagement rate - best for active, engaged audiences
-- **`relevance`**: Sort by topic relevance - best for finding topic experts
+- **`followers`**: Sort by raw follower count (highest first) - best for maximum
+  reach.
+- **`engagement`**: Sort by the computed `influenceScore` (see below). Note:
+  despite the name, this does **not** measure per-post engagement
+  (likes/reposts/replies); it reuses the follower-based influence score.
+- **`relevance`**: Sort by `relevanceScore`, which is the count of the user's
+  posts that matched the search query - best for finding topic-focused accounts.
 
 ## Influence Score
 
-The influence score is calculated based on:
-- Follower count (weighted heavily)
-- Engagement rate (likes, reposts, replies per post)
-- Post frequency and consistency
-- Network position (followers of followers)
+The influence score is a derived, follower-weighted heuristic. It is computed
+from three profile fields only:
+
+- **Follower count** - the primary term.
+- **Follower-to-following ratio** - capped at 10 (a quality signal).
+- **Post count** - an activity signal, capped via `min(postsCount / 100, 10)`.
+
+The score is roughly `followers * (1 + ratio/10) * (1 + activity/20)`, rounded
+to an integer. It does **not** analyze per-post engagement
+(likes/reposts/replies), posting consistency over time, or network position
+("followers of followers").
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol API rate limits:
-
-- 3,000 requests per hour for authenticated users
-- 300 requests per hour for unauthenticated users
+Each tool is rate limited to 100 requests per minute per tool by this server.
+Underlying AT Protocol / Bluesky API limits also apply; this tool fetches a
+profile per candidate author, so a higher `maxResults` issues more upstream
+calls.
 
 ## Related Tools
 
-- **[find_similar_users](#find-similar-users)** - Find users similar to a given user
-- **[discover_communities](#discover-communities)** - Discover communities around topics
-- **[analyze_network](#analyze-network)** - Analyze your social network
+- **[find_similar_users](./find-similar-users.md)** - Find users with
+  overlapping follow graphs
+- **[discover_communities](./discover-communities.md)** - Discover communities
+  around topics
+- **[analyze_network](./analyze-network.md)** - Analyze your social network
 - **[search_posts](./search-posts.md)** - Search for posts on specific topics
 - **[get_user_profile](./get-user-profile.md)** - Get detailed user profile
 
@@ -124,4 +139,3 @@ This tool is subject to AT Protocol API rate limits:
 
 - [Analytics Tools Guide](../../guide/tools-resources.md#analytics--insights)
 - [Content Discovery Guide](../../guide/tools-resources.md#content-discovery)
-

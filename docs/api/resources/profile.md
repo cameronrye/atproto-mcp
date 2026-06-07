@@ -1,6 +1,7 @@
 # Profile Resource
 
-MCP resource that exposes the authenticated user's profile information and statistics.
+MCP resource that exposes the authenticated user's profile information and
+statistics.
 
 ## Resource URI
 
@@ -59,7 +60,7 @@ This resource requires authentication to access the user's profile data.
 ```json
 {
   "uri": "atproto://profile",
-  "timestamp": "2024-01-15T10:30:00.000Z",
+  "timestamp": "2026-01-15T10:30:00.000Z",
   "profile": {
     "did": "did:plc:abc123xyz789",
     "handle": "alice.bsky.social",
@@ -70,8 +71,8 @@ This resource requires authentication to access the user's profile data.
     "followersCount": 1234,
     "followsCount": 567,
     "postsCount": 890,
-    "indexedAt": "2024-01-15T10:29:00.000Z",
-    "createdAt": "2023-06-15T08:00:00.000Z",
+    "indexedAt": "2026-01-15T10:29:00.000Z",
+    "createdAt": "2025-06-15T08:00:00.000Z",
     "labels": []
   },
   "session": {
@@ -98,16 +99,19 @@ console.log(`Posts: ${profileData.profile.postsCount}`);
 
 ### Monitoring Profile Changes
 
+Each read returns a fresh snapshot. The interval below is a client-side
+suggestion — the server does not poll or push profile updates.
+
 ```javascript
-// Check for profile updates
+// Re-read the profile periodically (client-side choice, not server behavior)
 let lastProfileUpdate = null;
 
 setInterval(async () => {
   const resource = await mcpClient.readResource('atproto://profile');
   const profile = JSON.parse(resource.text);
-  
+
   if (profile.timestamp !== lastProfileUpdate) {
-    console.log('Profile updated!');
+    console.log('Profile re-read');
     await handleProfileUpdate(profile);
     lastProfileUpdate = profile.timestamp;
   }
@@ -116,59 +120,22 @@ setInterval(async () => {
 
 ## Use Cases
 
-### Profile Display
-- Show user's own profile
-- Display profile statistics
-- Render avatar and banner
-- Show bio and description
-
-### Account Management
-- Monitor account status
-- Track follower growth
-- Display posting activity
-- Show account age
-
-### Analytics
-- Track follower count changes
-- Monitor posting frequency
-- Analyze profile engagement
-- Measure account growth
-
-### Session Management
-- Verify active session
-- Display current user info
-- Confirm authentication
-- Show logged-in user
+- Display the authenticated user's own profile and statistics
+- Track follower growth and posting activity over time
+- Verify the active session and confirm the logged-in user
 
 ## Best Practices
 
-### Caching
-- Cache profile data for 5-15 minutes
-- Invalidate on profile updates
-- Store for offline access
-- Implement cache versioning
+These are suggestions for client applications; none are enforced by this server.
 
-### Performance
-- Fetch on app startup
-- Refresh periodically
-- Update after profile edits
-- Prefetch for quick access
-
-### User Experience
-- Show profile in navigation
-- Display avatar prominently
-- Update UI on changes
-- Handle missing fields gracefully
-
-### Data Handling
-- Parse JSON safely
-- Validate data structure
-- Handle missing optional fields
-- Log parsing errors
+- Treat each read as a point-in-time snapshot; statistics may be slightly stale
+- Re-read after the user edits their profile to reflect changes
+- Parse the JSON defensively and handle missing optional fields
 
 ## Profile Fields
 
 ### Required Fields
+
 - `did` - Permanent user identifier
 - `handle` - User's handle (can change)
 - `followersCount` - Number of followers
@@ -176,6 +143,7 @@ setInterval(async () => {
 - `postsCount` - Number of posts
 
 ### Optional Fields
+
 - `displayName` - User's display name
 - `description` - Bio text (supports line breaks)
 - `avatar` - Avatar image URL
@@ -187,32 +155,24 @@ setInterval(async () => {
 ## Session Information
 
 ### Session Fields
+
 - `did` - Session DID (matches profile DID)
 - `handle` - Session handle (matches profile handle)
 - `active` - Whether session is active
 
 ### Session Status
+
 - **active: true** - Valid authenticated session
 - **active: false** - Session expired or invalid
 
 ## Limitations
 
-### Data Freshness
-- Data is a snapshot at fetch time
-- Statistics may be slightly stale
-- Profile changes may take time to reflect
-- Not real-time
-
-### Update Frequency
-- Don't poll more than once per minute
-- Statistics update periodically
-- Profile changes may have delay
-- Respect rate limits
-
-### Content
-- Only shows authenticated user's profile
-- Cannot access other users' profiles via this resource
-- Use `get_user_profile` tool for other users
+- Data is a snapshot at fetch time; statistics may be slightly stale and profile
+  edits may take time to reflect
+- This resource only exposes the authenticated user's own profile — use the
+  `get_user_profile` tool for other users
+- Calls share the per-tool rate limit (100 requests per minute per tool), so
+  avoid re-reading more often than you need
 
 ## Related Resources
 
@@ -229,4 +189,3 @@ setInterval(async () => {
 - [MCP Protocol Guide](../../guide/mcp-protocol.md)
 - [Resource Access Patterns](../../guide/tools-resources.md#resources)
 - [Profile Management](../../guide/tools-resources.md#profile-management)
-

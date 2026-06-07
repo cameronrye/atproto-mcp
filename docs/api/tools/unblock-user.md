@@ -1,6 +1,6 @@
 # unblock_user
 
-Unblock a previously blocked user.
+Unblock a previously blocked user to restore normal interactions.
 
 ## Authentication
 
@@ -8,18 +8,23 @@ Unblock a previously blocked user.
 
 ## Parameters
 
-### `blockUri` (required)
+### `actor` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the block record (returned from `block_user`)
+- **Description:** User identifier (DID or handle) to unblock. You do not need
+  the block record URI — the tool looks up your block record for this actor via
+  their profile (`viewer.blocking`) and deletes it.
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
   message: string;
-  deletedBlock: {
-    uri: string;
+  unblockedUser: {
+    actor: string;
   }
 }
 ```
@@ -30,66 +35,50 @@ Unblock a previously blocked user.
 
 ```json
 {
-  "blockUri": "at://did:plc:myuser/app.bsky.graph.block/block123"
+  "actor": "former-blocked.bsky.social"
 }
 ```
 
-**Response:**
+**Response (illustrative):**
+
 ```json
 {
   "success": true,
-  "message": "User unblocked successfully",
-  "deletedBlock": {
-    "uri": "at://did:plc:myuser/app.bsky.graph.block/block123"
+  "message": "User former-blocked.bsky.social has been unblocked. Normal interactions are now restored.",
+  "unblockedUser": {
+    "actor": "former-blocked.bsky.social"
+  }
+}
+```
+
+### User Not Currently Blocked
+
+If you are not blocking the actor, the tool returns `success: false` instead of
+throwing:
+
+```json
+{
+  "success": false,
+  "message": "User former-blocked.bsky.social is not currently blocked.",
+  "unblockedUser": {
+    "actor": "former-blocked.bsky.social"
   }
 }
 ```
 
 ## What Unblocking Does
 
-### Restored Access
-- User can see your public posts again
-- You can see user's posts again
-- User can follow you again
-- Normal interactions are possible
-
-### What's NOT Restored
-- Previous follow relationships (must re-follow)
-- Previous interactions remain deleted
-- Block history may be retained for safety
+- You and the user can see each other's public posts again.
+- The user can follow you again and normal interactions resume.
+- Previous follow relationships are not restored automatically — re-follow if
+  desired.
 
 ## Error Handling
 
-### Common Errors
-
-#### Invalid Block URI
-```json
-{
-  "error": "Invalid AT Protocol URI format",
-  "code": "VALIDATION_ERROR"
-}
-```
-
-#### Block Not Found
-```json
-{
-  "error": "Block record not found",
-  "code": "NOT_FOUND"
-}
-```
-
-## Best Practices
-
-### Tracking Blocks
-- Store block URI when blocking
-- Maintain list of blocked users
-- Provide UI to manage blocks
-
-### User Experience
-- Confirm unblock action
-- Explain unblock consequences
-- Allow re-blocking easily
-- Show unblock confirmation
+An `actor` that is neither a DID nor a handle raises a `VALIDATION_ERROR` before
+any network call. A "not currently blocked" condition is reported via
+`success: false` (see above), not as a thrown error. Unresolvable handles and
+other API failures surface as the underlying AT Protocol error.
 
 ## Related Tools
 
@@ -97,5 +86,4 @@ Unblock a previously blocked user.
 
 ## See Also
 
-- [Moderation Guide](../../guide/tools-resources.md#moderation)
-
+- [Moderation Tools](../../guide/tools-resources.md#moderation)

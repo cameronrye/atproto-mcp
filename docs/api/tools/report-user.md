@@ -1,6 +1,6 @@
 # report_user
 
-Report a user account for policy violations.
+Report a user account that violates community guidelines or terms of service.
 
 ## Authentication
 
@@ -9,33 +9,38 @@ Report a user account for policy violations.
 ## Parameters
 
 ### `actor` (required)
+
 - **Type:** `string`
-- **Description:** User identifier (DID or handle) to report
+- **Description:** User identifier (DID or handle) to report. Handles are
+  resolved to a DID, because a moderation `repoRef` subject must be a DID.
 
 ### `reasonType` (required)
+
 - **Type:** `string`
-- **Description:** Reason for report
-- **Values:**
-  - `spam` - Spam account
-  - `violation` - Terms of service violation
-  - `misleading` - Impersonation or misleading account
-  - `other` - Other reason
+- **Values:** `spam` | `violation` | `misleading` | `sexual` | `rude` | `other`
+- **Description:** Category of the report. Mapped to the corresponding
+  `com.atproto.moderation.defs#reason*` value.
 
 ### `reason` (optional)
+
 - **Type:** `string`
+- **Constraints:** Up to 2000 characters
 - **Description:** Additional details about the report
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
   message: string;
-  reportId: string;
-  reportedUser: {
-    did: string;
-    handle?: string;
-  }
+  reportId: string;          // server-assigned report id, as a string
+  reportDetails: {
+    actor: string;           // echoes the actor you passed in
+    reasonType: string;
+    reason?: string;
+  };
 }
 ```
 
@@ -51,15 +56,17 @@ Report a user account for policy violations.
 }
 ```
 
-**Response:**
+**Response (illustrative):**
+
 ```json
 {
   "success": true,
-  "message": "User reported successfully",
-  "reportId": "report_user_abc123",
-  "reportedUser": {
-    "did": "did:plc:abc123xyz789",
-    "handle": "spambot.bsky.social"
+  "message": "User has been reported successfully. Moderators will review your report.",
+  "reportId": "12345",
+  "reportDetails": {
+    "actor": "spambot.bsky.social",
+    "reasonType": "spam",
+    "reason": "Automated spam account posting promotional content"
   }
 }
 ```
@@ -84,110 +91,30 @@ Report a user account for policy violations.
 }
 ```
 
-## Report Types
+## Reason Types
 
-### `spam`
-- Bot accounts
-- Mass promotional accounts
-- Scam accounts
-- Fake engagement farms
+- **`spam`** - bot accounts, mass promotional accounts, scam or engagement-farm
+  accounts.
+- **`violation`** - terms-of-service violations, harassment campaigns, illegal
+  activity.
+- **`misleading`** - impersonation, fake accounts, deceptive practices.
+- **`sexual`** - accounts primarily posting prohibited sexual content.
+- **`rude`** - accounts engaged in harassment or hateful conduct.
+- **`other`** - anything not covered above; describe it in `reason`.
 
-### `violation`
-- Terms of service violations
-- Harassment campaigns
-- Hate speech accounts
-- Illegal activity
+## report_user vs report_content
 
-### `misleading`
-- Impersonation
-- Fake accounts
-- Deceptive practices
-- Identity fraud
-
-### `other`
-- Issues not covered by other categories
-- Provide detailed reason
+- **report_user** targets the account (a `repoRef` subject) for account-level
+  issues or a pattern of violations.
+- **report_content** targets a specific post (a `strongRef` subject) for a
+  single piece of violating content.
 
 ## Error Handling
 
-### Common Errors
-
-#### Invalid Actor
-```json
-{
-  "error": "Actor (DID or handle) is required",
-  "code": "VALIDATION_ERROR"
-}
-```
-
-#### User Not Found
-```json
-{
-  "error": "User not found",
-  "code": "NOT_FOUND"
-}
-```
-
-#### Cannot Report Self
-```json
-{
-  "error": "Cannot report yourself",
-  "code": "INVALID_OPERATION"
-}
-```
-
-## Best Practices
-
-### When to Report Users
-- Persistent policy violations
-- Coordinated abuse
-- Impersonation
-- Automated spam
-- Safety threats
-
-### vs. Reporting Content
-- **Report User**: Pattern of violations, account-level issues
-- **Report Content**: Specific post or content violations
-
-### Reporting Guidelines
-- Document specific violations
-- Include relevant context
-- Report patterns, not single incidents
-- Provide evidence when possible
-
-### User Experience
-- Make reporting accessible
-- Explain reporting process
-- Confirm submission
-- Provide status updates
-
-### Follow-up Actions
-- Block the user
-- Mute to avoid content
-- Report individual posts if needed
-- Contact platform support for urgent issues
-
-## What Happens After Reporting
-
-### Review Process
-1. Report submitted to moderation team
-2. Account reviewed for violations
-3. Pattern analysis conducted
-4. Action taken if violations confirmed
-
-### Possible Outcomes
-- Account warned
-- Account suspended
-- Account banned
-- Content removed
-- No action (no violation found)
-
-## Privacy and Safety
-
-- Reports are confidential
-- Reporter identity protected
-- Report details not shared with reported user
-- Multiple reports may trigger faster review
+An `actor` that is neither a DID nor a handle, a `reasonType` outside the
+allowed values, or a `reason` over 2000 characters raises a `VALIDATION_ERROR`
+before any network call. Unresolvable handles and other failures surface as the
+underlying AT Protocol error.
 
 ## Related Tools
 
@@ -197,7 +124,5 @@ Report a user account for policy violations.
 
 ## See Also
 
-- [Moderation Guide](../../guide/tools-resources.md#moderation)
-- [Community Guidelines](../../guide/tools-resources.md#guidelines)
-- [Safety Best Practices](../../guide/tools-resources.md#safety)
-
+- [Moderation Tools](../../guide/tools-resources.md#moderation)
+- [AT Protocol Moderation](https://docs.bsky.app/docs/advanced-guides/moderation)

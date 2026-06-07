@@ -6,10 +6,20 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import {
+  FIREHOSE_DECODING_IMPLEMENTED,
   FirehoseClient,
   type IFirehoseEvent,
   type IFirehoseSubscription,
 } from '../../utils/firehose-client.js';
+
+/**
+ * Shared disclaimer surfaced to the calling LLM whenever firehose decoding is
+ * not implemented, so an empty result is not mistaken for "nothing matched".
+ */
+const FIREHOSE_NOT_IMPLEMENTED_NOTE =
+  'AT Protocol firehose frame (CAR/DAG-CBOR) decoding is not implemented in this build, ' +
+  'so no live events are ever decoded into the buffer. Empty results here mean "streaming ' +
+  'is not available", not "no activity".';
 
 const StartStreamingSchema = z.object({
   collections: z.array(z.string()).optional().default([]),
@@ -26,7 +36,9 @@ export class StartStreamingTool extends BaseTool {
   public readonly schema = {
     method: 'start_streaming',
     description:
-      'Start real-time streaming of AT Protocol events from the firehose. Optionally filter by specific collections.',
+      'Start real-time streaming of AT Protocol firehose events, optionally filtered by ' +
+      'collection. NOTE: firehose frame decoding is not implemented in this build, so this ' +
+      'currently returns a "not implemented" status and delivers no events.',
     params: StartStreamingSchema,
   };
 
@@ -36,6 +48,15 @@ export class StartStreamingTool extends BaseTool {
 
   constructor(atpClient: AtpClient) {
     super(atpClient, 'StartStreaming');
+  }
+
+  /** Disconnect the shared firehose client (called on server shutdown). */
+  static async shutdown(): Promise<void> {
+    if (StartStreamingTool.firehoseClient) {
+      await StartStreamingTool.firehoseClient.disconnect();
+      StartStreamingTool.firehoseClient = null;
+    }
+    StartStreamingTool.eventBuffer = [];
   }
 
   protected async execute(params: { collections?: string[]; subscriptionId: string }): Promise<{
@@ -57,6 +78,27 @@ export class StartStreamingTool extends BaseTool {
         subscriptionId: params.subscriptionId,
         collections: params.collections,
       });
+
+      // Firehose frame decoding is not implemented, so opening a socket would
+      // only buffer nothing and leak a connection. Refuse honestly instead of
+      // reporting a stream as 'active' that can never deliver events.
+      if (!FIREHOSE_DECODING_IMPLEMENTED) {
+        this.logger.warn('start_streaming requested but firehose decoding is not implemented');
+        return {
+          success: false,
+          message: `Real-time streaming is not available. ${FIREHOSE_NOT_IMPLEMENTED_NOTE}`,
+          subscription: {
+            id: params.subscriptionId,
+            collections: params.collections || [],
+            status: 'not_implemented',
+          },
+          firehoseStatus: {
+            connected: false,
+            lastSeq: null,
+            subscriptionCount: 0,
+          },
+        };
+      }
 
       // Initialize firehose client if not already done
       if (!StartStreamingTool.firehoseClient) {
@@ -205,7 +247,9 @@ export class StopStreamingTool extends BaseTool {
 export class GetStreamingStatusTool extends BaseTool {
   public readonly schema = {
     method: 'get_streaming_status',
-    description: 'Get the current status of firehose streaming and recent events.',
+    description:
+      'Get the current status of firehose streaming and recent events. NOTE: firehose ' +
+      'decoding is not implemented, so the event buffer is empty in normal operation.',
     params: GetStreamingStatusSchema,
   };
 
@@ -215,6 +259,8 @@ export class GetStreamingStatusTool extends BaseTool {
 
   protected async execute(): Promise<{
     success: boolean;
+    firehoseDecodingImplemented: boolean;
+    note?: string;
     firehoseStatus: {
       connected: boolean;
       lastSeq: number | null;
@@ -252,6 +298,8 @@ export class GetStreamingStatusTool extends BaseTool {
 
       return {
         success: true,
+        firehoseDecodingImplemented: FIREHOSE_DECODING_IMPLEMENTED,
+        ...(FIREHOSE_DECODING_IMPLEMENTED ? {} : { note: FIREHOSE_NOT_IMPLEMENTED_NOTE }),
         firehoseStatus,
         recentEvents,
         eventBufferSize: StartStreamingTool.eventBuffer.length,
@@ -266,7 +314,9 @@ export class GetStreamingStatusTool extends BaseTool {
 export class GetRecentEventsTool extends BaseTool {
   public readonly schema = {
     method: 'get_recent_events',
-    description: 'Get recent events from the firehose stream buffer.',
+    description:
+      'Get recent events from the firehose stream buffer. NOTE: firehose decoding is not ' +
+      'implemented, so the buffer is empty in normal operation.',
     params: z.object({
       limit: z.number().min(1).max(100).default(20),
       collection: z.string().optional(),
@@ -279,6 +329,8 @@ export class GetRecentEventsTool extends BaseTool {
 
   protected async execute(params: { limit?: number; collection?: string }): Promise<{
     success: boolean;
+    firehoseDecodingImplemented: boolean;
+    note?: string;
     events: Array<{
       type: string;
       seq: number;
@@ -321,6 +373,8 @@ export class GetRecentEventsTool extends BaseTool {
 
       return {
         success: true,
+        firehoseDecodingImplemented: FIREHOSE_DECODING_IMPLEMENTED,
+        ...(FIREHOSE_DECODING_IMPLEMENTED ? {} : { note: FIREHOSE_NOT_IMPLEMENTED_NOTE }),
         events: recentEvents,
         totalBuffered: StartStreamingTool.eventBuffer.length,
         filtered,
@@ -336,7 +390,9 @@ export class MonitorKeywordsTool extends BaseTool {
   public readonly schema = {
     method: 'monitor_keywords',
     description:
-      'Monitor the firehose for posts containing specific keywords. Returns matching posts from the event buffer.',
+      'Scan the in-memory firehose event buffer for posts containing specific keywords. ' +
+      'NOTE: firehose decoding is not implemented, so the buffer is empty in normal ' +
+      'operation and this returns no matches.',
     params: z.object({
       keywords: z.array(z.string()).min(1, 'At least one keyword is required'),
       limit: z.number().min(1).max(100).default(20),
@@ -354,6 +410,8 @@ export class MonitorKeywordsTool extends BaseTool {
     caseSensitive?: boolean;
   }): Promise<{
     success: boolean;
+    firehoseDecodingImplemented: boolean;
+    note?: string;
     keywords: string[];
     matches: Array<{
       keyword: string;
@@ -441,6 +499,8 @@ export class MonitorKeywordsTool extends BaseTool {
 
       return {
         success: true,
+        firehoseDecodingImplemented: FIREHOSE_DECODING_IMPLEMENTED,
+        ...(FIREHOSE_DECODING_IMPLEMENTED ? {} : { note: FIREHOSE_NOT_IMPLEMENTED_NOTE }),
         keywords: params.keywords,
         matches: matches.slice(0, params.limit || 20),
         totalMatches: matches.length,
@@ -457,7 +517,9 @@ export class TrackUsersTool extends BaseTool {
   public readonly schema = {
     method: 'track_users',
     description:
-      'Track activity from specific users in the firehose stream. Returns recent events from the specified users.',
+      'Scan the in-memory firehose event buffer for activity from specific users (matched ' +
+      'by DID). NOTE: firehose decoding is not implemented, so the buffer is empty in normal ' +
+      'operation and this returns no events.',
     params: z.object({
       users: z.array(z.string()).min(1, 'At least one user DID or handle is required'),
       limit: z.number().min(1).max(100).default(20),
@@ -478,6 +540,8 @@ export class TrackUsersTool extends BaseTool {
     eventTypes?: string[];
   }): Promise<{
     success: boolean;
+    firehoseDecodingImplemented: boolean;
+    note?: string;
     users: string[];
     events: Array<{
       user: string;
@@ -561,6 +625,8 @@ export class TrackUsersTool extends BaseTool {
 
       return {
         success: true,
+        firehoseDecodingImplemented: FIREHOSE_DECODING_IMPLEMENTED,
+        ...(FIREHOSE_DECODING_IMPLEMENTED ? {} : { note: FIREHOSE_NOT_IMPLEMENTED_NOTE }),
         users: params.users,
         events: events.slice(0, params.limit || 20),
         totalEvents: events.length,

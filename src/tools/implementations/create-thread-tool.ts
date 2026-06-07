@@ -18,12 +18,30 @@ const CreateThreadSchema = z.object({
           .string()
           .min(1, 'Post text cannot be empty')
           .max(300, 'Post text cannot exceed 300 characters'),
-        langs: z.array(z.string().length(2, 'Language codes must be 2 characters')).optional(),
+        langs: z
+          .array(
+            z
+              .string()
+              .regex(
+                /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
+                'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
+              )
+          )
+          .optional(),
       })
     )
     .min(2, 'Thread must contain at least 2 posts')
     .max(25, 'Thread cannot exceed 25 posts'),
-  langs: z.array(z.string().length(2, 'Language codes must be 2 characters')).optional(),
+  langs: z
+    .array(
+      z
+        .string()
+        .regex(
+          /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
+          'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
+        )
+    )
+    .optional(),
 });
 
 /**

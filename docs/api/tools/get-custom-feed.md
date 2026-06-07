@@ -4,35 +4,64 @@ Access custom algorithm feeds on AT Protocol.
 
 ## Authentication
 
-**Optional:** Public tool (works without authentication)
+**Required:** Yes (Private tool)
 
 ## Parameters
 
-### `feed` (required)
+### `feedUri` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the custom feed
+- **Description:** AT Protocol URI of the custom feed generator
+  (`at://.../app.bsky.feed.generator/...`)
 
 ### `limit` (optional)
+
 - **Type:** `number`
 - **Default:** `50`
 - **Constraints:** 1-100
 - **Description:** Maximum number of posts to return
 
 ### `cursor` (optional)
+
 - **Type:** `string`
 - **Description:** Pagination cursor
 
 ## Response
 
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
+
 ```typescript
 {
   success: boolean;
-  feed: Array<{
-    post: Post;
-    reason?: any;
+  feed: {
+    uri: string;
+    displayName?: string;
+    description?: string;
+    creator: {
+      did: string;
+      handle: string;
+      displayName?: string;
+    };
+  };
+  posts: Array<{
+    uri: string;
+    cid: string;
+    author: {
+      did: string;
+      handle: string;
+      displayName?: string;
+      avatar?: string;
+    };
+    text: string;
+    createdAt: string;
+    replyCount: number;
+    repostCount: number;
+    likeCount: number;
+    isLiked: boolean;       // requires authentication to be meaningful
+    isReposted: boolean;    // requires authentication to be meaningful
   }>;
   cursor?: string;
-  hasMore: boolean;
 }
 ```
 
@@ -42,7 +71,7 @@ Access custom algorithm feeds on AT Protocol.
 
 ```json
 {
-  "feed": "at://did:plc:abc123/app.bsky.feed.generator/my-feed"
+  "feedUri": "at://did:plc:abc123/app.bsky.feed.generator/my-feed"
 }
 ```
 
@@ -50,7 +79,7 @@ Access custom algorithm feeds on AT Protocol.
 
 ```json
 {
-  "feed": "at://did:plc:abc123/app.bsky.feed.generator/my-feed",
+  "feedUri": "at://did:plc:abc123/app.bsky.feed.generator/my-feed",
   "limit": 30,
   "cursor": "cursor_from_previous_response"
 }
@@ -58,36 +87,15 @@ Access custom algorithm feeds on AT Protocol.
 
 ## Custom Feeds
 
-### What are Custom Feeds?
-- Algorithm-driven content feeds
-- Created by community members
-- Curated content collections
-- Topic-specific feeds
+Custom feeds are algorithm-driven content collections published by community
+members as feed generators (records of type `app.bsky.feed.generator`). Common
+examples include topic feeds (tech, art, science), language-specific feeds, and
+community feeds. The `feedUri` identifies the generator to query.
 
-### Popular Feed Types
-- Topic feeds (tech, art, science)
-- Language-specific feeds
-- Community feeds
-- Trending content feeds
+## Pagination
 
-## Use Cases
-
-### Content Discovery
-- Find niche content
-- Follow specific topics
-- Discover new creators
-
-### Community Building
-- Create topic communities
-- Curate quality content
-- Build engaged audiences
-
-## Best Practices
-
-- Explore different feeds
-- Cache feed content
-- Respect feed creator's intent
-- Provide feed attribution
+Pass the `cursor` from the previous response to fetch the next page. `limit`
+accepts 1-100 (default 50).
 
 ## Related Tools
 
@@ -97,4 +105,3 @@ Access custom algorithm feeds on AT Protocol.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

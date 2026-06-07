@@ -1,370 +1,110 @@
 # Utility Types
 
-Helper types and interfaces used throughout the server.
+Shared helper types exported from `src/types/index.ts`.
 
-## Response Types
+This page documents only the utility types the server actually exports. (Branded
+identifier types like `DID`/`ATURI` and their validators live on the
+[Core Types](./core.md) page; error classes live on the
+[Error Types](./errors.md) page.)
 
-### SuccessResponse
+## Result
 
 ```typescript
-interface SuccessResponse<T = unknown> {
-  success: true;
-  data: T;
-  message?: string;
+type Result<T, E = Error> =
+  | { success: true; data: T }
+  | { success: false; error: E };
+```
+
+**Description:** Discriminated union for representing a success or failure
+without throwing. Narrow on the `success` field to access `data` or `error`.
+
+**Example:**
+
+```typescript
+function parse(value: string): Result<number> {
+  const n = Number(value);
+  return Number.isNaN(n)
+    ? { success: false, error: new Error('not a number') }
+    : { success: true, data: n };
+}
+
+const result = parse('42');
+if (result.success) {
+  console.log(result.data); // number
+} else {
+  console.error(result.error);
 }
 ```
 
-**Description:** Standard success response wrapper.
-
-**Example:**
-```typescript
-const response: SuccessResponse<IAtpPost> = {
-  success: true,
-  data: post,
-  message: 'Post created successfully'
-};
-```
-
-### ErrorResponse
+## IPaginatedResponse
 
 ```typescript
-interface ErrorResponse {
-  success: false;
-  error: string;
-  code: string;
-  details?: unknown;
-}
-```
-
-**Description:** Standard error response wrapper.
-
-**Example:**
-```typescript
-const response: ErrorResponse = {
-  success: false,
-  error: 'Post text cannot be empty',
-  code: 'VALIDATION_ERROR',
-  details: { field: 'text' }
-};
-```
-
-### PaginatedResponse
-
-```typescript
-interface PaginatedResponse<T> {
-  success: boolean;
+interface IPaginatedResponse<T> {
   data: T[];
   cursor?: string;
   hasMore: boolean;
 }
 ```
 
-**Description:** Paginated data response.
+**Description:** Wrapper for cursor-paginated collections.
+
+**Fields:**
+
+- `data` - The page of items.
+- `cursor` - Opaque cursor for the next page (absent when there is no next
+  page).
+- `hasMore` - Whether more items are available.
 
 **Example:**
+
 ```typescript
-const response: PaginatedResponse<IAtpPost> = {
-  success: true,
+const page: IPaginatedResponse<IAtpPost> = {
   data: posts,
   cursor: 'next_page_cursor',
-  hasMore: true
+  hasMore: true,
 };
 ```
 
-## Pagination Types
+::: tip Tool results are JSON text
 
-### CursorPagination
+MCP tools return their results as stringified JSON text content rather than a
+guaranteed structured schema. The types on this page describe the server's
+internal TypeScript shapes; treat any response JSON in the tool docs as
+illustrative.
+
+:::
+
+## IResourceInfo
 
 ```typescript
-interface CursorPagination {
-  cursor?: string;
-  limit?: number;
+interface IResourceInfo {
+  uri: string;
+  name: string;
+  description: string;
+  mimeType?: string;
 }
 ```
 
-**Description:** Cursor-based pagination parameters.
+**Description:** Metadata describing an MCP resource exposed by the server.
 
-**Example:**
-```typescript
-const pagination: CursorPagination = {
-  cursor: 'abc123',
-  limit: 50
-};
-```
-
-### PageInfo
+## IPromptTemplate
 
 ```typescript
-interface PageInfo {
-  hasNextPage: boolean;
-  hasPreviousPage: boolean;
-  startCursor?: string;
-  endCursor?: string;
-}
-```
-
-**Description:** Pagination metadata.
-
-## Filter Types
-
-### DateRange
-
-```typescript
-interface DateRange {
-  since?: string;  // ISO 8601
-  until?: string;  // ISO 8601
-}
-```
-
-**Description:** Date range filter.
-
-**Example:**
-```typescript
-const range: DateRange = {
-  since: '2024-01-01T00:00:00Z',
-  until: '2024-01-31T23:59:59Z'
-};
-```
-
-### SortOptions
-
-```typescript
-interface SortOptions {
-  sort?: 'asc' | 'desc' | 'top' | 'latest';
-  sortBy?: string;
-}
-```
-
-**Description:** Sorting options.
-
-## Blob Types
-
-### BlobRef
-
-```typescript
-interface BlobRef {
-  $type: 'blob';
-  ref: {
-    $link: CID;
-  };
-  mimeType: string;
-  size: number;
-}
-```
-
-**Description:** Reference to uploaded blob.
-
-**Example:**
-```typescript
-const imageBlob: BlobRef = {
-  $type: 'blob',
-  ref: {
-    $link: 'bafyreiabc123...' as CID
-  },
-  mimeType: 'image/jpeg',
-  size: 245678
-};
-```
-
-## Embed Types
-
-### ImageEmbed
-
-```typescript
-interface ImageEmbed {
-  $type: 'app.bsky.embed.images';
-  images: Array<{
-    alt: string;
-    image: BlobRef;
+interface IPromptTemplate {
+  name: string;
+  description: string;
+  arguments: Array<{
+    name: string;
+    description: string;
+    required: boolean;
   }>;
 }
 ```
 
-### ExternalEmbed
-
-```typescript
-interface ExternalEmbed {
-  $type: 'app.bsky.embed.external';
-  external: {
-    uri: string;
-    title: string;
-    description: string;
-    thumb?: BlobRef;
-  };
-}
-```
-
-### RecordEmbed
-
-```typescript
-interface RecordEmbed {
-  $type: 'app.bsky.embed.record';
-  record: {
-    uri: ATURI;
-    cid: CID;
-  };
-}
-```
-
-## Facet Types
-
-### RichTextFacet
-
-```typescript
-interface RichTextFacet {
-  index: {
-    byteStart: number;
-    byteEnd: number;
-  };
-  features: Array<MentionFeature | LinkFeature | TagFeature>;
-}
-```
-
-### MentionFeature
-
-```typescript
-interface MentionFeature {
-  $type: 'app.bsky.richtext.facet#mention';
-  did: DID;
-}
-```
-
-### LinkFeature
-
-```typescript
-interface LinkFeature {
-  $type: 'app.bsky.richtext.facet#link';
-  uri: string;
-}
-```
-
-### TagFeature
-
-```typescript
-interface TagFeature {
-  $type: 'app.bsky.richtext.facet#tag';
-  tag: string;
-}
-```
-
-## Utility Functions
-
-### Type Guards
-
-```typescript
-function isSuccessResponse<T>(
-  response: SuccessResponse<T> | ErrorResponse
-): response is SuccessResponse<T> {
-  return response.success === true;
-}
-
-function isErrorResponse(
-  response: SuccessResponse | ErrorResponse
-): response is ErrorResponse {
-  return response.success === false;
-}
-```
-
-### Type Assertions
-
-```typescript
-function assertDefined<T>(
-  value: T | undefined | null,
-  message: string
-): asserts value is T {
-  if (value === undefined || value === null) {
-    throw new Error(message);
-  }
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unexpected value: ${value}`);
-}
-```
-
-## Generic Types
-
-### Nullable
-
-```typescript
-type Nullable<T> = T | null;
-```
-
-### Optional
-
-```typescript
-type Optional<T> = T | undefined;
-```
-
-### Maybe
-
-```typescript
-type Maybe<T> = T | null | undefined;
-```
-
-### DeepPartial
-
-```typescript
-type DeepPartial<T> = {
-  [P in keyof T]?: T[P] extends object ? DeepPartial<T[P]> : T[P];
-};
-```
-
-### DeepReadonly
-
-```typescript
-type DeepReadonly<T> = {
-  readonly [P in keyof T]: T[P] extends object ? DeepReadonly<T[P]> : T[P];
-};
-```
-
-## Promise Types
-
-### AsyncResult
-
-```typescript
-type AsyncResult<T, E = Error> = Promise<
-  | { success: true; data: T }
-  | { success: false; error: E }
->;
-```
-
-**Example:**
-```typescript
-async function fetchPost(uri: ATURI): AsyncResult<IAtpPost> {
-  try {
-    const post = await getPost(uri);
-    return { success: true, data: post };
-  } catch (error) {
-    return { success: false, error: error as Error };
-  }
-}
-```
-
-## Best Practices
-
-### Type Usage
-- Use utility types for consistency
-- Prefer interfaces over types for objects
-- Use type aliases for unions
-- Document complex types
-
-### Type Safety
-- Avoid `any` type
-- Use type guards
-- Implement type assertions
-- Validate at runtime
-
-### Generic Types
-- Use generics for reusable types
-- Constrain generics appropriately
-- Provide default type parameters
-- Document generic parameters
+**Description:** Metadata describing an MCP prompt and its arguments.
 
 ## See Also
 
 - [Core Types](./core.md)
 - [Parameter Types](./parameters.md)
 - [Error Types](./errors.md)
-- [TypeScript Handbook](https://www.typescriptlang.org/docs/handbook/)
-

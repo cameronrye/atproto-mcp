@@ -44,8 +44,9 @@ export class FindSimilarUsersTool extends BaseTool {
   public readonly schema = {
     method: 'find_similar_users',
     description:
-      'Find users similar to a given user based on their content, followers, and engagement patterns. ' +
-      'Analyzes mutual followers, content topics, and engagement to identify similar accounts.',
+      'Find users similar to a given user based on shared follow-graph connections (accounts ' +
+      'followed by the same people, and mutual followers). Ranking also factors in follower/' +
+      'following-ratio similarity. NOTE: content-topic similarity is NOT analyzed.',
     params: FindSimilarUsersSchema,
   };
 
@@ -68,8 +69,7 @@ export class FindSimilarUsersTool extends BaseTool {
       similarityReasons: string[];
       metrics?: {
         mutualFollowers: number;
-        contentSimilarity: number;
-        engagementSimilarity: number;
+        followerRatioSimilarity: number;
       };
     }>;
     baseUser: {
@@ -157,7 +157,9 @@ export class FindSimilarUsersTool extends BaseTool {
 
           for (const candidate of theirFollowsResponse.data.follows as any[]) {
             if (candidate.did === baseProfile.did) continue; // Skip self
-            if ((candidate.followersCount || 0) < params.minFollowerCount) continue;
+            // NOTE: minFollowerCount is applied AFTER hydration (below) — these
+            // ProfileView candidates have no followersCount, so filtering here
+            // would drop everyone whenever minFollowerCount > 0.
 
             if (!candidateUsers.has(candidate.did)) {
               candidateUsers.set(candidate.did, {
@@ -184,7 +186,7 @@ export class FindSimilarUsersTool extends BaseTool {
 
           for (const candidate of theirFollowersResponse.data.followers as any[]) {
             if (candidate.did === baseProfile.did) continue;
-            if ((candidate.followersCount || 0) < params.minFollowerCount) continue;
+            // minFollowerCount is applied after hydration (see below).
 
             if (!candidateUsers.has(candidate.did)) {
               candidateUsers.set(candidate.did, {
@@ -204,11 +206,22 @@ export class FindSimilarUsersTool extends BaseTool {
         candidatesCount: candidateUsers.size,
       });
 
+      // Candidates come from getFollows/getFollowers as ProfileView entries that
+      // lack followersCount/followsCount/postsCount. Hydrate them via getProfiles
+      // so the minFollowerCount filter and ratio similarity use real numbers
+      // instead of treating every absent count as 0.
+      await this.hydrateCandidateProfiles(agent, candidateUsers);
+
       // Calculate similarity scores
       const similarUsers = [];
 
       for (const [did, data] of candidateUsers.entries()) {
         const profile = data.profile;
+
+        // Apply the follower-count threshold now that counts are real.
+        if ((profile.followersCount || 0) < params.minFollowerCount) {
+          continue;
+        }
 
         // Calculate mutual followers
         let mutualFollowers = 0;
@@ -255,10 +268,11 @@ export class FindSimilarUsersTool extends BaseTool {
         };
 
         if (params.includeMetrics) {
+          // contentSimilarity intentionally omitted — post-content topics are not
+          // analyzed, so reporting a value (previously hardcoded 0) would mislead.
           user.metrics = {
             mutualFollowers,
-            contentSimilarity: 0, // Would need post analysis
-            engagementSimilarity: followerRatioSimilarity,
+            followerRatioSimilarity,
           };
         }
 
@@ -329,6 +343,41 @@ export class FindSimilarUsersTool extends BaseTool {
 
     if (maxRatio === 0) return 1;
     return Math.max(0, 1 - diff / maxRatio);
+  }
+
+  /**
+   * Hydrate candidate ProfileView entries (which lack follower/post counts) into
+   * ProfileViewDetailed via getProfiles, updating each candidate's `profile` in
+   * place so downstream filtering/scoring uses real counts. getProfiles accepts
+   * up to 25 actors per call; falls back to the raw entry when getProfiles is
+   * unavailable or a profile is not returned.
+   */
+  private async hydrateCandidateProfiles(
+    agent: any,
+    candidateUsers: Map<string, { profile: any; [key: string]: any }>
+  ): Promise<void> {
+    if (typeof agent.getProfiles !== 'function') {
+      return;
+    }
+    const dids = Array.from(candidateUsers.keys());
+    for (let i = 0; i < dids.length; i += 25) {
+      const chunk = dids.slice(i, i + 25);
+      try {
+        const resp = await this.executeAtpOperation(
+          async () => agent.getProfiles({ actors: chunk }),
+          'getProfiles',
+          { count: chunk.length }
+        );
+        for (const detailed of (resp.data.profiles as any[]) ?? []) {
+          const entry = candidateUsers.get(detailed.did);
+          if (entry) {
+            entry.profile = detailed;
+          }
+        }
+      } catch (error) {
+        this.logger.warn('Candidate profile hydration failed for a chunk', error as Error);
+      }
+    }
   }
 }
 

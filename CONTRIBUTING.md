@@ -1,33 +1,42 @@
 # Contributing to AT Protocol MCP Server
 
-Thank you for your interest in contributing to the AT Protocol MCP Server! This document provides guidelines and information for contributors.
+Thank you for your interest in contributing to the AT Protocol MCP Server! This
+document provides guidelines and information for contributors.
 
 ## About This Project
 
-The AT Protocol MCP Server is an **MCP (Model Context Protocol) server** that enables **LLM clients** to interact with the AT Protocol ecosystem. Contributions to this project help improve how LLMs access and use AT Protocol functionality.
+The AT Protocol MCP Server is an **MCP (Model Context Protocol) server** that
+enables **LLM clients** to interact with the AT Protocol ecosystem.
+Contributions to this project help improve how LLMs access and use AT Protocol
+functionality.
 
 **What we're building:**
+
 - MCP tools that LLMs can call to interact with AT Protocol
 - MCP resources that provide context data to LLMs
 - MCP prompts that help LLMs perform common tasks
 - Infrastructure for deploying and scaling the MCP server
 
 **What this is NOT:**
+
 - A direct-use API or SDK for application developers
 - A JavaScript/TypeScript library for importing into apps
 - An end-user application
 
-If you're looking to build applications with AT Protocol, consider using the official `@atproto/api` package directly instead.
+If you're looking to build applications with AT Protocol, consider using the
+official `@atproto/api` package directly instead.
 
 ## Getting Started
 
 ### Prerequisites
+
 - Node.js 20+
 - pnpm (recommended) or npm
 - Git
 - Basic knowledge of TypeScript, AT Protocol, and MCP
 
 ### Development Setup
+
 1. Fork the repository on GitHub
 2. Clone your fork locally:
    ```bash
@@ -45,7 +54,8 @@ If you're looking to build applications with AT Protocol, consider using the off
 
 ### Cross-Platform Development
 
-This project supports development on **Windows, macOS, and Linux**. All build commands are cross-platform compatible.
+This project supports development on **Windows, macOS, and Linux**. All build
+commands are cross-platform compatible.
 
 #### Using npm Scripts
 
@@ -68,7 +78,8 @@ npm run status           # Show project status
 
 #### Cross-Platform Best Practices
 
-When contributing code, please follow these guidelines to ensure cross-platform compatibility:
+When contributing code, please follow these guidelines to ensure cross-platform
+compatibility:
 
 1. **Use npm scripts** for all build tasks instead of shell commands
 2. **Avoid Unix-specific commands** like `rm`, `chmod`, `grep`, `awk`, `sed`
@@ -80,11 +91,13 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 5. **Test on multiple platforms** when possible (Windows, macOS, Linux)
 6. **Use forward slashes** in paths (Node.js normalizes them automatically)
 7. **Avoid hardcoded paths** - use `path.join()` or `path.resolve()`
-8. **Don't assume shell availability** - use Node.js scripts instead of shell scripts
+8. **Don't assume shell availability** - use Node.js scripts instead of shell
+   scripts
 
 #### Example: Cross-Platform File Deletion
 
 **Don't do this** (Unix-only):
+
 ```json
 {
   "scripts": {
@@ -94,6 +107,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 ```
 
 **Do this instead** (cross-platform):
+
 ```json
 {
   "scripts": {
@@ -105,6 +119,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 #### Example: Cross-Platform Executable
 
 **Don't do this** (Unix-only):
+
 ```json
 {
   "scripts": {
@@ -114,6 +129,7 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 ```
 
 **Do this instead** (cross-platform):
+
 ```json
 {
   "scripts": {
@@ -122,11 +138,13 @@ When contributing code, please follow these guidelines to ensure cross-platform 
 }
 ```
 
-Where `scripts/make-executable.js` checks the platform and only runs chmod on Unix systems.
+Where `scripts/make-executable.js` checks the platform and only runs chmod on
+Unix systems.
 
 ## Development Workflow
 
 ### Branch Strategy
+
 - `main` - Production-ready code
 - `develop` - Integration branch for features
 - `feature/feature-name` - Individual features
@@ -134,7 +152,9 @@ Where `scripts/make-executable.js` checks the platform and only runs chmod on Un
 - `docs/documentation-update` - Documentation changes
 
 ### Making Changes
+
 1. Create a new branch from `develop`:
+
    ```bash
    git checkout develop
    git pull origin develop
@@ -146,6 +166,7 @@ Where `scripts/make-executable.js` checks the platform and only runs chmod on Un
 3. Write or update tests for your changes
 
 4. Run the test suite:
+
    ```bash
    pnpm test
    pnpm run lint
@@ -153,6 +174,7 @@ Where `scripts/make-executable.js` checks the platform and only runs chmod on Un
    ```
 
 5. Commit your changes using conventional commits:
+
    ```bash
    git commit -m "feat: add new AT Protocol tool for user search"
    ```
@@ -160,6 +182,7 @@ Where `scripts/make-executable.js` checks the platform and only runs chmod on Un
 6. Push to your fork and create a pull request
 
 ### Commit Message Format
+
 We use [Conventional Commits](https://www.conventionalcommits.org/):
 
 - `feat:` - New features
@@ -173,6 +196,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 ## Testing
 
 ### Running Tests
+
 ```bash
 # Run all tests
 pnpm test
@@ -188,6 +212,7 @@ pnpm run test:ui
 ```
 
 ### Writing Tests
+
 - Write unit tests for all new functions and classes
 - Write integration tests for MCP tools and AT Protocol operations
 - Mock external dependencies (AT Protocol API calls)
@@ -195,16 +220,17 @@ pnpm run test:ui
 - Follow the AAA pattern (Arrange, Act, Assert)
 
 Example test structure:
+
 ```typescript
 describe('createPost tool', () => {
   it('should create a post with text content successfully', async () => {
     // Arrange
     const mockAgent = createMockAtpAgent();
     const tool = new CreatePostTool(mockAgent);
-    
+
     // Act
     const result = await tool.execute({ text: 'Hello world!' });
-    
+
     // Assert
     expect(result.success).toBe(true);
     expect(result.data.uri).toBeDefined();
@@ -215,6 +241,7 @@ describe('createPost tool', () => {
 ## Code Style
 
 ### TypeScript Guidelines
+
 - Use strict TypeScript configuration
 - Provide explicit return types for public functions
 - Use branded types for domain-specific identifiers
@@ -222,12 +249,14 @@ describe('createPost tool', () => {
 - Use proper error handling with custom error classes
 
 ### Code Organization
+
 - Organize code by feature/domain
 - Use barrel exports for clean module interfaces
 - Keep functions pure and side-effect free where possible
 - Implement proper separation of concerns
 
 ### Naming Conventions
+
 - Use PascalCase for interfaces (prefixed with `I`)
 - Use PascalCase for types and enums
 - Use camelCase for variables and functions
@@ -237,39 +266,51 @@ describe('createPost tool', () => {
 ## Adding New Features
 
 ### MCP Tools
+
 When adding new MCP tools that LLMs can call:
 
 1. **Create the tool** in `src/tools/`
 2. **Define clear schemas** - Use Zod for parameter validation
-3. **Write descriptive metadata** - LLMs use descriptions to understand what tools do
-4. **Add error handling** - Return clear error messages that LLMs can explain to users
+3. **Write descriptive metadata** - LLMs use descriptions to understand what
+   tools do
+4. **Add error handling** - Return clear error messages that LLMs can explain to
+   users
 5. **Write tests** - Unit and integration tests for the tool
 6. **Update documentation** - Add examples showing how LLMs use the tool
-7. **Add usage examples** - Show natural language requests that would trigger the tool
+7. **Add usage examples** - Show natural language requests that would trigger
+   the tool
 
 **Example**: When adding a `search_users` tool, document it like:
-- **What it does**: "Allows LLMs to search for AT Protocol users by name or handle"
+
+- **What it does**: "Allows LLMs to search for AT Protocol users by name or
+  handle"
 - **Example user request**: "Find users named John on Bluesky"
 - **What the LLM does**: Calls `search_users({ query: "John" })`
 
 ### AT Protocol Integration
+
 When adding AT Protocol features to MCP tools:
 
 1. **Use official SDK** - Use the `@atproto/api` package
-2. **Handle authentication** - Support both authenticated and unauthenticated modes
-3. **Respect rate limits** - Implement backoff and return clear rate limit errors
+2. **Handle authentication** - Support both authenticated and unauthenticated
+   modes
+3. **Respect rate limits** - Implement backoff and return clear rate limit
+   errors
 4. **Error handling** - Translate AT Protocol errors into LLM-friendly messages
-5. **Validate responses** - Ensure data matches expected schemas before returning to LLM
+5. **Validate responses** - Ensure data matches expected schemas before
+   returning to LLM
 
 ## Documentation
 
 ### Code Documentation
+
 - Use JSDoc comments for all public APIs
 - Include parameter descriptions and examples
 - Document error conditions and return types
 - Keep documentation up-to-date with code changes
 
 ### User Documentation
+
 - Update README.md for new features
 - Add examples to the docs site
 - Update API reference documentation
@@ -278,6 +319,7 @@ When adding AT Protocol features to MCP tools:
 ## Bug Reports
 
 When reporting bugs:
+
 1. Use the bug report template
 2. Provide clear reproduction steps
 3. Include environment information
@@ -287,6 +329,7 @@ When reporting bugs:
 ## Feature Requests
 
 When requesting features:
+
 1. Use the feature request template
 2. Explain the use case and problem
 3. Provide implementation ideas if possible
@@ -296,6 +339,7 @@ When requesting features:
 ## Code Review Process
 
 ### For Contributors
+
 - Ensure all tests pass
 - Follow the coding standards
 - Write clear commit messages
@@ -303,6 +347,7 @@ When requesting features:
 - Keep pull requests focused and small
 
 ### For Reviewers
+
 - Review for correctness and style
 - Test the changes locally
 - Provide constructive feedback
@@ -310,14 +355,14 @@ When requesting features:
 
 ## License
 
-By contributing to this project, you agree that your contributions will be licensed under the MIT License.
+By contributing to this project, you agree that your contributions will be
+licensed under the MIT License.
 
 ## Community
 
 - Be respectful and inclusive
 - Help others learn and grow
 - Share knowledge and best practices
-- Follow our Code of Conduct
 
 ## Getting Help
 

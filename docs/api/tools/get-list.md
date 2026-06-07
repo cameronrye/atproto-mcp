@@ -1,47 +1,51 @@
 # get_list
 
-Get details and members of a list.
+Get the contents of a list, including its members.
 
 ## Authentication
 
-**Optional:** Public tool (works without authentication)
+**Required:** Yes (Private tool)
 
 ## Parameters
 
-### `list` (required)
+### `listUri` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the list
+- **Description:** AT Protocol URI of the list (`at://...`)
 
 ### `limit` (optional)
+
 - **Type:** `number`
 - **Default:** `50`
 - **Constraints:** 1-100
 - **Description:** Maximum number of members to return
 
 ### `cursor` (optional)
+
 - **Type:** `string`
-- **Description:** Pagination cursor
+- **Description:** Pagination cursor from a previous response
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
   list: {
     uri: string;
-    cid: string;
     name: string;
-    purpose: string;
     description?: string;
+    purpose: string;
     creator: {
       did: string;
       handle: string;
       displayName?: string;
     };
-    indexedAt: string;
+    itemCount: number;   // members returned in this page
   };
   items: Array<{
-    uri: string;
+    uri: string;         // AT-URI of the listitem record
     subject: {
       did: string;
       handle: string;
@@ -49,10 +53,12 @@ Get details and members of a list.
       avatar?: string;
     };
   }>;
-  cursor?: string;
-  hasMore: boolean;
+  cursor?: string;       // present when more pages are available
 }
 ```
+
+`itemCount` reflects the number of items in the current page, not the total list
+size. Continue paging with `cursor` to retrieve the whole list.
 
 ## Examples
 
@@ -60,26 +66,26 @@ Get details and members of a list.
 
 ```json
 {
-  "list": "at://did:plc:abc123/app.bsky.graph.list/list123"
+  "listUri": "at://did:plc:abc123/app.bsky.graph.list/list123"
 }
 ```
 
-**Response:**
+**Response (illustrative):**
+
 ```json
 {
   "success": true,
   "list": {
     "uri": "at://did:plc:abc123/app.bsky.graph.list/list123",
-    "cid": "bafyreiabc123...",
     "name": "Favorite Developers",
-    "purpose": "curatelist",
     "description": "Developers I follow for tech insights",
+    "purpose": "app.bsky.graph.defs#curatelist",
     "creator": {
       "did": "did:plc:abc123",
       "handle": "alice.bsky.social",
       "displayName": "Alice"
     },
-    "indexedAt": "2024-01-15T10:30:00.000Z"
+    "itemCount": 1
   },
   "items": [
     {
@@ -92,8 +98,7 @@ Get details and members of a list.
       }
     }
   ],
-  "cursor": "next_page_cursor",
-  "hasMore": true
+  "cursor": "next_page_cursor"
 }
 ```
 
@@ -101,32 +106,17 @@ Get details and members of a list.
 
 ```json
 {
-  "list": "at://did:plc:abc123/app.bsky.graph.list/list123",
+  "listUri": "at://did:plc:abc123/app.bsky.graph.list/list123",
   "limit": 25,
   "cursor": "cursor_from_previous_response"
 }
 ```
 
-## Use Cases
+## Error Handling
 
-### List Management
-- View list members
-- Audit list contents
-- Export list data
-- Sync lists
-
-### Discovery
-- Find curated accounts
-- Explore topic lists
-- Follow list members
-- Share lists
-
-## Best Practices
-
-- Cache list data
-- Paginate large lists
-- Handle deleted lists
-- Show list metadata
+An invalid `listUri` (not starting with `at://`) raises a `VALIDATION_ERROR`
+before any network call. A missing or deleted list surfaces as the underlying AT
+Protocol error.
 
 ## Related Tools
 
@@ -137,4 +127,4 @@ Get details and members of a list.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-
+- [List Management](../../guide/tools-resources.md#list-management)

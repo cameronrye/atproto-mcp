@@ -1,12 +1,13 @@
 # Tools & Resources
 
-A comprehensive guide to MCP tools and resources available in the AT Protocol MCP Server.
+A comprehensive guide to MCP tools and resources available in the AT Protocol
+MCP Server.
 
 ## Overview
 
 The server provides three types of MCP primitives:
 
-1. **Tools** (57) - Executable functions for AT Protocol operations
+1. **Tools** (60) - Executable functions for AT Protocol operations
 2. **Resources** (4) - Data sources for context
 3. **Prompts** (2) - Templates for common tasks
 
@@ -14,24 +15,51 @@ The server provides three types of MCP primitives:
 
 ### Public Tools (No Authentication Required)
 
-These tools work without authentication:
+These tools work in unauthenticated mode against public AT Protocol data:
 
 #### Data Retrieval
-- `get_user_profile` - Get public profile information (ENHANCED mode: provides additional viewer-specific data when authenticated)
+
+- `get_user_profile` - Get public profile information (ENHANCED mode: provides
+  additional viewer-specific data when authenticated)
+- `get_followers` - Get a user's follower list (ENHANCED mode: works without
+  authentication, richer viewer data when authenticated)
+- `get_follows` - Get a user's following list (ENHANCED mode: works without
+  authentication, richer viewer data when authenticated)
+
+**Note:** Most other tools require authentication. `search_posts`, in
+particular, requires authentication (the AT Protocol search API changed in 2025
+to require auth). App passwords are the supported auth path — set
+`ATPROTO_IDENTIFIER` and `ATPROTO_PASSWORD` (generate an app password in Bluesky
+Settings). See [Authentication](./authentication.md).
 
 #### OAuth Management
-- `start_oauth_flow` - Initiate OAuth authentication
-- `handle_oauth_callback` - Complete OAuth flow
-- `refresh_oauth_tokens` - Refresh authentication tokens
-- `revoke_oauth_tokens` - Revoke OAuth tokens
 
-**Note:** As of 2025, the AT Protocol API has changed to require authentication for most endpoints that were previously public, including `search_posts`, `get_followers`, `get_follows`, `get_thread`, and `get_custom_feed`.
+OAuth is **experimental** and the flow is currently a dead end (callback
+exchange is not implemented). See [Experimental & Roadmap](./experimental.md).
+
+- `start_oauth_flow` - Build a PKCE authorization URL (experimental — see below)
+- `handle_oauth_callback` - **Not implemented** (always throws
+  `OAUTH_NOT_IMPLEMENTED`)
+- `refresh_oauth_tokens` - **Not implemented** (always throws
+  `OAUTH_NOT_IMPLEMENTED`)
+- `revoke_oauth_tokens` - **Not implemented** (always throws
+  `OAUTH_NOT_IMPLEMENTED`)
+
+::: warning Experimental
+
+`start_oauth_flow` only builds a heuristic PKCE authorization URL (no
+authorization-server metadata discovery or PAR). Because `handle_oauth_callback`
+is not implemented, the OAuth flow cannot be completed — use app-password
+authentication instead. See [Experimental & Roadmap](./experimental.md).
+
+:::
 
 ### Private Tools (Authentication Required)
 
 These tools require authentication to perform write operations:
 
 #### Social Operations
+
 - `create_post` - Create new posts
 - `create_thread` - Create multi-post threads in one call
 - `reply_to_post` - Reply to existing posts
@@ -40,15 +68,16 @@ These tools require authentication to perform write operations:
 - `follow_user` / `unfollow_user` - Follow and unfollow users
 
 #### Data Retrieval
-- `search_posts` - Search for posts across the network (requires auth as of 2025)
+
+- `search_posts` - Search for posts across the network (requires authentication;
+  the AT Protocol search API changed in 2025 to require auth)
 - `get_timeline` - Get personalized timeline
-- `get_followers` - Get follower lists (requires auth as of 2025)
-- `get_follows` - Get following lists (requires auth as of 2025)
 - `get_notifications` - Get notifications
-- `get_thread` - View post threads (requires auth as of 2025)
-- `get_custom_feed` - Access custom feeds (requires auth as of 2025)
+- `get_thread` - View post threads
+- `get_custom_feed` - Access custom feeds
 
 #### Content Management
+
 - `delete_post` - Delete your posts
 - `update_profile` - Update your profile
 - `upload_image` - Upload images
@@ -57,12 +86,14 @@ These tools require authentication to perform write operations:
 - `generate_link_preview` - Generate link preview cards
 
 #### List Management
+
 - `create_list` - Create user lists
 - `add_to_list` - Add users to lists
 - `remove_from_list` - Remove users from lists
 - `get_list` - Get list details
 
 #### Moderation
+
 - `mute_user` / `unmute_user` - Mute and unmute users
 - `block_user` / `unblock_user` - Block and unblock users
 - `report_content` - Report inappropriate content
@@ -70,38 +101,64 @@ These tools require authentication to perform write operations:
 - `analyze_moderation_status` - Check moderation status of content
 
 #### Real-time Streaming & Intelligence
-- `start_streaming` - Start real-time event stream with filtering
-- `stop_streaming` - Stop event stream
-- `get_streaming_status` - Check streaming status
-- `get_recent_events` - Get recent streamed events
-- `monitor_keywords` - Monitor firehose for specific keywords in real-time
-- `track_users` - Track activity from specific users in real-time
+
+::: danger Not implemented
+
+The 6 streaming tools below are registered and visible to MCP clients but are
+**not functional** — firehose decoding is gated off, so `start_streaming` opens
+no connection (returns `status: 'not_implemented'`) and the event-buffer tools
+always return an empty buffer. See [Experimental & Roadmap](./experimental.md).
+
+:::
+
+- `start_streaming` - **Not implemented** — returns `success: false`,
+  `status: 'not_implemented'`; opens no firehose connection
+- `stop_streaming` - **Not implemented** — no active stream to stop
+- `get_streaming_status` - **Not implemented** — reports streaming as inactive
+- `get_recent_events` - **Not implemented** — always returns an empty event
+  buffer
+- `monitor_keywords` - **Not implemented** — always returns an empty event
+  buffer
+- `track_users` - **Not implemented** — always returns an empty event buffer
 
 #### Batch Operations
+
 - `batch_follow` - Follow multiple users at once (up to 25)
 - `batch_like` - Like multiple posts at once (up to 25)
 - `batch_repost` - Repost multiple posts at once (up to 25)
 
 #### Analytics & Insights
-- `analyze_engagement` - Analyze engagement patterns across posts
+
+- `analyze_engagement` - Analyze engagement patterns across posts (engagement
+  rate is engagement per hour since posting, a time-velocity measure)
 - `analyze_network` - Analyze user's network and connections
-- `suggest_content_strategy` - Get content strategy recommendations based on performance
+- `suggest_content_strategy` - Get content strategy recommendations based on
+  performance
 - `find_influential_users` - Find influential users in a topic area
 
 #### Content Discovery
-- `discover_trending` - Discover trending topics and posts
-- `find_similar_users` - Find users similar to a given user
+
+- `discover_trending` - Surface trending topics by sampling the caller's own
+  home timeline (~100 posts), not the whole network
+- `find_similar_users` - Find similar users by shared follows/followers (graph
+  overlap only; does not analyze content or topics)
 - `recommend_content` - Get personalized content recommendations
 - `discover_communities` - Discover communities around topics
 
 #### Composite Operations
+
 - `get_user_summary` - Get complete user profile with stats and analysis
 - `get_post_context` - Get post with thread, author, and engagement data
 
 #### Rich Media
-- `generate_alt_text` - Generate descriptive alt text for images
-- `analyze_image` - Analyze image metadata and properties
-- `extract_media_from_post` - Extract all media from posts
+
+- `generate_alt_text` - **Placeholder** — does not analyze image pixels; returns
+  alt-text writing guidance / a template only (no vision model). See
+  [Experimental & Roadmap](./experimental.md).
+- `analyze_image` - Report an image blob's declared size and MIME type (does not
+  decode pixels, so no dimensions or aspect ratio)
+- `extract_media_from_post` - Extract media references from a post (passes
+  through the embed-declared aspect ratio, which may be undefined)
 
 ## Tool Usage Patterns
 
@@ -114,6 +171,7 @@ Through your LLM client:
 ```
 
 The LLM will call `search_posts` with:
+
 ```json
 {
   "q": "artificial intelligence",
@@ -129,6 +187,7 @@ The LLM will call `search_posts` with:
 ```
 
 The LLM will call `create_post` with:
+
 ```json
 {
   "text": "Hello from AT Protocol!",
@@ -145,6 +204,7 @@ The LLM will call `create_post` with:
 The LLM will:
 
 1. Call `search_posts` with:
+
 ```json
 {
   "q": "AI",
@@ -154,6 +214,7 @@ The LLM will:
 ```
 
 2. Call `like_post` with:
+
 ```json
 {
   "uri": "at://...",
@@ -166,18 +227,20 @@ The LLM will:
 Each tool has an authentication mode:
 
 ### PUBLIC Mode
+
 - Works without authentication
 - Access to public data only
-- No rate limit on authentication
-- Example: `search_posts`, `get_user_profile`
+- Example: `get_user_profile`, `analyze_image`
 
 ### PRIVATE Mode
+
 - Requires authentication
 - Can perform write operations
 - Access to private data
 - Example: `create_post`, `like_post`
 
 ### ENHANCED Mode
+
 - Works without authentication
 - Provides more data when authenticated
 - Graceful degradation
@@ -185,23 +248,26 @@ Each tool has an authentication mode:
 
 ## Resources
 
-Resources provide context data that LLMs can read. The server provides 4 resources:
+Resources provide context data that LLMs can read. The server provides 4
+resources. Resource contents are returned as stringified JSON text; the shapes
+below are illustrative.
 
 ### atproto://timeline
 
 Your personalized timeline feed. **Requires authentication.**
 
-**Content**:
+**Content** (illustrative):
+
 ```json
 {
   "uri": "atproto://timeline",
-  "timestamp": "2024-01-01T12:00:00Z",
+  "timestamp": "2026-06-06T12:00:00Z",
   "posts": [
     {
       "uri": "at://...",
       "author": { "did": "...", "handle": "..." },
       "text": "Post content",
-      "createdAt": "2024-01-01T11:00:00Z",
+      "createdAt": "2026-06-06T11:00:00Z",
       "likeCount": 10,
       "repostCount": 5,
       "isLiked": false
@@ -212,6 +278,7 @@ Your personalized timeline feed. **Requires authentication.**
 ```
 
 **Usage**:
+
 ```
 "Summarize my timeline"
 "What are people talking about in my feed?"
@@ -221,11 +288,12 @@ Your personalized timeline feed. **Requires authentication.**
 
 Your profile information and statistics. **Requires authentication.**
 
-**Content**:
+**Content** (illustrative):
+
 ```json
 {
   "uri": "atproto://profile",
-  "timestamp": "2024-01-01T12:00:00Z",
+  "timestamp": "2026-06-06T12:00:00Z",
   "profile": {
     "did": "did:plc:...",
     "handle": "username.bsky.social",
@@ -244,6 +312,7 @@ Your profile information and statistics. **Requires authentication.**
 ```
 
 **Usage**:
+
 ```
 "Show me my profile stats"
 "How many followers do I have?"
@@ -253,26 +322,28 @@ Your profile information and statistics. **Requires authentication.**
 
 Your recent notifications and mentions. **Requires authentication.**
 
-**Content**:
+**Content** (illustrative):
+
 ```json
 {
   "uri": "atproto://notifications",
-  "timestamp": "2024-01-01T12:00:00Z",
+  "timestamp": "2026-06-06T12:00:00Z",
   "notifications": [
     {
       "uri": "at://...",
       "author": { "did": "...", "handle": "..." },
       "reason": "like",
       "isRead": false,
-      "indexedAt": "2024-01-01T11:00:00Z"
+      "indexedAt": "2026-06-06T11:00:00Z"
     }
   ],
   "cursor": "...",
-  "seenAt": "2024-01-01T10:00:00Z"
+  "seenAt": "2026-06-06T10:00:00Z"
 }
 ```
 
 **Usage**:
+
 ```
 "Check my notifications"
 "Who liked my recent posts?"
@@ -280,104 +351,72 @@ Your recent notifications and mentions. **Requires authentication.**
 
 ### atproto://conversation-context
 
-Tracks conversation state across LLM interactions. **Always available (no authentication required).**
+A scratchpad for conversation state. **Always available (no authentication
+required).**
 
-**Content**:
+::: warning Placeholder
+
+This resource is **registered and readable, but the server does not
+auto-populate it** during tool calls. It exists as a placeholder/scratchpad:
+unless a client explicitly writes to it, every array is empty. Treat empty
+arrays as "not tracked", not "nothing happened".
+
+:::
+
+The resource always returns the structure below. The `context` arrays
+(`recentlyDiscussedPosts`, `activeThreads`, `mentionedUsers`, `searchHistory`,
+`recentActions`) are present but empty by default, and the `summary` counts are
+all `0`:
+
 ```json
 {
   "uri": "atproto://conversation-context",
-  "timestamp": "2024-01-01T12:00:00Z",
+  "timestamp": "2026-06-06T12:00:00Z",
   "context": {
-    "recentlyDiscussedPosts": [
-      {
-        "uri": "at://...",
-        "cid": "...",
-        "text": "Post content",
-        "author": "user.bsky.social",
-        "discussedAt": "2024-01-01T11:00:00Z",
-        "context": "Discussed in conversation about AI"
-      }
-    ],
-    "activeThreads": [
-      {
-        "rootUri": "at://...",
-        "rootCid": "...",
-        "topic": "AI discussion",
-        "lastInteraction": "2024-01-01T11:00:00Z",
-        "participantCount": 5
-      }
-    ],
-    "mentionedUsers": [
-      {
-        "did": "did:plc:...",
-        "handle": "user.bsky.social",
-        "displayName": "User Name",
-        "mentionedAt": "2024-01-01T11:00:00Z",
-        "context": "Mentioned in discussion about features"
-      }
-    ],
-    "searchHistory": [
-      {
-        "query": "artificial intelligence",
-        "timestamp": "2024-01-01T11:00:00Z",
-        "resultCount": 25
-      }
-    ],
-    "recentActions": [
-      {
-        "action": "create_post",
-        "target": "at://...",
-        "timestamp": "2024-01-01T11:00:00Z",
-        "details": {}
-      }
-    ]
+    "recentlyDiscussedPosts": [],
+    "activeThreads": [],
+    "mentionedUsers": [],
+    "searchHistory": [],
+    "recentActions": []
   },
   "summary": {
-    "discussedPostsCount": 10,
-    "activeThreadsCount": 3,
-    "mentionedUsersCount": 5,
-    "searchHistoryCount": 8,
-    "recentActionsCount": 15
+    "discussedPostsCount": 0,
+    "activeThreadsCount": 0,
+    "mentionedUsersCount": 0,
+    "searchHistoryCount": 0,
+    "recentActionsCount": 0
   }
 }
 ```
 
-**Usage**:
-```
-"What have we been discussing?"
-"Show me the conversation context"
-"What posts have I interacted with recently?"
-```
-
-**Purpose**: This resource helps LLMs maintain context across interactions, tracking:
-- Posts that have been discussed in the conversation
-- Active threads being followed
-- Users that have been mentioned
-- Search queries performed
-- Recent actions taken
-
-This enables more coherent, contextual responses from LLMs by providing conversation history.
+Because the server never writes to this resource on your behalf, do not rely on
+it to recall posts, threads, users, searches, or actions from earlier in a
+conversation.
 
 ## Prompts
 
-Prompts help LLMs perform common tasks with better context.
+Prompts help LLMs perform common tasks with better context. The server provides
+2 prompts. Both **require authentication** to be available.
 
 ### content_composition
 
 Helps compose engaging social media posts.
 
 **Arguments**:
-- `topic` (optional) - Topic to write about
+
+- `topic` (required) - The main topic or subject for the post
 - `tone` (optional) - Desired tone (casual, professional, humorous, informative)
 - `length` (optional) - Post length (short, medium, long)
-- `include_hashtags` (optional) - Whether to include hashtags
+- `include_hashtags` (optional) - Whether to include relevant hashtags
 
 **Usage**:
+
 ```
 "Help me write a post about TypeScript"
 ```
 
 The LLM will use the prompt to generate:
+
 - Engaging content
 - Appropriate tone
 - Relevant hashtags
@@ -388,16 +427,21 @@ The LLM will use the prompt to generate:
 Helps generate thoughtful replies to posts.
 
 **Arguments**:
-- `original_post` (optional) - The post being replied to
-- `reply_type` (optional) - Type of reply (supportive, questioning, informative, humorous)
-- `relationship` (optional) - Relationship to author (friend, colleague, stranger)
+
+- `original_post` (required) - The original post content to reply to
+- `reply_type` (optional) - Type of reply (supportive, questioning, informative,
+  humorous)
+- `relationship` (optional) - Relationship to the original poster (friend,
+  colleague, stranger)
 
 **Usage**:
+
 ```
 "Help me reply to this post: [post content]"
 ```
 
 The LLM will generate:
+
 - Contextually appropriate reply
 - Matching tone
 - Engaging conversation starter
@@ -407,6 +451,7 @@ The LLM will generate:
 ### List Available Tools
 
 Through your LLM client:
+
 ```
 "What tools are available?"
 "Show me all AT Protocol operations"
@@ -434,7 +479,7 @@ Through your LLM client:
 - Provide context when needed
 - Chain operations logically
 - Handle errors gracefully
-- Respect rate limits
+- Respect rate limits (the server allows 100 requests per minute per tool)
 
 ### For Resource Access
 
@@ -457,10 +502,10 @@ Through your LLM client:
 ```
 1. Use content_composition prompt
    "Help me write a post about [topic]"
-   
+
 2. Review and refine
    "Make it more casual"
-   
+
 3. Create the post
    "Post this: [content]"
 ```
@@ -470,10 +515,10 @@ Through your LLM client:
 ```
 1. Check timeline
    "What's new in my feed?"
-   
+
 2. Find interesting content
    "Search for posts about [topic]"
-   
+
 3. Engage
    "Like and repost the top post"
 ```
@@ -483,10 +528,10 @@ Through your LLM client:
 ```
 1. Check notifications
    "Show my recent notifications"
-   
+
 2. Respond to mentions
    "Reply to [user] saying [message]"
-   
+
 3. Moderate if needed
    "Mute [user]" or "Report this content"
 ```
@@ -509,6 +554,7 @@ Tools return structured errors:
 ```
 
 Common error scenarios:
+
 - **Authentication required** - Use authenticated mode
 - **Rate limit exceeded** - Wait and retry
 - **Invalid parameters** - Check parameter format
@@ -516,11 +562,11 @@ Common error scenarios:
 
 ## Next Steps
 
-- **[API Reference](../api/tools.md)** - Detailed tool documentation
+- **[API Reference](../api/index.md)** - Detailed tool documentation
 - **[Examples](../examples/basic-usage.md)** - See tools in action
 - **[Error Handling](./error-handling.md)** - Handle errors properly
 
 ---
 
-**Previous**: [AT Protocol](./at-protocol.md) ← | **Next**: [Error Handling](./error-handling.md) →
-
+**Previous**: [AT Protocol](./at-protocol.md) ← | **Next**:
+[Error Handling](./error-handling.md) →

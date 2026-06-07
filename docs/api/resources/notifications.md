@@ -1,6 +1,7 @@
 # Notifications Resource
 
-MCP resource that exposes the authenticated user's recent notifications and mentions.
+MCP resource that exposes the authenticated user's recent notifications and
+mentions.
 
 ## Resource URI
 
@@ -50,27 +51,39 @@ This resource requires authentication to access the user's notifications.
 ## Notification Types
 
 ### `like`
+
 Someone liked your post
+
 - `reasonSubject`: URI of the liked post
 
 ### `repost`
+
 Someone reposted your post
+
 - `reasonSubject`: URI of the reposted post
 
 ### `follow`
+
 Someone followed you
+
 - No `reasonSubject`
 
 ### `mention`
+
 Someone mentioned you in a post
+
 - `reasonSubject`: URI of the post with mention
 
 ### `reply`
+
 Someone replied to your post
+
 - `reasonSubject`: URI of the parent post
 
 ### `quote`
+
 Someone quoted your post
+
 - `reasonSubject`: URI of the quoted post
 
 ## Example Response
@@ -78,7 +91,7 @@ Someone quoted your post
 ```json
 {
   "uri": "atproto://notifications",
-  "timestamp": "2024-01-15T10:30:00.000Z",
+  "timestamp": "2026-01-15T10:30:00.000Z",
   "notifications": [
     {
       "uri": "at://did:plc:abc123/app.bsky.feed.like/like123",
@@ -97,10 +110,10 @@ Someone quoted your post
           "uri": "at://did:plc:myuser/app.bsky.feed.post/post123",
           "cid": "bafyreiabc123..."
         },
-        "createdAt": "2024-01-15T10:25:00.000Z"
+        "createdAt": "2026-01-15T10:25:00.000Z"
       },
       "isRead": false,
-      "indexedAt": "2024-01-15T10:25:01.000Z",
+      "indexedAt": "2026-01-15T10:25:01.000Z",
       "labels": []
     },
     {
@@ -115,10 +128,10 @@ Someone quoted your post
       "record": {
         "$type": "app.bsky.graph.follow",
         "subject": "did:plc:myuser",
-        "createdAt": "2024-01-15T10:20:00.000Z"
+        "createdAt": "2026-01-15T10:20:00.000Z"
       },
       "isRead": false,
-      "indexedAt": "2024-01-15T10:20:01.000Z",
+      "indexedAt": "2026-01-15T10:20:01.000Z",
       "labels": []
     },
     {
@@ -144,15 +157,15 @@ Someone quoted your post
             "cid": "bafyreiabc123..."
           }
         },
-        "createdAt": "2024-01-15T10:15:00.000Z"
+        "createdAt": "2026-01-15T10:15:00.000Z"
       },
       "isRead": true,
-      "indexedAt": "2024-01-15T10:15:01.000Z",
+      "indexedAt": "2026-01-15T10:15:01.000Z",
       "labels": []
     }
   ],
   "cursor": "next_page_cursor",
-  "seenAt": "2024-01-15T10:10:00.000Z"
+  "seenAt": "2026-01-15T10:10:00.000Z"
 }
 ```
 
@@ -165,19 +178,24 @@ Someone quoted your post
 const resource = await mcpClient.readResource('atproto://notifications');
 const notificationsData = JSON.parse(resource.text);
 
-console.log(`Unread notifications: ${
-  notificationsData.notifications.filter(n => !n.isRead).length
-}`);
+console.log(
+  `Unread notifications: ${
+    notificationsData.notifications.filter(n => !n.isRead).length
+  }`
+);
 ```
 
 ### Polling for New Notifications
 
+Each read returns a fresh snapshot. The interval below is a client-side
+suggestion — the server does not poll or push notifications on your behalf.
+
 ```javascript
-// Poll for new notifications every 30 seconds
+// Re-read notifications periodically (client-side choice, not server behavior)
 setInterval(async () => {
   const resource = await mcpClient.readResource('atproto://notifications');
   const data = JSON.parse(resource.text);
-  
+
   const unread = data.notifications.filter(n => !n.isRead);
   if (unread.length > 0) {
     await handleNewNotifications(unread);
@@ -205,87 +223,44 @@ console.log(`Replies: ${grouped.reply?.length || 0}`);
 
 ## Use Cases
 
-### Notification Display
-- Show unread notification count
-- Display notification list
-- Group by notification type
-- Show notification details
-
-### User Engagement
-- Alert on new notifications
-- Show notification badges
-- Provide quick actions
-- Enable notification filtering
-
-### Analytics
-- Track notification patterns
-- Measure engagement rates
-- Analyze notification types
-- Monitor response times
-
-### Automation
-- Auto-respond to mentions
-- Track important notifications
-- Filter spam notifications
-- Archive old notifications
+- Show an unread count and render a grouped notification list
+- Alert on new mentions, replies, likes, reposts, and follows
+- Drive automation such as auto-responding to mentions
+- Analyze notification patterns and engagement
 
 ## Best Practices
 
-### Polling
-- Poll every 30-60 seconds
-- Use exponential backoff on errors
-- Respect rate limits
-- Implement efficient diffing
+These are suggestions for client applications; none are enforced by this server.
 
-### User Experience
-- Show unread count prominently
-- Group similar notifications
-- Provide quick actions (like, reply)
-- Mark as read when viewed
-
-### Performance
-- Cache notifications briefly
-- Process asynchronously
-- Implement virtual scrolling
-- Prefetch notification details
-
-### Data Handling
-- Parse JSON safely
-- Validate notification types
-- Handle missing fields
-- Log parsing errors
+- Treat each read as a point-in-time snapshot and re-read when you need newer
+  data
+- Group similar notifications and surface the unread count prominently
+- Use the `cursor` to page through older notifications
+- Parse the JSON defensively and handle missing optional fields
 
 ## Notification Management
 
 ### Read Status
+
 - `isRead: false` - Unread notification
 - `isRead: true` - Read notification
-- Update via `get_notifications` tool
+- This resource and the `get_notifications` tool are **read-only**; neither
+  marks notifications as read. The read/seen state is set elsewhere in the AT
+  Protocol stack (e.g. when the user views notifications in a client).
 
 ### Seen Timestamp
-- `seenAt` - Last time user viewed notifications
-- Used to determine "new" notifications
-- Update when user views notifications
+
+- `seenAt` - Last time notifications were marked as seen for this account
+- Used to determine which notifications are "new"
 
 ## Limitations
 
-### Data Freshness
-- Data is a snapshot at fetch time
-- Not real-time (poll for updates)
-- May include deleted content briefly
-- Read status may be slightly stale
-
-### Pagination
-- Limited to 50 notifications per fetch
-- Use cursor for additional notifications
-- Cursor may expire after time
-- No backward pagination
-
-### Content
-- Only includes recent notifications
-- Older notifications may be archived
-- Some notification types may be filtered
-- Respects user's notification preferences
+- Data is a snapshot at fetch time, not a real-time stream; re-read for updates
+- Each read returns up to 50 notifications (hardcoded server-side); use the
+  `cursor` to fetch more
+- Cursors are forward-only and may expire over time
+- Only recent notifications are included; older ones may be archived by the
+  service
 
 ## Related Resources
 
@@ -294,11 +269,11 @@ console.log(`Replies: ${grouped.reply?.length || 0}`);
 
 ## Related Tools
 
-- **[get_notifications](../tools/get-notifications.md)** - Get notifications with more control
+- **[get_notifications](../tools/get-notifications.md)** - Get notifications
+  with more control
 
 ## See Also
 
 - [MCP Protocol Guide](../../guide/mcp-protocol.md)
 - [Resource Access Patterns](../../guide/tools-resources.md#resources)
 - [Notification Handling](../../guide/tools-resources.md#notifications)
-

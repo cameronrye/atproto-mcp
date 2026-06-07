@@ -8,25 +8,30 @@ Add a user to an existing list.
 
 ## Parameters
 
-### `list` (required)
-- **Type:** `string`
-- **Description:** AT Protocol URI of the list
+### `listUri` (required)
 
-### `subject` (required)
 - **Type:** `string`
-- **Description:** User identifier (DID or handle) to add
+- **Description:** AT Protocol URI of the list (`at://...`)
+
+### `actor` (required)
+
+- **Type:** `string`
+- **Description:** User identifier (DID or handle) to add. Handles are resolved
+  to a DID before the list-item record is created, because a list item's subject
+  must be a DID.
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
   message: string;
   listItem: {
-    uri: string;
-    cid: string;
-    list: string;
-    subject: string;
+    uri: string; // AT-URI of the created listitem record
+    listUri: string;
+    actor: string; // echoes the actor you passed in
   }
 }
 ```
@@ -37,67 +42,45 @@ Add a user to an existing list.
 
 ```json
 {
-  "list": "at://did:plc:myuser/app.bsky.graph.list/list123",
-  "subject": "alice.bsky.social"
+  "listUri": "at://did:plc:myuser/app.bsky.graph.list/list123",
+  "actor": "alice.bsky.social"
 }
 ```
 
-**Response:**
+**Response (illustrative):**
+
 ```json
 {
   "success": true,
-  "message": "User added to list successfully",
+  "message": "User alice.bsky.social added to list successfully",
   "listItem": {
     "uri": "at://did:plc:myuser/app.bsky.graph.listitem/item123",
-    "cid": "bafyreiabc123...",
-    "list": "at://did:plc:myuser/app.bsky.graph.list/list123",
-    "subject": "did:plc:abc123xyz789"
+    "listUri": "at://did:plc:myuser/app.bsky.graph.list/list123",
+    "actor": "alice.bsky.social"
   }
 }
 ```
 
 ## Error Handling
 
-### Common Errors
+Validation runs before any network call:
 
-#### List Not Found
-```json
-{
-  "error": "List not found",
-  "code": "NOT_FOUND"
-}
-```
+- An invalid `listUri` (not starting with `at://`) raises a `VALIDATION_ERROR`.
+- An `actor` that is neither a DID (`did:...`) nor a handle (`user.domain`)
+  raises a `VALIDATION_ERROR`.
 
-#### User Already in List
-```json
-{
-  "error": "User is already in this list",
-  "code": "DUPLICATE"
-}
-```
-
-#### User Not Found
-```json
-{
-  "error": "User not found",
-  "code": "NOT_FOUND"
-}
-```
-
-## Best Practices
-
-- Verify user exists before adding
-- Check for duplicates
-- Store list item URI for removal
-- Batch add operations when possible
+Other failures (list not found, unresolvable handle, network errors) are
+surfaced as the underlying AT Protocol error. This tool does not deduplicate, so
+adding the same user twice creates a second list-item record rather than
+failing.
 
 ## Related Tools
 
 - **[create_list](./create-list.md)** - Create a list
 - **[remove_from_list](./remove-from-list.md)** - Remove from list
-- **[get_list](./get-list.md)** - Get list details
+- **[get_list](./get-list.md)** - Get list contents
 
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-
+- [List Management](../../guide/tools-resources.md#list-management)

@@ -5,7 +5,7 @@
  */
 
 import { parseArgs } from 'node:util';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
@@ -16,6 +16,57 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const logger = new Logger('CLI');
+
+/**
+ * Load environment variables from a `.env` file in the current working directory
+ * (if present) so the documented `.env` workflow actually takes effect. Real
+ * environment variables always win over `.env` values, and a missing file is a
+ * no-op. Kept dependency-free and minimal on purpose.
+ */
+function loadEnvFile(): void {
+  const envPath = join(process.cwd(), '.env');
+  if (!existsSync(envPath)) {
+    return;
+  }
+  try {
+    const content = readFileSync(envPath, 'utf8');
+    let loaded = 0;
+    for (const rawLine of content.split('\n')) {
+      const line = rawLine.trim();
+      if (line === '' || line.startsWith('#')) {
+        continue;
+      }
+      const eq = line.indexOf('=');
+      if (eq === -1) {
+        continue;
+      }
+      const key = line.slice(0, eq).trim();
+      // Real environment variables take precedence over .env.
+      if (key === '' || key in process.env) {
+        continue;
+      }
+      let value = line.slice(eq + 1).trim();
+      if (
+        value.length >= 2 &&
+        ((value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'")))
+      ) {
+        // Quoted value: take the contents verbatim (a '#' inside quotes is data).
+        value = value.slice(1, -1);
+      } else {
+        // Unquoted value: strip a trailing inline comment (whitespace + '#').
+        value = value.replace(/\s+#.*$/, '').trim();
+      }
+      process.env[key] = value;
+      loaded++;
+    }
+    if (loaded > 0) {
+      logger.info('Loaded environment variables from .env', { count: loaded });
+    }
+  } catch (error) {
+    logger.warn('Failed to load .env file', error);
+  }
+}
 
 /**
  * CLI argument definitions
@@ -68,9 +119,13 @@ AT Protocol MCP Server - Comprehensive interface for LLMs to interact with AT Pr
 
 Usage: atproto-mcp [options]
 
+Transport: this server communicates over stdio (for MCP clients such as Claude
+Desktop). It does not listen on a TCP port; --port/--host are accepted but
+currently have no effect.
+
 Options:
-  -p, --port <number>        Server port (default: 3000)
-  -h, --host <string>        Server host (default: localhost)
+  -p, --port <number>        Server port (reserved; stdio transport ignores it)
+  -h, --host <string>        Server host (reserved; stdio transport ignores it)
   -s, --service <url>        AT Protocol service URL (default: https://bsky.social)
   -a, --auth <method>        Authentication method: app-password|oauth (optional)
   -l, --log-level <level>    Log level: debug|info|warn|error (default: info)
@@ -237,6 +292,10 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
 async function main(): Promise<void> {
   try {
     logger.info('Starting AT Protocol MCP Server CLI');
+
+    // Load .env (if present) before building configuration so its values are
+    // visible to ConfigManager and the rest of the server.
+    loadEnvFile();
 
     // Parse command line arguments
     const cliConfig = parseCliArgs();

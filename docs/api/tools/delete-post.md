@@ -9,6 +9,7 @@ Delete a post from AT Protocol.
 ## Parameters
 
 ### `uri` (required)
+
 - **Type:** `string`
 - **Description:** AT Protocol URI of the post to delete
 
@@ -35,6 +36,7 @@ Delete a post from AT Protocol.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -50,6 +52,7 @@ Delete a post from AT Protocol.
 ### Common Errors
 
 #### Invalid URI
+
 ```json
 {
   "error": "Invalid AT Protocol URI format",
@@ -58,6 +61,7 @@ Delete a post from AT Protocol.
 ```
 
 #### Post Not Found
+
 ```json
 {
   "error": "Post not found",
@@ -65,30 +69,28 @@ Delete a post from AT Protocol.
 }
 ```
 
-#### Not Authorized
+#### Post Belongs to Another User
+
+Before deleting, the tool verifies the post's DID matches the authenticated
+session. If it does not, the operation fails:
+
 ```json
 {
-  "error": "Not authorized to delete this post",
-  "code": "UNAUTHORIZED"
+  "error": "Cannot delete post: post belongs to another user",
+  "code": "TOOL_EXECUTION_ERROR"
 }
 ```
 
 ## Best Practices
 
 ### Permissions
-- You can only delete your own posts
-- Verify ownership before attempting deletion
-- Handle authorization errors gracefully
+
+- You can only delete your own posts; the tool checks ownership before deleting
 
 ### Cascading Effects
+
 - Deleting a post doesn't delete replies to it
 - Likes and reposts of the deleted post become invalid
-- Thread structure is maintained with deleted posts
-
-### User Experience
-- Confirm deletion with users before executing
-- Provide undo functionality if possible
-- Show clear feedback after deletion
 
 ## Related Tools
 
@@ -98,4 +100,3 @@ Delete a post from AT Protocol.
 ## See Also
 
 - [Content Management Examples](../../examples/content-management.md)
-

@@ -9,6 +9,7 @@ Follow a user on AT Protocol.
 ## Parameters
 
 ### `actor` (required)
+
 - **Type:** `string`
 - **Description:** User identifier - can be either a DID or handle
 - **Examples:**
@@ -41,6 +42,7 @@ Follow a user on AT Protocol.
 ```
 
 **Response:**
+
 ```json
 {
   "uri": "at://did:plc:myuser/app.bsky.graph.follow/follow123",
@@ -64,7 +66,8 @@ Follow a user on AT Protocol.
 
 ### Already Following
 
-If you're already following the user, the tool returns the existing follow record:
+If you're already following the user, the tool returns the existing follow
+record:
 
 ```json
 {
@@ -84,6 +87,7 @@ If you're already following the user, the tool returns the existing follow recor
 ### Common Errors
 
 #### Invalid Actor
+
 ```json
 {
   "error": "Actor (DID or handle) is required",
@@ -92,6 +96,7 @@ If you're already following the user, the tool returns the existing follow recor
 ```
 
 #### User Not Found
+
 ```json
 {
   "error": "User not found",
@@ -99,49 +104,48 @@ If you're already following the user, the tool returns the existing follow recor
 }
 ```
 
-#### Cannot Follow Self
-```json
-{
-  "error": "Cannot follow yourself",
-  "code": "INVALID_OPERATION"
-}
-```
-
 #### Rate Limit Exceeded
+
+When this server's per-tool limit is exceeded, the tool returns a generic
+internal error (there is no `RATE_LIMIT_EXCEEDED` code or `retryAfter` from the
+per-tool limiter):
+
 ```json
 {
-  "error": "Rate limit exceeded. Please try again later.",
-  "code": "RATE_LIMIT_EXCEEDED",
-  "retryAfter": 60
+  "error": "Rate limit exceeded for tool \"follow_user\". Please slow down and retry shortly.",
+  "code": "InternalError"
 }
 ```
 
 ## Best Practices
 
 ### Actor Identifiers
+
 - **Handles** are more user-friendly but can change
 - **DIDs** are permanent and never change
 - Use DIDs for programmatic operations
 - Use handles for user-facing features
 
 ### Following Strategy
+
 - Check if already following before calling to avoid unnecessary operations
 - Store the follow URI if you need to unfollow later
-- Respect rate limits when following multiple users
-- Consider implementing follow limits to prevent spam
 
 ### Bulk Operations
-When following multiple users:
-- Add delays between follow operations
-- Implement exponential backoff for rate limits
-- Track failed follows for retry logic
-- Monitor for rate limit responses
+
+To follow many users in one call, use **[batch_follow](./batch-follow.md)**
+instead of looping over this tool.
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol rate limits:
-- **Default limit:** 100 follows per hour
-- **Burst limit:** 5 follows per minute
+This server applies a per-tool rate limit of **100 requests per minute**. When
+the limit is exceeded, the tool returns a generic internal error with the
+message
+`Rate limit exceeded for tool "follow_user". Please slow down and retry shortly.`
+(no `retryAfter` value). Note: a separate `RATE_LIMIT_EXCEEDED` code with a
+`retryAfter` value is only surfaced when the upstream AT Protocol API itself
+returns HTTP 429 — that is a different mechanism from this server's per-tool
+limiter.
 
 ## Related Tools
 
@@ -153,5 +157,4 @@ This tool is subject to AT Protocol rate limits:
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-- [Social Graph Guide](../../guide/tools-resources.md#social-graph)
-
+- [Tools & Resources Guide](../../guide/tools-resources.md#social-operations)

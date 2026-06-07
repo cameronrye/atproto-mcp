@@ -1,84 +1,41 @@
 # get_streaming_status
 
-Get the current status of firehose streaming and recent events.
+Report the current status of firehose streaming and recent buffered events.
+
+::: danger Not implemented
+
+`get_streaming_status` is registered and visible to MCP clients but reports a
+**non-functional** subsystem — firehose decoding is not implemented
+(`FIREHOSE_DECODING_IMPLEMENTED = false`), so the firehose is never connected
+and the event buffer is always empty. The response includes
+`firehoseDecodingImplemented: false` and an explanatory `note`. See
+[Experimental & Roadmap](../../guide/experimental.md).
+
+:::
 
 ## Authentication
 
-**Optional:** Public tool
+**Optional:** No authentication is performed.
 
 ## Parameters
 
-None
+None.
+
+## Behavior
+
+The tool reports the state of the shared firehose client and event buffer.
+Because nothing ever connects, the buffer is always empty (`eventBufferSize: 0`,
+`recentEvents: []`) and the connection status is always disconnected.
 
 ## Response
 
-```typescript
-{
-  success: boolean;
-  firehoseStatus: {
-    connected: boolean;      // Whether firehose is connected
-    lastSeq: number | null;  // Last sequence number received
-    subscriptionCount: number; // Number of active subscriptions
-  };
-  recentEvents: Array<{
-    type: string;           // Event type
-    seq: number;            // Sequence number
-    time: string;           // Event timestamp
-    repo: string;           // Repository DID
-    collection?: string;    // Collection name
-    operation?: string;     // Operation type
-    receivedAt: string;     // When event was received
-  }>;
-  eventBufferSize: number;  // Total events in buffer
-}
-```
-
-## Examples
-
-### Get Status
-
-```json
-{}
-```
-
-**Response:**
-```json
-{
-  "success": true,
-  "firehoseStatus": {
-    "connected": true,
-    "lastSeq": 12345678,
-    "subscriptionCount": 2
-  },
-  "recentEvents": [
-    {
-      "type": "commit",
-      "seq": 12345670,
-      "time": "2024-01-15T10:30:00.000Z",
-      "repo": "did:plc:abc123",
-      "collection": "app.bsky.feed.post",
-      "operation": "create",
-      "receivedAt": "2024-01-15T10:30:00.123Z"
-    },
-    {
-      "type": "commit",
-      "seq": 12345671,
-      "time": "2024-01-15T10:30:01.000Z",
-      "repo": "did:plc:def456",
-      "collection": "app.bsky.feed.like",
-      "operation": "create",
-      "receivedAt": "2024-01-15T10:30:01.234Z"
-    }
-  ],
-  "eventBufferSize": 100
-}
-```
-
-### Not Connected
+Tool results are returned as stringified JSON text. The shape is illustrative:
 
 ```json
 {
   "success": true,
+  "firehoseDecodingImplemented": false,
+  "note": "AT Protocol firehose frame (CAR/DAG-CBOR) decoding is not implemented in this build, so no live events are ever decoded into the buffer. Empty results here mean \"streaming is not available\", not \"no activity\".",
   "firehoseStatus": {
     "connected": false,
     "lastSeq": null,
@@ -89,89 +46,18 @@ None
 }
 ```
 
-## Status Fields
-
-### Connection Status
-- **connected: true** - Actively receiving events
-- **connected: false** - Not connected or disconnected
-
-### Last Sequence Number
-- **null** - Never connected or no events received
-- **number** - Last event sequence number
-- Used for resuming streams after disconnection
-
-### Subscription Count
-- Number of active subscriptions
-- Each subscription can filter different collections
-- 0 means no active subscriptions
-
-### Recent Events
-- Last 10 events from buffer
-- Includes metadata about each event
-- Useful for monitoring stream health
-
-## Use Cases
-
-### Health Monitoring
-```javascript
-// Check if streaming is healthy
-const status = await getStreamingStatus();
-if (!status.firehoseStatus.connected) {
-  console.error('Firehose disconnected!');
-  await reconnect();
-}
-```
-
-### Debugging
-```javascript
-// Debug event flow
-const status = await getStreamingStatus();
-console.log('Last sequence:', status.firehoseStatus.lastSeq);
-console.log('Recent events:', status.recentEvents.length);
-console.log('Buffer size:', status.eventBufferSize);
-```
-
-### Dashboard Display
-```javascript
-// Show streaming stats in UI
-setInterval(async () => {
-  const status = await getStreamingStatus();
-  updateDashboard({
-    connected: status.firehoseStatus.connected,
-    eventsPerSecond: calculateRate(status.recentEvents),
-    subscriptions: status.firehoseStatus.subscriptionCount
-  });
-}, 1000);
-```
-
-## Best Practices
-
-### Monitoring
-- Poll status regularly (every 5-10 seconds)
-- Alert on disconnections
-- Track sequence number gaps
-- Monitor buffer size
-
-### Reconnection
-- Detect disconnections quickly
-- Implement exponential backoff
-- Resume from last sequence number
-- Log reconnection attempts
-
-### Performance
-- Don't poll too frequently (< 1 second)
-- Cache status for short periods
-- Use for debugging, not event processing
-- Monitor subscription count
+`recentEvents` would return up to the last 10 buffered events, but the buffer
+never populates. The `note` field is present whenever
+`firehoseDecodingImplemented` is `false`.
 
 ## Related Tools
 
-- **[start_streaming](./start-streaming.md)** - Start streaming
-- **[stop_streaming](./stop-streaming.md)** - Stop streaming
-- **[get_recent_events](./get-recent-events.md)** - Get buffered events
+- **[start_streaming](./start-streaming.md)** — Start streaming (currently not
+  implemented)
+- **[stop_streaming](./stop-streaming.md)** — Stop streaming
+- **[get_recent_events](./get-recent-events.md)** — Read the (empty) event
+  buffer
 
 ## See Also
 
-- [Real-time Data Examples](../../examples/real-time-data.md)
-- [Monitoring Guide](../../guide/tools-resources.md#monitoring)
-
+- [Experimental & Roadmap](../../guide/experimental.md)

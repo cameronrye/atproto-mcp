@@ -2,13 +2,33 @@
 
 Practical examples for managing content, media, and profiles on AT Protocol.
 
-These examples show how an LLM interacts with the AT Protocol MCP Server tools using JSON-formatted parameters.
+These examples show how an LLM interacts with the AT Protocol MCP Server tools
+using JSON-formatted parameters.
+
+::: tip Response shapes are illustrative
+
+Tool results are returned as **stringified JSON text content**, not a guaranteed
+structured schema. The `Response (JSON)` blocks below illustrate the kind of
+data a tool returns; exact field names and structure may differ.
+
+:::
+
+::: tip Rate limiting and batching
+
+Each tool is rate limited to roughly **100 requests per minute per tool**. When
+a workflow performs many calls in sequence (uploads, deletions, posts), pace
+them out with a short delay between calls so you stay under the limit. The
+per-step "wait N seconds" notes below are conservative spacing suggestions, not
+hard requirements.
+
+:::
 
 ## Profile Management
 
 ### Update Profile Information
 
 **User Request:**
+
 ```
 "Update my profile display name to 'Alice Smith' and bio to 'Software engineer and coffee enthusiast ☕ Building cool things with AT Protocol'"
 ```
@@ -16,6 +36,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `update_profile`
 
 **Parameters (JSON):**
+
 ```json
 {
   "displayName": "Alice Smith",
@@ -24,6 +45,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -34,6 +56,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Update Profile Avatar
 
 **User Request:**
+
 ```
 "Update my profile avatar with this image"
 ```
@@ -41,17 +64,20 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `update_profile`
 
 **Parameters (JSON):**
+
 ```json
 {
   "avatar": "<blob reference or base64 encoded image data>"
 }
 ```
 
-**Note:** Images are typically provided as blob references or base64-encoded data. The LLM receives image data from the user's client.
+**Note:** Images are typically provided as blob references or base64-encoded
+data. The LLM receives image data from the user's client.
 
 ### Update Profile Banner
 
 **User Request:**
+
 ```
 "Update my profile banner"
 ```
@@ -59,6 +85,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `update_profile`
 
 **Parameters (JSON):**
+
 ```json
 {
   "banner": "<blob reference or base64 encoded image data>"
@@ -68,6 +95,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Complete Profile Update
 
 **User Request:**
+
 ```
 "Update my entire profile with new name, bio, avatar, and banner"
 ```
@@ -75,6 +103,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `update_profile`
 
 **Parameters (JSON):**
+
 ```json
 {
   "displayName": "Alice Smith",
@@ -89,6 +118,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Upload Single Image
 
 **User Request:**
+
 ```
 "Upload this sunset photo with alt text 'A beautiful sunset over the ocean'"
 ```
@@ -96,6 +126,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `upload_image`
 
 **Parameters (JSON):**
+
 ```json
 {
   "image": "<blob reference or base64 encoded image data>",
@@ -104,6 +135,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -123,6 +155,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Upload Multiple Images Workflow
 
 **User Request:**
+
 ```
 "Upload these three photos"
 ```
@@ -130,6 +163,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Workflow:** Call `upload_image` for each image sequentially
 
 **First Image:**
+
 ```json
 {
   "image": "<blob reference 1>",
@@ -138,6 +172,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Second Image:**
+
 ```json
 {
   "image": "<blob reference 2>",
@@ -146,6 +181,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Third Image:**
+
 ```json
 {
   "image": "<blob reference 3>",
@@ -158,6 +194,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Upload Video
 
 **User Request:**
+
 ```
 "Upload this tutorial video"
 ```
@@ -165,6 +202,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `upload_video`
 
 **Parameters (JSON):**
+
 ```json
 {
   "video": "<blob reference or base64 encoded video data>",
@@ -173,6 +211,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -189,6 +228,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Upload Video with Captions
 
 **User Request:**
+
 ```
 "Upload this conference talk video with English captions"
 ```
@@ -196,6 +236,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `upload_video`
 
 **Parameters (JSON):**
+
 ```json
 {
   "video": "<blob reference>",
@@ -214,6 +255,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Post with Mentions
 
 **User Request:**
+
 ```
 "Create a post saying 'Great work @alice.bsky.social!'"
 ```
@@ -225,6 +267,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `get_user_profile`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social"
@@ -236,6 +279,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_rich_text_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Great work @alice.bsky.social!",
@@ -261,6 +305,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Post with Links
 
 **User Request:**
+
 ```
 "Create a post with a link: 'Check out this article: https://example.com'"
 ```
@@ -268,6 +313,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_rich_text_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Check out this article: https://example.com",
@@ -291,6 +337,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Post with Hashtags
 
 **User Request:**
+
 ```
 "Create a post saying 'Loving the #atproto community!'"
 ```
@@ -298,6 +345,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_rich_text_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Loving the #atproto community!",
@@ -321,6 +369,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Post with Multiple Facets
 
 **User Request:**
+
 ```
 "Create a post: 'Hey @alice check out #atproto at https://atproto.com'"
 ```
@@ -332,6 +381,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `get_user_profile`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social"
@@ -343,6 +393,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_rich_text_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Hey @alice check out #atproto at https://atproto.com",
@@ -392,6 +443,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Generate Link Preview
 
 **User Request:**
+
 ```
 "Generate a preview for https://example.com/article"
 ```
@@ -399,6 +451,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `generate_link_preview`
 
 **Parameters (JSON):**
+
 ```json
 {
   "url": "https://example.com/article"
@@ -406,6 +459,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -426,6 +480,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Post with Link Preview Workflow
 
 **User Request:**
+
 ```
 "Create a post about the AT Protocol overview with a link preview"
 ```
@@ -435,6 +490,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `generate_link_preview`
 
 **Parameters (JSON):**
+
 ```json
 {
   "url": "https://atproto.com/guides/overview"
@@ -446,6 +502,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Great introduction to AT Protocol",
@@ -469,6 +526,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Delete a Post
 
 **User Request:**
+
 ```
 "Delete this post"
 ```
@@ -476,6 +534,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `delete_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789"
@@ -483,6 +542,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -493,77 +553,80 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Delete Multiple Posts Workflow
 
 **User Request:**
+
 ```
 "Delete these three posts"
 ```
 
-**Workflow:** Call `delete_post` for each URI sequentially with delays
+**Workflow:** Call `delete_post` for each URI sequentially, pacing the calls per
+the rate-limiting note at the top of this page.
 
-**First Post:**
 ```json
-{
-  "uri": "at://did:plc:abc123/app.bsky.feed.post/post1"
-}
+// Post 1
+{ "uri": "at://did:plc:abc123/app.bsky.feed.post/post1" }
+
+// Post 2
+{ "uri": "at://did:plc:abc123/app.bsky.feed.post/post2" }
+
+// Post 3
+{ "uri": "at://did:plc:abc123/app.bsky.feed.post/post3" }
 ```
-
-**Wait 1 second**
-
-**Second Post:**
-```json
-{
-  "uri": "at://did:plc:abc123/app.bsky.feed.post/post2"
-}
-```
-
-**Wait 1 second**
-
-**Third Post:**
-```json
-{
-  "uri": "at://did:plc:abc123/app.bsky.feed.post/post3"
-}
-```
-
-**Best Practice:** Wait 1 second between deletions to avoid rate limits.
 
 ### Delete Old Posts Workflow
 
 **User Request:**
+
 ```
 "Delete all my posts older than 30 days"
 ```
 
-**Step 1: Search for Old Posts**
+::: warning No match-all search
 
-**Tool Call:** `search_posts`
+AT Protocol search has **no match-all wildcard**, and `search_posts` requires a
+non-empty `q` term — an empty query (`"q": ""`) is rejected and will **not**
+return all of an author's posts. To enumerate your own posts you must read them
+from a feed (e.g. `get_timeline`) rather than search, then filter by date
+client-side before deleting.
+
+:::
+
+**Step 1: List Your Recent Posts**
+
+**Tool Call:** `get_timeline`
 
 **Parameters (JSON):**
+
 ```json
 {
-  "q": "",
-  "author": "myhandle.bsky.social",
-  "until": "2024-01-01T00:00:00Z"
+  "limit": 50
 }
 ```
 
+The LLM reads the returned feed, paginating with the `cursor`, and filters for
+your own posts whose `createdAt` is older than 30 days. (If you want posts
+matching a keyword instead, `search_posts` with a real `q` term plus `author`
+and `until` works.)
+
 **Step 2: Delete Each Post**
 
-For each post in the search results:
+For each old post identified above:
 
 **Tool Call:** `delete_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/oldpost"
 }
 ```
 
-**Wait 1 second between each deletion**
+Pace the deletions per the rate-limiting note at the top of this page.
 
 ## Content Scheduling
 
-**Note:** LLMs cannot directly schedule posts for future execution. Scheduling requires an external system that triggers the LLM at the scheduled time.
+**Note:** LLMs cannot directly schedule posts for future execution. Scheduling
+requires an external system that triggers the LLM at the scheduled time.
 
 ### Scheduled Post Workflow
 
@@ -571,7 +634,8 @@ For each post in the search results:
 
 **Implementation Approach:**
 
-1. **External Scheduler** (cron job, task scheduler, etc.) triggers the LLM at the desired time
+1. **External Scheduler** (cron job, task scheduler, etc.) triggers the LLM at
+   the desired time
 2. **LLM receives trigger** with the post content
 3. **LLM creates the post** using the `create_post` tool
 
@@ -582,6 +646,7 @@ For each post in the search results:
 **Tool Call:** `create_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Good morning! ☀️"
@@ -593,6 +658,7 @@ For each post in the search results:
 **Tool Call:** `create_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Good night! 🌙"
@@ -604,11 +670,13 @@ For each post in the search results:
 If you want the LLM to help manage a schedule:
 
 **User Request:**
+
 ```
 "I want to schedule two posts: 'Good morning! ☀️' at 9 AM and 'Good night! 🌙' at 9 PM"
 ```
 
 **LLM Response:**
+
 ```
 "I've noted your scheduled posts:
 
@@ -628,6 +696,7 @@ Would you like me to create either of these posts now instead?"
 ### Mute Users
 
 **User Request:**
+
 ```
 "Mute spammer.bsky.social"
 ```
@@ -635,6 +704,7 @@ Would you like me to create either of these posts now instead?"
 **Tool Call:** `mute_user`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "spammer.bsky.social"
@@ -642,6 +712,7 @@ Would you like me to create either of these posts now instead?"
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -652,6 +723,7 @@ Would you like me to create either of these posts now instead?"
 ### Block Users
 
 **User Request:**
+
 ```
 "Block harasser.bsky.social"
 ```
@@ -659,6 +731,7 @@ Would you like me to create either of these posts now instead?"
 **Tool Call:** `block_user`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "harasser.bsky.social"
@@ -666,6 +739,7 @@ Would you like me to create either of these posts now instead?"
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -679,6 +753,7 @@ Would you like me to create either of these posts now instead?"
 ### Report Content
 
 **User Request:**
+
 ```
 "Report this post for spam"
 ```
@@ -686,6 +761,7 @@ Would you like me to create either of these posts now instead?"
 **Tool Call:** `report_content`
 
 **Parameters (JSON):**
+
 ```json
 {
   "subject": {
@@ -698,6 +774,7 @@ Would you like me to create either of these posts now instead?"
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -706,6 +783,7 @@ Would you like me to create either of these posts now instead?"
 ```
 
 **Reason Types:**
+
 - `"spam"` - Spam or unwanted content
 - `"violation"` - Terms of service violation
 - `"misleading"` - Misleading or false information
@@ -716,6 +794,7 @@ Would you like me to create either of these posts now instead?"
 ### Report User
 
 **User Request:**
+
 ```
 "Report spambot.bsky.social for being a spam account"
 ```
@@ -723,6 +802,7 @@ Would you like me to create either of these posts now instead?"
 **Tool Call:** `report_user`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "spambot.bsky.social",
@@ -732,6 +812,7 @@ Would you like me to create either of these posts now instead?"
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -744,134 +825,57 @@ Would you like me to create either of these posts now instead?"
 ### Batch Upload Images Workflow
 
 **User Request:**
+
 ```
 "Upload these 6 images"
 ```
 
-**Workflow:** Upload images in batches of 3 with delays between batches
-
-**Batch 1 (Images 1-3):**
-
-Upload these in parallel or sequentially:
+**Workflow:** Upload images in batches, calling `upload_image` once per image
+and pacing the calls per the rate-limiting note at the top of this page.
 
 ```json
-// Image 1
-{
-  "image": "<blob reference 1>",
-  "alt": "Image 1"
-}
+// Batch 1
+{ "image": "<blob reference 1>", "alt": "Image 1" }
+{ "image": "<blob reference 2>", "alt": "Image 2" }
+{ "image": "<blob reference 3>", "alt": "Image 3" }
 
-// Image 2
-{
-  "image": "<blob reference 2>",
-  "alt": "Image 2"
-}
-
-// Image 3
-{
-  "image": "<blob reference 3>",
-  "alt": "Image 3"
-}
+// Batch 2
+{ "image": "<blob reference 4>", "alt": "Image 4" }
+{ "image": "<blob reference 5>", "alt": "Image 5" }
+{ "image": "<blob reference 6>", "alt": "Image 6" }
 ```
 
-**Wait 2 seconds**
-
-**Batch 2 (Images 4-6):**
-
-```json
-// Image 4
-{
-  "image": "<blob reference 4>",
-  "alt": "Image 4"
-}
-
-// Image 5
-{
-  "image": "<blob reference 5>",
-  "alt": "Image 5"
-}
-
-// Image 6
-{
-  "image": "<blob reference 6>",
-  "alt": "Image 6"
-}
-```
-
-**Best Practice:** Process in batches to avoid overwhelming the server and respect rate limits.
+Collect the returned blob references to attach to a post.
 
 ### Batch Create Posts Workflow
 
 **User Request:**
+
 ```
 "Create these three posts: 'Post 1', 'Post 2', 'Post 3'"
 ```
 
-**Workflow:** Create posts sequentially with delays
+**Workflow:** Call `create_post` once per post, sequentially, pacing the calls
+per the rate-limiting note at the top of this page.
 
-**First Post:**
-
-**Tool Call:** `create_post`
-
-**Parameters (JSON):**
 ```json
-{
-  "text": "Post 1"
-}
+{ "text": "Post 1" }
+{ "text": "Post 2" }
+{ "text": "Post 3" }
 ```
-
-**Wait 5 seconds**
-
-**Second Post:**
-
-**Tool Call:** `create_post`
-
-**Parameters (JSON):**
-```json
-{
-  "text": "Post 2"
-}
-```
-
-**Wait 5 seconds**
-
-**Third Post:**
-
-**Tool Call:** `create_post`
-
-**Parameters (JSON):**
-```json
-{
-  "text": "Post 3"
-}
-```
-
-**Best Practice:** Wait 5 seconds between posts to avoid rate limits.
 
 ## Best Practices
 
 ### Image Optimization
 
-**Note:** LLMs cannot directly optimize images. Image optimization should be done by the client application before providing the image to the LLM.
+**Note:** LLMs cannot directly optimize images, and this server does not enforce
+its own image size or format caps. Any size/format limits come from the
+**Bluesky platform**, not from this tool. Image optimization should be done by
+the client application before providing the image to the LLM.
 
-**Recommended Image Specifications:**
-- **Maximum dimensions:** 1000x1000 pixels
-- **Format:** JPEG, PNG, or WebP
-- **Quality:** 85% for JPEG
-- **File size:** Under 1MB per image
-
-**User Guidance:**
-
-When a user provides a large image, the LLM can suggest:
-
-```
-"This image appears to be quite large. For best results, please:
-1. Resize to a maximum of 1000x1000 pixels
-2. Compress to under 1MB
-3. Use JPEG format with 85% quality
-
-Would you like to proceed with uploading the image as-is, or would you prefer to optimize it first?"
-```
+When a user provides a very large image, the LLM can suggest resizing or
+compressing it (using a common web format such as JPEG, PNG, or WebP) to stay
+within the platform's upload limits before uploading.
 
 ### Error Recovery Workflow
 
@@ -882,6 +886,7 @@ Would you like to proceed with uploading the image as-is, or would you prefer to
 **Tool Call:** `upload_image`
 
 **Parameters (JSON):**
+
 ```json
 {
   "image": "<blob reference>",
@@ -923,7 +928,5 @@ Please try again later or with a different image."
 ## See Also
 
 - [Social Operations Examples](./social-operations.md)
-- [Real-time Data Examples](./real-time-data.md)
 - [Custom Integration Examples](./custom-integration.md)
 - [API Reference](../api/)
-

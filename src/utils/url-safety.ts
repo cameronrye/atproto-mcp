@@ -8,7 +8,10 @@
  * directory.
  */
 
-import { lookup } from 'node:dns/promises';
+import http from 'node:http';
+import https from 'node:https';
+import zlib from 'node:zlib';
+import { type LookupAddress, type LookupOptions, lookup as dnsLookup } from 'node:dns';
 import { isIP, isIPv4, isIPv6 } from 'node:net';
 import path from 'node:path';
 
@@ -176,60 +179,67 @@ export function assertSafePath(filePath: string, baseDir: string): string {
   return resolved;
 }
 
-async function assertResolvedHostIsPublic(hostname: string): Promise<void> {
+/**
+ * DNS lookup that validates every resolved address against the SSRF blocklist
+ * and pins the connection to a validated address.
+ *
+ * Passed as the `lookup` option to node:http/https so the address that is
+ * VALIDATED is exactly the address that is CONNECTED to. A plain `fetch()`
+ * resolves DNS independently when it opens the socket, which leaves a DNS
+ * rebinding time-of-check/time-of-use gap: a hostname can resolve to a public IP
+ * during validation and to a private IP (e.g. 169.254.169.254) at connect time.
+ * Pinning here closes that gap.
+ */
+function safeLookup(
+  hostname: string,
+  options: LookupOptions,
+  callback: (
+    err: NodeJS.ErrnoException | null,
+    address: string | LookupAddress[],
+    family?: number
+  ) => void
+): void {
+  const wantsAll = options.all === true;
   const host = stripBrackets(hostname);
+
   if (isIP(host)) {
     if (isBlockedAddress(host)) {
-      throw new Error(`Refusing to fetch private/internal address ${host}`);
+      callback(new Error(`Refusing to connect to private/internal address ${host}`), '', 0);
+      return;
     }
+    const family = isIPv6(host) ? 6 : 4;
+    callback(null, wantsAll ? [{ address: host, family }] : host, family);
     return;
   }
-  const results = await lookup(host, { all: true });
-  if (results.length === 0) {
-    throw new Error(`Could not resolve host: ${host}`);
-  }
-  for (const { address } of results) {
-    if (isBlockedAddress(address)) {
-      throw new Error(`Refusing to fetch ${host}: resolves to private/internal address ${address}`);
-    }
-  }
-}
 
-async function readCapped(
-  response: Response,
-  maxBytes: number,
-  signal?: AbortSignal
-): Promise<Buffer> {
-  const reader = response.body?.getReader();
-  if (!reader) {
-    const buf = Buffer.from(await response.arrayBuffer());
-    if (buf.length > maxBytes) {
-      throw new Error(`Response exceeds the maximum allowed size of ${maxBytes} bytes`);
+  dnsLookup(host, { all: true }, (err, addresses) => {
+    if (err) {
+      callback(err, '', 0);
+      return;
     }
-    return buf;
-  }
-  const chunks: Buffer[] = [];
-  let total = 0;
-  for (;;) {
-    // The timeout signal also aborts the underlying fetch stream (so reader.read()
-    // rejects), but check here too in case the deadline lands between chunks — a
-    // slow-drip body must not hang past the timeout.
-    if (signal?.aborted) {
-      await reader.cancel();
-      throw new Error('Timed out while reading the response body');
+    const list: LookupAddress[] = Array.isArray(addresses) ? addresses : [];
+    if (list.length === 0) {
+      callback(new Error(`Could not resolve host: ${host}`), '', 0);
+      return;
     }
-    const { done, value } = await reader.read();
-    if (done) break;
-    if (value) {
-      total += value.byteLength;
-      if (total > maxBytes) {
-        await reader.cancel();
-        throw new Error(`Response exceeds the maximum allowed size of ${maxBytes} bytes`);
+    for (const entry of list) {
+      if (isBlockedAddress(entry.address)) {
+        callback(
+          new Error(
+            `Refusing to fetch ${host}: resolves to private/internal address ${entry.address}`
+          ),
+          '',
+          0
+        );
+        return;
       }
-      chunks.push(Buffer.from(value));
     }
-  }
-  return Buffer.concat(chunks);
+    if (wantsAll) {
+      callback(null, list);
+    } else {
+      callback(null, list[0]!.address, list[0]!.family);
+    }
+  });
 }
 
 export interface ISafeFetchResult {
@@ -246,10 +256,114 @@ export interface ISafeFetchOptions {
   headers?: Record<string, string>;
 }
 
+interface IHopResult {
+  status: number;
+  contentType: string | null;
+  location: string | null;
+  body: Buffer | null;
+}
+
 /**
- * SSRF-safe fetch: enforces an http(s)-only scheme, resolves DNS and rejects any
- * private/internal resolved address, follows redirects manually (re-validating
- * each hop), and caps both response size and total time.
+ * Perform a single GET request, pinning DNS to a pre-validated address and
+ * capping both response size and elapsed time. Redirect responses resolve with
+ * their `location` (body discarded) so the caller can re-validate the next hop.
+ */
+function performRequest(
+  url: URL,
+  opts: { maxBytes: number; timeoutMs: number; headers?: Record<string, string> }
+): Promise<IHopResult> {
+  return new Promise((resolve, reject) => {
+    const isHttps = url.protocol === 'https:';
+    const lib = isHttps ? https : http;
+
+    let settled = false;
+    const finish = (fn: () => void): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      fn();
+    };
+
+    const req = lib.request(
+      {
+        protocol: url.protocol,
+        hostname: stripBrackets(url.hostname),
+        port: url.port !== '' ? Number(url.port) : isHttps ? 443 : 80,
+        path: `${url.pathname}${url.search}`,
+        method: 'GET',
+        headers: opts.headers ?? {},
+        lookup: safeLookup,
+      },
+      res => {
+        const status = res.statusCode ?? 0;
+        const location = res.headers.location ?? null;
+        const contentType = res.headers['content-type'] ?? null;
+
+        if (status >= 300 && status < 400 && location) {
+          res.resume(); // discard a redirect's body
+          finish(() => resolve({ status, contentType, location, body: null }));
+          return;
+        }
+
+        // node:http does NOT auto-decompress (unlike fetch), so decode per
+        // Content-Encoding. The size cap is applied to the DECOMPRESSED output to
+        // bound memory even against a small but bomb-like compressed payload.
+        const encoding = String(res.headers['content-encoding'] ?? '').toLowerCase();
+        let stream: NodeJS.ReadableStream = res;
+        if (encoding === 'gzip' || encoding === 'x-gzip') {
+          stream = res.pipe(zlib.createGunzip());
+        } else if (encoding === 'deflate') {
+          stream = res.pipe(zlib.createInflate());
+        } else if (encoding === 'br') {
+          stream = res.pipe(zlib.createBrotliDecompress());
+        }
+
+        const chunks: Buffer[] = [];
+        let total = 0;
+        stream.on('data', (chunk: Buffer) => {
+          total += chunk.length;
+          if (total > opts.maxBytes) {
+            req.destroy();
+            finish(() =>
+              reject(
+                new Error(`Response exceeds the maximum allowed size of ${opts.maxBytes} bytes`)
+              )
+            );
+            return;
+          }
+          chunks.push(chunk);
+        });
+        stream.on('end', () =>
+          finish(() =>
+            resolve({ status, contentType, location: null, body: Buffer.concat(chunks) })
+          )
+        );
+        stream.on('error', e =>
+          finish(() => reject(e instanceof Error ? e : new Error(String(e))))
+        );
+        // Surface transport errors too (e.g. socket reset before the decompressor sees data).
+        res.on('error', e => finish(() => reject(e instanceof Error ? e : new Error(String(e)))));
+      }
+    );
+
+    const timer = setTimeout(
+      () => {
+        req.destroy(new Error('Request timed out'));
+      },
+      Math.max(1, opts.timeoutMs)
+    );
+    timer.unref();
+
+    req.on('error', e => finish(() => reject(e instanceof Error ? e : new Error(String(e)))));
+    req.end();
+  });
+}
+
+/**
+ * SSRF-safe fetch: enforces an http(s)-only scheme, pins DNS to a validated
+ * public address (so the validated IP is the connected IP — no rebinding TOCTOU),
+ * follows redirects manually (re-validating each hop), and caps response size and
+ * TOTAL elapsed time across all hops.
  */
 export async function safeFetch(
   rawUrl: string,
@@ -258,40 +372,33 @@ export async function safeFetch(
   const maxBytes = options.maxBytes ?? 5 * 1024 * 1024;
   const timeoutMs = options.timeoutMs ?? 10_000;
   const maxRedirects = options.maxRedirects ?? 3;
+  const deadline = Date.now() + timeoutMs;
 
   let current = parseSafeHttpUrl(rawUrl);
 
   for (let redirect = 0; redirect <= maxRedirects; redirect++) {
-    await assertResolvedHostIsPublic(current.hostname);
-
-    // One timeout per hop, spanning BOTH the request and the body read. Aborting
-    // the controller cancels the fetch and its response stream, so a server that
-    // sends headers fast and then drips the body cannot hang past timeoutMs.
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const response = await fetch(current, {
-        redirect: 'manual',
-        signal: controller.signal,
-        ...(options.headers ? { headers: options.headers } : {}),
-      });
-
-      const location = response.headers.get('location');
-      if (response.status >= 300 && response.status < 400 && location) {
-        current = parseSafeHttpUrl(new URL(location, current).toString());
-        continue;
-      }
-
-      const body = await readCapped(response, maxBytes, controller.signal);
-      return {
-        url: current.toString(),
-        status: response.status,
-        contentType: response.headers.get('content-type'),
-        body,
-      };
-    } finally {
-      clearTimeout(timer);
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 0) {
+      throw new Error(`Timed out while fetching ${rawUrl}`);
     }
+
+    const hop = await performRequest(current, {
+      maxBytes,
+      timeoutMs: remainingMs,
+      ...(options.headers ? { headers: options.headers } : {}),
+    });
+
+    if (hop.location && hop.status >= 300 && hop.status < 400) {
+      current = parseSafeHttpUrl(new URL(hop.location, current).toString());
+      continue;
+    }
+
+    return {
+      url: current.toString(),
+      status: hop.status,
+      contentType: hop.contentType,
+      body: hop.body ?? Buffer.alloc(0),
+    };
   }
 
   throw new Error(`Too many redirects while fetching ${rawUrl}`);

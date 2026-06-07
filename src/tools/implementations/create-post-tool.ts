@@ -9,6 +9,7 @@ import {
   type ATURI,
   type CID,
   type ICreatePostParams,
+  ValidationError,
   validateATURI,
   validateCID,
 } from '../../types/index.js';
@@ -47,7 +48,16 @@ const CreatePostSchema = z.object({
         .optional(),
     })
     .optional(),
-  langs: z.array(z.string().length(2, 'Language codes must be 2 characters')).optional(),
+  langs: z
+    .array(
+      z
+        .string()
+        .regex(
+          /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
+          'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
+        )
+    )
+    .optional(),
 });
 
 /**
@@ -125,7 +135,10 @@ export class CreatePostTool extends BaseTool {
 
       // Handle embeds if provided
       if (params.embed) {
-        postRecord.embed = await this.processEmbed(params.embed);
+        const processedEmbed = await this.processEmbed(params.embed);
+        if (processedEmbed) {
+          postRecord.embed = processedEmbed;
+        }
       }
 
       // Create the post using AT Protocol
@@ -220,17 +233,29 @@ export class CreatePostTool extends BaseTool {
   /**
    * Process embed data for the post
    */
-  private async processEmbed(embed: NonNullable<ICreatePostParams['embed']>): Promise<any> {
-    const processedEmbed: any = {};
+  private async processEmbed(
+    embed: NonNullable<ICreatePostParams['embed']>
+  ): Promise<any | undefined> {
+    const hasImages = !!(embed.images && embed.images.length > 0);
+    const hasExternal = !!embed.external;
 
-    // Handle image embeds
-    if (embed.images && embed.images.length > 0) {
-      this.logger.debug('Processing image embeds', { count: embed.images.length });
+    // An AT Protocol post embed is a union: a post may carry images OR an
+    // external link, not both. Combining them previously produced a malformed
+    // record (`$type: external` with an `images` array). Reject the combination.
+    if (hasImages && hasExternal) {
+      throw new ValidationError(
+        'A post can include either images or an external link embed, not both. Provide only one.',
+        'embed',
+        embed
+      );
+    }
+
+    if (hasImages) {
+      this.logger.debug('Processing image embeds', { count: embed.images!.length });
 
       const images = [];
-      for (const img of embed.images) {
+      for (const img of embed.images!) {
         try {
-          // Upload the image blob
           const uploadResult = await this.uploadBlob(img.image);
           images.push({
             alt: img.alt,
@@ -242,23 +267,26 @@ export class CreatePostTool extends BaseTool {
         }
       }
 
-      processedEmbed.$type = 'app.bsky.embed.images';
-      processedEmbed.images = images;
-    }
-
-    // Handle external link embeds
-    if (embed.external) {
-      this.logger.debug('Processing external link embed', { uri: embed.external.uri });
-
-      processedEmbed.$type = 'app.bsky.embed.external';
-      processedEmbed.external = {
-        uri: embed.external.uri,
-        title: embed.external.title,
-        description: embed.external.description,
+      return {
+        $type: 'app.bsky.embed.images',
+        images,
       };
     }
 
-    return processedEmbed;
+    if (hasExternal) {
+      this.logger.debug('Processing external link embed', { uri: embed.external!.uri });
+
+      return {
+        $type: 'app.bsky.embed.external',
+        external: {
+          uri: embed.external!.uri,
+          title: embed.external!.title,
+          description: embed.external!.description,
+        },
+      };
+    }
+
+    return undefined;
   }
 
   /**

@@ -8,13 +8,17 @@ Upload an image to AT Protocol for use in posts or profile.
 
 ## Parameters
 
-### `image` (required)
-- **Type:** `Blob`
-- **Description:** Image file data
+### `filePath` (required)
 
-### `alt` (optional)
 - **Type:** `string`
-- **Description:** Alt text for accessibility
+- **Description:** Path to the local image file to upload. Must resolve within
+  the allowed media directory (defaults to the process working directory;
+  override with `ATPROTO_MEDIA_DIR`).
+
+### `altText` (optional)
+
+- **Type:** `string`
+- **Description:** Alt text for accessibility. Maximum 1000 characters.
 
 ## Response
 
@@ -22,15 +26,19 @@ Upload an image to AT Protocol for use in posts or profile.
 {
   success: boolean;
   message: string;
-  blob: {
-    $type: string;
-    ref: {
-      $link: string;
+  image: {
+    blob: {
+      type: string;        // value: 'blob'
+      ref: string;         // stringified CID, e.g. 'bafkrei...'
+      mimeType: string;
+      size: number;
     };
-    mimeType: string;
-    size: number;
+    alt: string;
+    aspectRatio?: {
+      width: number;
+      height: number;
+    };
   };
-  alt?: string;
 }
 ```
 
@@ -40,25 +48,26 @@ Upload an image to AT Protocol for use in posts or profile.
 
 ```json
 {
-  "image": "<Blob data>",
-  "alt": "A beautiful sunset over the ocean"
+  "filePath": "./images/sunset.jpg",
+  "altText": "A beautiful sunset over the ocean"
 }
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
-  "message": "Image uploaded successfully",
-  "blob": {
-    "$type": "blob",
-    "ref": {
-      "$link": "bafyreiabc123..."
+  "message": "Image uploaded successfully from ./images/sunset.jpg",
+  "image": {
+    "blob": {
+      "type": "blob",
+      "ref": "bafkreiabc123...",
+      "mimeType": "image/jpeg",
+      "size": 245678
     },
-    "mimeType": "image/jpeg",
-    "size": 245678
-  },
-  "alt": "A beautiful sunset over the ocean"
+    "alt": "A beautiful sunset over the ocean"
+  }
 }
 ```
 
@@ -71,55 +80,67 @@ Upload an image to AT Protocol for use in posts or profile.
 
 ## Size Limits
 
-- **Maximum file size:** 1MB
-- **Recommended dimensions:** 
-  - Posts: 1000x1000px or smaller
-  - Avatar: 400x400px
-  - Banner: 1500x500px
+- **Maximum file size:** 1MB — enforced by the tool; files larger than
+  `1024 * 1024` bytes are rejected before upload.
+
+The tool reads a local file path and uploads the bytes as-is. It does **not**
+inspect, resize, or re-encode the image, so it has no notion of pixel
+dimensions. (Bluesky may downscale large images for display, but that is a
+platform behavior, not something this tool controls.)
 
 ## Error Handling
 
 ### Common Errors
 
-#### Invalid Format
-```json
-{
-  "error": "Unsupported image format",
-  "code": "VALIDATION_ERROR"
-}
+The tool surfaces errors as messages (returned as stringified JSON text
+content). The exact text:
+
+#### Unsupported Format
+
+```text
+Unsupported image format: <extension>
 ```
 
+Only `.jpg`, `.jpeg`, `.png`, `.gif`, and `.webp` are accepted.
+
 #### File Too Large
-```json
-{
-  "error": "Image size exceeds 1MB limit",
-  "code": "VALIDATION_ERROR"
-}
+
+```text
+Image file size cannot exceed 1MB
 ```
 
 #### Upload Failed
+
+Upload failures, oversized files, and unsupported formats all surface as an
+error with code `TOOL_EXECUTION_ERROR`. The message is the underlying error text
+(e.g. `Image file size cannot exceed 1MB` or the AT client's failure message).
+There is no dedicated `UPLOAD_ERROR` code.
+
 ```json
 {
-  "error": "Failed to upload image",
-  "code": "UPLOAD_ERROR"
+  "error": "<underlying failure message>",
+  "code": "TOOL_EXECUTION_ERROR"
 }
 ```
 
 ## Best Practices
 
 ### Image Optimization
+
 - Compress images before uploading
 - Use appropriate format (JPEG for photos, PNG for graphics)
 - Resize to appropriate dimensions
 - Remove EXIF data for privacy
 
 ### Accessibility
+
 - Always provide descriptive alt text
 - Describe the content and context
 - Keep alt text under 1000 characters
 - Don't start with "Image of" or "Picture of"
 
 ### Performance
+
 - Upload images before creating posts
 - Cache blob references for reuse
 - Implement retry logic for failed uploads
@@ -135,4 +156,3 @@ Upload an image to AT Protocol for use in posts or profile.
 
 - [Content Management Examples](../../examples/content-management.md)
 - [Media Best Practices](../../guide/tools-resources.md#media)
-

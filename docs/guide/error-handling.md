@@ -1,502 +1,314 @@
 # Error Handling
 
-Comprehensive guide to handling errors in the AT Protocol MCP Server.
+How the AT Protocol MCP Server reports errors, and patterns your client can use
+to handle them.
 
-## Error Types
+For step-by-step fixes to specific symptoms, see
+[Troubleshooting](./troubleshooting.md). This page focuses on concepts: what
+errors look like on the wire, what the server's internal error types are, and
+example handling patterns you implement **on the client side**.
 
-The server implements a hierarchical error system:
+## What an Error Looks Like Over the Wire
 
-### 1. MCP Protocol Errors
+The server speaks JSON-RPC 2.0 over stdio. When a tool call fails, the client
+receives a standard JSON-RPC error object.
 
-Standard JSON-RPC 2.0 errors:
+| Code   | Name             | When it is used                                                                  |
+| ------ | ---------------- | -------------------------------------------------------------------------------- |
+| -32700 | Parse Error      | Invalid JSON received                                                            |
+| -32600 | Invalid Request  | Malformed JSON-RPC request                                                       |
+| -32601 | Method Not Found | Unknown JSON-RPC method                                                          |
+| -32602 | Invalid Params   | A tool's input failed validation, or the tool name is unknown                    |
+| -32603 | Internal Error   | Everything else: auth failures, rate limits, network errors, unexpected failures |
 
-| Code | Name | Description |
-|------|------|-------------|
-| -32700 | Parse Error | Invalid JSON received |
-| -32600 | Invalid Request | Invalid JSON-RPC request |
-| -32601 | Method Not Found | Method does not exist |
-| -32602 | Invalid Params | Invalid method parameters |
-| -32603 | Internal Error | Internal server error |
+Two cases map to specific codes:
 
-### 2. AT Protocol Errors
+- **Validation failures** (a tool argument that fails its schema) surface as
+  **`-32602` Invalid Params**, with the validation message.
+- **Unknown tool names** also surface as **`-32602` Invalid Params**.
 
-AT Protocol-specific errors:
+Every other failure — including authentication errors, rate-limit rejections,
+and AT Protocol/network errors — is sanitized and returned as **`-32603`
+Internal Error**. The server deliberately strips internal detail (stack traces,
+raw upstream payloads) from the message before it crosses the wire.
 
-| Type | Description | HTTP Status |
-|------|-------------|-------------|
-| `AuthenticationError` | Authentication failed or required | 401 |
-| `AuthorizationError` | Insufficient permissions | 403 |
-| `NotFoundError` | Resource not found | 404 |
-| `RateLimitError` | Rate limit exceeded | 429 |
-| `ValidationError` | Invalid input data | 400 |
-| `NetworkError` | Network or connection issue | 503 |
+A typical error response:
 
-### 3. Application Errors
-
-Server-specific errors:
-
-| Type | Description |
-|------|-------------|
-| `ToolExecutionError` | Tool execution failed |
-| `ResourceReadError` | Resource read failed |
-| `PromptGenerationError` | Prompt generation failed |
-| `ConfigurationError` | Invalid configuration |
-
-## Error Structure
-
-All errors follow a consistent structure:
-
-```typescript
+```json
 {
-  error: {
-    code: number;           // JSON-RPC error code
-    message: string;        // Human-readable message
-    data?: {                // Additional error details
-      type: string;         // Error type
-      details: string;      // Detailed description
-      context?: object;     // Error context
-      stack?: string;       // Stack trace (dev only)
-    }
+  "jsonrpc": "2.0",
+  "id": 2,
+  "error": {
+    "code": -32603,
+    "message": "Tool execution failed: <sanitized message>",
+    "data": { "tool": "create_post" }
   }
 }
 ```
 
-## Common Errors
+::: warning Illustrative shapes
+
+The exact `message` and `data` contents depend on the failure and on
+sanitization, so treat the JSON in this guide as illustrative rather than a
+guaranteed schema. Successful tool results are likewise returned as
+**stringified JSON text content**, not a structured object.
+
+:::
+
+## Internal Error Types
+
+Inside the server, failures are represented by a small hierarchy of error
+classes (defined in `src/types/index.ts`). These are **server-internal**: they
+are caught and translated into the JSON-RPC codes above before reaching the
+client. Knowing them helps when reading debug logs.
+
+All extend `BaseError`, which carries a string `code`, a `timestamp`, and an
+optional `context` object.
+
+| Class                 | `code` string           | Notes                                                                                                      |
+| --------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `AuthenticationError` | `AUTHENTICATION_FAILED` | Auth required or failed (HTTP 401 upstream). Mapped to `-32603`.                                           |
+| `RateLimitError`      | `RATE_LIMIT_EXCEEDED`   | Carries an optional `retryAfter` (seconds). Mapped to `-32603`.                                            |
+| `ValidationError`     | `VALIDATION_ERROR`      | Carries `field`/`value`. Mapped to **`-32602`**.                                                           |
+| `ConfigurationError`  | `CONFIGURATION_ERROR`   | Invalid configuration, raised at startup/config load.                                                      |
+| `AtpError`            | varies                  | Base for AT Protocol errors; also used as a fallback (`UNKNOWN_ERROR`) for unrecognized upstream failures. |
+| `McpError`            | `MCP_<code>`            | Carries an MCP/JSON-RPC numeric code.                                                                      |
+
+These classes expose a string `code` property (e.g.
+`error.code === 'RATE_LIMIT_EXCEEDED'`), not a `type` property. There is no
+separate `AuthorizationError`, `NotFoundError`, `NetworkError`,
+`ToolExecutionError`, `ResourceReadError`, or `PromptGenerationError` —
+non-validation HTTP `4xx` responses from the API collapse into
+`ValidationError`, and anything unrecognized becomes a generic `AtpError`.
+
+## Common Failures and How to Respond
 
 ### Authentication Required
 
-**Error**:
-```json
-{
-  "error": {
-    "code": -32603,
-    "message": "Authentication required",
-    "data": {
-      "type": "AuthenticationError",
-      "details": "This operation requires authentication. Please provide ATPROTO_IDENTIFIER and ATPROTO_PASSWORD.",
-      "tool": "create_post"
-    }
-  }
-}
-```
+Raised when a tool needs a session and none is available, or credentials are
+wrong. Reaches the client as `-32603` with a message indicating authentication
+is required.
 
-**Solution**:
+**Respond by**: setting credentials before launching the server (app password
+from Bluesky **Settings &rarr; App Passwords**):
+
 ```bash
-# Set authentication credentials
 export ATPROTO_IDENTIFIER="your-handle.bsky.social"
-export ATPROTO_PASSWORD="your-app-password"
+export ATPROTO_PASSWORD="xxxx-xxxx-xxxx-xxxx"
 atproto-mcp
 ```
 
+Without credentials the server still runs, but only public tools (notably
+`get_user_profile`) work; `search_posts` requires authentication (the AT
+Protocol search API changed in 2025 to require auth). See
+[Troubleshooting &rarr; Authentication](./troubleshooting.md#authentication-issues).
+
 ### Invalid Parameters
 
-**Error**:
-```json
-{
-  "error": {
-    "code": -32602,
-    "message": "Invalid params",
-    "data": {
-      "type": "ValidationError",
-      "details": "Post text cannot exceed 300 characters",
-      "field": "text",
-      "value": "..."
-    }
-  }
-}
-```
+A tool argument failed its schema. Reaches the client as **`-32602`**; the
+message names the offending field.
 
-**Solution**:
-- Validate input before calling tools
-- Check parameter requirements
-- Follow schema constraints
+**Respond by**: validating input before the call. For example, post `text` must
+be non-empty and within Bluesky's 300-character limit, and `langs` must be
+BCP-47 codes (`en`, `en-US`, `pt-BR`).
 
 ### Rate Limit Exceeded
 
-**Error**:
-```json
-{
-  "error": {
-    "code": -32603,
-    "message": "Rate limit exceeded",
-    "data": {
-      "type": "RateLimitError",
-      "details": "Too many requests. Please wait before retrying.",
-      "retryAfter": 60,
-      "limit": 100,
-      "remaining": 0
-    }
-  }
-}
-```
+The server enforces a per-tool limit of **100 requests per minute** (a 60-second
+sliding window, counted independently for each tool). Exceeding it reaches the
+client as `-32603` with a message stating the rate limit was exceeded for that
+tool.
 
-**Solution**:
+**Respond by**: backing off and retrying. The window clears within 60 seconds.
+An example client-side backoff is shown below in
+[Client-Side Patterns](#client-side-patterns).
+
+Bluesky also enforces its own platform-side limits; a persistent `429` upstream
+surfaces here as an internal error too.
+
+### Network / Upstream Errors
+
+Failures reaching the AT Protocol service (or unexpected upstream responses) are
+sanitized and returned as `-32603`.
+
+**Respond by**: checking connectivity and the service URL, and retrying
+transient failures. See
+[Troubleshooting &rarr; Cannot Reach the AT Protocol Service](./troubleshooting.md#cannot-reach-the-at-protocol-service).
+
+## Client-Side Patterns
+
+The snippets below are **example patterns for the code that calls the server**
+(your MCP client or integration). They are **not** features the server ships or
+runs on your behalf — adapt them to your stack. Because errors arrive as
+JSON-RPC error objects, branch on the numeric `code` (and the human-readable
+`message`) rather than on a custom `type` field.
+
+### Retry with Backoff
+
+Retry transient failures (rate limits, network blips); do not retry validation
+errors.
+
 ```typescript
-// Implement exponential backoff
-async function retryWithBackoff(fn, maxRetries = 3) {
-  for (let i = 0; i < maxRetries; i++) {
+// Example client-side helper — NOT shipped by the server.
+async function callWithRetry(
+  call: () => Promise<unknown>,
+  { maxRetries = 3, baseDelayMs = 1000 } = {}
+) {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
-      return await fn();
-    } catch (error) {
-      if (error.type === 'RateLimitError' && i < maxRetries - 1) {
-        const delay = Math.pow(2, i) * 1000; // Exponential backoff
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
-      throw error;
+      return await call();
+    } catch (err) {
+      lastError = err;
+
+      // -32602 (Invalid Params) is client-correctable; don't retry it.
+      const code = (err as { code?: number }).code;
+      if (code === -32602) throw err;
+
+      // Exponential backoff for everything else (rate limits, network).
+      const delay = baseDelayMs * 2 ** attempt;
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
-}
-```
 
-### Resource Not Found
-
-**Error**:
-```json
-{
-  "error": {
-    "code": -32603,
-    "message": "Resource not found",
-    "data": {
-      "type": "NotFoundError",
-      "details": "Post not found or has been deleted",
-      "uri": "at://did:plc:abc123.../app.bsky.feed.post/xyz789"
-    }
-  }
-}
-```
-
-**Solution**:
-- Verify resource URIs are correct
-- Check if resource still exists
-- Handle deleted content gracefully
-
-### Network Error
-
-**Error**:
-```json
-{
-  "error": {
-    "code": -32603,
-    "message": "Network error",
-    "data": {
-      "type": "NetworkError",
-      "details": "Failed to connect to AT Protocol service",
-      "service": "https://bsky.social"
-    }
-  }
-}
-```
-
-**Solution**:
-- Check internet connectivity
-- Verify service URL is correct
-- Check for service outages
-- Implement retry logic
-
-## Error Handling Patterns
-
-### Try-Catch Pattern
-
-```typescript
-try {
-  const result = await tool.execute(params);
-  return result;
-} catch (error) {
-  if (error.type === 'AuthenticationError') {
-    // Handle authentication error
-    console.error('Please authenticate first');
-  } else if (error.type === 'RateLimitError') {
-    // Handle rate limit
-    console.error('Rate limit exceeded, retrying...');
-    await delay(error.retryAfter * 1000);
-    return retry();
-  } else {
-    // Handle other errors
-    console.error('Operation failed:', error.message);
-  }
+  throw lastError;
 }
 ```
 
 ### Graceful Degradation
 
+Fall back to a public path when an authenticated one is unavailable — useful if
+you sometimes run the server unauthenticated.
+
 ```typescript
-async function getUserProfile(actor: string) {
+// Example client-side pattern — NOT shipped by the server.
+async function getProfile(actor: string) {
   try {
-    // Try authenticated request first
-    return await getProfileAuthenticated(actor);
-  } catch (error) {
-    if (error.type === 'AuthenticationError') {
-      // Fall back to public request
-      return await getProfilePublic(actor);
+    return await callAuthenticated('get_user_profile', { actor });
+  } catch (err) {
+    // get_user_profile also works unauthenticated, so retry the public path.
+    if ((err as { code?: number }).code === -32603) {
+      return await callPublic('get_user_profile', { actor });
     }
-    throw error;
+    throw err;
   }
-}
-```
-
-### Retry with Backoff
-
-```typescript
-async function executeWithRetry(
-  operation: () => Promise<any>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-) {
-  let lastError;
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      return await operation();
-    } catch (error) {
-      lastError = error;
-      
-      // Don't retry on certain errors
-      if (error.type === 'ValidationError' || 
-          error.type === 'AuthenticationError') {
-        throw error;
-      }
-      
-      // Calculate delay with exponential backoff
-      const delay = baseDelay * Math.pow(2, attempt);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  
-  throw lastError;
 }
 ```
 
 ### Circuit Breaker
 
+If the upstream service is failing repeatedly, stop hammering it for a cooldown
+period.
+
 ```typescript
+// Example client-side pattern — NOT shipped by the server.
 class CircuitBreaker {
   private failures = 0;
   private lastFailureTime = 0;
   private readonly threshold = 5;
-  private readonly timeout = 60000; // 1 minute
-  
-  async execute(operation: () => Promise<any>) {
-    // Check if circuit is open
-    if (this.isOpen()) {
-      throw new Error('Circuit breaker is open');
-    }
-    
+  private readonly cooldownMs = 60_000;
+
+  async execute<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.isOpen()) throw new Error('Circuit breaker is open');
     try {
       const result = await operation();
-      this.onSuccess();
+      this.failures = 0;
       return result;
     } catch (error) {
-      this.onFailure();
+      this.failures++;
+      this.lastFailureTime = Date.now();
       throw error;
     }
   }
-  
+
   private isOpen(): boolean {
-    if (this.failures >= this.threshold) {
-      const timeSinceLastFailure = Date.now() - this.lastFailureTime;
-      return timeSinceLastFailure < this.timeout;
-    }
-    return false;
-  }
-  
-  private onSuccess() {
-    this.failures = 0;
-  }
-  
-  private onFailure() {
-    this.failures++;
-    this.lastFailureTime = Date.now();
+    if (this.failures < this.threshold) return false;
+    return Date.now() - this.lastFailureTime < this.cooldownMs;
   }
 }
 ```
 
-## Error Logging
+### Client-Side Rate Limiting
 
-### Development
-
-```bash
-# Enable debug logging
-LOG_LEVEL=debug atproto-mcp
-```
-
-Output includes:
-- Full error messages
-- Stack traces
-- Request/response details
-- Timing information
-
-### Production
-
-```bash
-# Use info or warn level
-LOG_LEVEL=info atproto-mcp
-```
-
-Output includes:
-- Error messages (sanitized)
-- Error types and codes
-- Context information
-- No sensitive data
-
-### Structured Logging
+Throttle requests before they reach the server, so you stay under the
+100-per-minute, per-tool budget.
 
 ```typescript
-logger.error('Tool execution failed', {
-  tool: 'create_post',
-  error: error.message,
-  type: error.type,
-  code: error.code,
-  context: {
-    user: 'did:plc:...',
-    timestamp: new Date().toISOString()
-  }
-});
-```
-
-## Error Recovery
-
-### Automatic Recovery
-
-The server implements automatic recovery for:
-
-- **Session expiration**: Automatically refreshes sessions
-- **Network timeouts**: Retries with exponential backoff
-- **Temporary failures**: Implements circuit breaker pattern
-
-### Manual Recovery
-
-For persistent errors:
-
-```bash
-# Restart the server
-atproto-mcp
-
-# Clear cache
-rm -rf ~/.cache/atproto-mcp
-
-# Reset configuration
-cp .env.example .env
-```
-
-## Debugging Errors
-
-### Enable Debug Mode
-
-```bash
-atproto-mcp --log-level debug
-```
-
-### Check Logs
-
-```bash
-# View recent logs
-tail -f ~/.local/share/atproto-mcp/logs/server.log
-
-# Search for errors
-grep ERROR ~/.local/share/atproto-mcp/logs/server.log
-```
-
-### Validate Configuration
-
-```bash
-# Check environment variables
-env | grep ATPROTO
-
-# Test authentication
-atproto-mcp --log-level debug
-```
-
-### Test Tools
-
-```bash
-# Test specific tool
-echo '{"method":"tools/call","params":{"name":"search_posts","arguments":{"q":"test"}}}' | atproto-mcp
-```
-
-## Error Prevention
-
-### Input Validation
-
-```typescript
-// Validate before calling tools
-function validatePostText(text: string) {
-  if (!text || text.trim().length === 0) {
-    throw new ValidationError('Post text cannot be empty');
-  }
-  if (text.length > 300) {
-    throw new ValidationError('Post text cannot exceed 300 characters');
-  }
-}
-```
-
-### Rate Limiting
-
-```typescript
-// Implement client-side rate limiting
+// Example client-side pattern — NOT shipped by the server.
 class RateLimiter {
   private requests: number[] = [];
   private readonly limit = 100;
-  private readonly window = 60000; // 1 minute
-  
-  async checkLimit() {
+  private readonly windowMs = 60_000;
+
+  allow(): boolean {
     const now = Date.now();
-    this.requests = this.requests.filter(time => now - time < this.window);
-    
-    if (this.requests.length >= this.limit) {
-      throw new RateLimitError('Client rate limit exceeded');
-    }
-    
+    this.requests = this.requests.filter(t => now - t < this.windowMs);
+    if (this.requests.length >= this.limit) return false;
     this.requests.push(now);
+    return true;
   }
 }
 ```
 
-### Connection Management
+## Testing Tools Manually
 
-```typescript
-// Implement connection pooling
-const agent = new AtpAgent({
-  service: 'https://bsky.social',
-  persistSession: true,
-  maxRetries: 3,
-  timeout: 30000
-});
+You can drive the stdio server by hand for quick checks. Keep two things in
+mind:
+
+1. Every message needs the JSON-RPC envelope: `jsonrpc: "2.0"` and an `id`.
+2. The MCP protocol requires an **`initialize` handshake first** — `tools/list`
+   and `tools/call` will not work until the server has been initialized.
+
+Send the handshake, then a request, on stdin (one JSON object per line):
+
+```bash
+atproto-mcp <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual-test","version":"0.0.0"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/list"}
+EOF
 ```
 
-## Best Practices
+To call a tool, send a `tools/call` request after initializing:
 
-### Error Handling
+```bash
+atproto-mcp <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual-test","version":"0.0.0"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized"}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_user_profile","arguments":{"actor":"bsky.app"}}}
+EOF
+```
 
-- Always handle errors explicitly
-- Provide meaningful error messages
-- Log errors with context
-- Implement retry logic for transient errors
-- Use circuit breakers for failing services
+Responses are written to stdout as JSON-RPC; logs go to stderr. Add
+`--log-level debug` to see the server's internal view of any failure. For real
+usage, let your MCP client manage this handshake for you.
 
-### Error Reporting
+## Logging
 
-- Include error type and code
-- Provide actionable error messages
-- Sanitize sensitive data
-- Include relevant context
-- Log errors for debugging
+Use `--log-level` (or `LOG_LEVEL`) to control verbosity. Logs are written to
+**stderr** so they never corrupt the JSON-RPC stream on stdout.
 
-### Error Recovery
+```bash
+# Development: full detail
+atproto-mcp --log-level debug
 
-- Implement automatic recovery when possible
-- Provide manual recovery options
-- Document recovery procedures
-- Test error scenarios
-- Monitor error rates
+# Production: errors and warnings only
+atproto-mcp --log-level warn
+```
+
+Before returning an internal error to the client, the server runs it through an
+error sanitizer that strips sensitive detail from the outbound message. Full
+detail (including the underlying cause) remains visible in the server's own logs
+at `debug` level.
 
 ## Next Steps
 
-- **[Troubleshooting](./troubleshooting.md)** - Common issues and solutions
-- **[Deployment](./deployment.md)** - Production deployment
-- **[API Reference](../api/tools.md)** - Tool documentation
+- **[Troubleshooting](./troubleshooting.md)** — Symptom-to-fix for common issues
+- **[Deployment](./deployment.md)** — Production deployment
+- **[Tools Reference](../api/index)** — Per-tool parameters and behavior
 
 ---
 
-**Previous**: [Tools & Resources](./tools-resources.md) ← | **Next**: [Troubleshooting](./troubleshooting.md) →
-
+**Previous**: [Tools & Resources](./tools-resources.md) &larr; | **Next**:
+[Troubleshooting](./troubleshooting.md) &rarr;

@@ -9,20 +9,32 @@ Retrieve the authenticated user's notifications.
 ## Parameters
 
 ### `limit` (optional)
+
 - **Type:** `number`
 - **Default:** `50`
 - **Constraints:** 1-100
 - **Description:** Maximum number of notifications to return
 
 ### `cursor` (optional)
+
 - **Type:** `string`
 - **Description:** Pagination cursor from previous response
 
 ### `seenAt` (optional)
+
 - **Type:** `string`
-- **Description:** ISO 8601 timestamp of when notifications were last seen
+- **Description:** ISO 8601 timestamp passed through to the read API to compute
+  each notification's `isRead` flag relative to that time. This is a read-only
+  parameter; it does **not** mark notifications as read or change server-side
+  read state.
+
+This tool is read-only: it lists notifications but never mutates server-side
+read state.
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
@@ -37,7 +49,6 @@ Retrieve the authenticated user's notifications.
       avatar?: string;
     };
     reason: string;  // "like", "repost", "follow", "mention", "reply", "quote"
-    reasonSubject?: string;
     record: any;
     isRead: boolean;
     indexedAt: string;
@@ -68,46 +79,55 @@ Retrieve the authenticated user's notifications.
 }
 ```
 
-### Mark Notifications as Seen
+### Compute `isRead` Relative to a Timestamp
+
+Passing `seenAt` controls how the `isRead` flag on each returned notification is
+computed; it does not change any server-side state.
 
 ```json
 {
   "limit": 50,
-  "seenAt": "2024-01-15T10:30:00.000Z"
+  "seenAt": "2026-01-15T10:30:00.000Z"
 }
 ```
 
 ## Notification Types
 
+The `reason` field is one of the following values. Note that this tool maps each
+notification to
+`{ uri, cid, author, reason, record, isRead, indexedAt, labels }` only; the AT
+Protocol `reasonSubject` value is not surfaced in the output.
+
 ### `like`
+
 Someone liked your post
-- `reasonSubject`: URI of the liked post
 
 ### `repost`
+
 Someone reposted your post
-- `reasonSubject`: URI of the reposted post
 
 ### `follow`
+
 Someone followed you
-- No `reasonSubject`
 
 ### `mention`
+
 Someone mentioned you in a post
-- `reasonSubject`: URI of the post with mention
 
 ### `reply`
+
 Someone replied to your post
-- `reasonSubject`: URI of the parent post
 
 ### `quote`
+
 Someone quoted your post
-- `reasonSubject`: URI of the quoted post
 
 ## Error Handling
 
 ### Common Errors
 
 #### Authentication Required
+
 ```json
 {
   "error": "Authentication required",
@@ -116,6 +136,7 @@ Someone quoted your post
 ```
 
 #### Invalid Limit
+
 ```json
 {
   "error": "Limit must be between 1 and 100",
@@ -123,27 +144,11 @@ Someone quoted your post
 }
 ```
 
-## Best Practices
+## Pagination
 
-### Polling
-- Poll every 30-60 seconds for new notifications
-- Use `seenAt` to track read status
-- Implement exponential backoff for errors
-
-### Display
-- Group notifications by type
-- Show unread count prominently
-- Provide quick actions (like, reply)
-
-### Performance
-- Cache notifications for short periods
-- Prefetch notification details
-- Implement virtual scrolling
-
-### User Experience
-- Mark as read when viewed
-- Allow filtering by notification type
-- Provide notification preferences
+Pass the `cursor` from the previous response to fetch older notifications, and
+check `hasMore` before requesting another page. `limit` accepts 1-100 (default
+50).
 
 ## Related Tools
 
@@ -153,5 +158,3 @@ Someone quoted your post
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-- [Real-time Data Examples](../../examples/real-time-data.md)
-

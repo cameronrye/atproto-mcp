@@ -38,6 +38,7 @@ abstract class BaseError extends Error {
 **Description:** Base class for all custom errors.
 
 **Fields:**
+
 - `message` - Error message
 - `code` - Error code
 - `timestamp` - When error occurred
@@ -65,17 +66,16 @@ class AtpError extends BaseError {
 **Description:** Errors from AT Protocol operations.
 
 **Additional Fields:**
+
 - `statusCode` - HTTP status code
 - `details` - Error details from API
 
 **Example:**
+
 ```typescript
-throw new AtpError(
-  'Failed to create post',
-  'POST_CREATION_FAILED',
-  400,
-  { reason: 'Invalid text format' }
-);
+throw new AtpError('Failed to create post', 'POST_CREATION_FAILED', 400, {
+  reason: 'Invalid text format',
+});
 ```
 
 ### AuthenticationError
@@ -95,17 +95,16 @@ class AuthenticationError extends AtpError {
 **Description:** Authentication failures.
 
 **Common Causes:**
+
 - Invalid credentials
 - Expired session
 - Missing authentication
 - Invalid tokens
 
 **Example:**
+
 ```typescript
-throw new AuthenticationError(
-  'Session expired',
-  { sessionAge: '2 hours' }
-);
+throw new AuthenticationError('Session expired', { sessionAge: '2 hours' });
 ```
 
 ### RateLimitError
@@ -125,9 +124,11 @@ class RateLimitError extends AtpError {
 **Description:** Rate limit exceeded.
 
 **Additional Fields:**
+
 - `retryAfter` - Seconds until retry allowed
 
 **Example:**
+
 ```typescript
 throw new RateLimitError(
   'Rate limit exceeded',
@@ -155,10 +156,12 @@ class ValidationError extends BaseError {
 **Description:** Input validation failures.
 
 **Additional Fields:**
+
 - `field` - Field that failed validation
 - `value` - Invalid value
 
 **Example:**
+
 ```typescript
 throw new ValidationError(
   'Post text cannot exceed 300 characters',
@@ -173,10 +176,7 @@ throw new ValidationError(
 
 ```typescript
 class ConfigurationError extends BaseError {
-  constructor(
-    message: string,
-    context?: Record<string, unknown>
-  ) {
+  constructor(message: string, context?: Record<string, unknown>) {
     super(message, 'CONFIGURATION_ERROR', context);
   }
 }
@@ -185,16 +185,17 @@ class ConfigurationError extends BaseError {
 **Description:** Configuration issues.
 
 **Common Causes:**
+
 - Missing required config
 - Invalid config values
 - Conflicting settings
 
 **Example:**
+
 ```typescript
-throw new ConfigurationError(
-  'OAuth client ID is required',
-  { authMethod: 'oauth' }
-);
+throw new ConfigurationError('OAuth client ID is required', {
+  authMethod: 'oauth',
+});
 ```
 
 ## MCP Errors
@@ -217,6 +218,7 @@ class McpError extends BaseError {
 **Description:** MCP protocol errors.
 
 **MCP Error Codes:**
+
 - `-32700` - Parse error
 - `-32600` - Invalid request
 - `-32601` - Method not found
@@ -224,12 +226,9 @@ class McpError extends BaseError {
 - `-32603` - Internal error
 
 **Example:**
+
 ```typescript
-throw new McpError(
-  'Invalid tool parameters',
-  -32602,
-  { tool: 'create_post' }
-);
+throw new McpError('Invalid tool parameters', -32602, { tool: 'create_post' });
 ```
 
 ## Error Handling Patterns
@@ -264,12 +263,12 @@ async function createPostWithRetry(params: ICreatePostParams) {
       return await createPost(params);
     } catch (error) {
       attempts++;
-      
+
       if (error instanceof RateLimitError && attempts < maxAttempts) {
         await sleep(error.retryAfter * 1000);
         continue;
       }
-      
+
       throw error;
     }
   }
@@ -287,7 +286,7 @@ function logError(error: Error): void {
       message: error.message,
       timestamp: error.timestamp,
       context: error.context,
-      stack: error.stack
+      stack: error.stack,
     });
   } else {
     console.error(error);
@@ -297,16 +296,19 @@ function logError(error: Error): void {
 
 ## Error Codes
 
-### Common Error Codes
+### Error Codes Emitted by This Server
 
-- `AUTHENTICATION_FAILED` - Authentication error
-- `RATE_LIMIT_EXCEEDED` - Rate limit hit
-- `VALIDATION_ERROR` - Invalid input
-- `CONFIGURATION_ERROR` - Config issue
-- `NOT_FOUND` - Resource not found
-- `UNAUTHORIZED` - Not authorized
-- `DUPLICATE` - Duplicate resource
-- `INVALID_OPERATION` - Invalid operation
+These codes are set by the error classes above and are the ones you can rely on:
+
+- `AUTHENTICATION_FAILED` - From `AuthenticationError` (HTTP 401)
+- `RATE_LIMIT_EXCEEDED` - From `RateLimitError` (HTTP 429)
+- `VALIDATION_ERROR` - From `ValidationError`
+- `CONFIGURATION_ERROR` - From `ConfigurationError`
+
+`AtpError` carries whatever `code` the throwing site supplies. The generic codes
+the server uses when wrapping unexpected failures are `TOOL_EXECUTION_ERROR`,
+`UNKNOWN_TOOL_ERROR`, and `UNKNOWN_ERROR`. `McpError` uses a code of the form
+`MCP_<number>` derived from its JSON-RPC error code.
 
 ### HTTP Status Codes
 
@@ -321,24 +323,28 @@ function logError(error: Error): void {
 ## Best Practices
 
 ### Error Creation
+
 - Use specific error classes
 - Provide clear messages
 - Include relevant context
 - Set appropriate codes
 
 ### Error Handling
+
 - Catch specific error types
 - Implement retry logic
 - Log errors appropriately
 - Provide user feedback
 
 ### Error Recovery
+
 - Retry transient errors
 - Refresh expired sessions
 - Handle rate limits
 - Fallback gracefully
 
 ### Error Reporting
+
 - Log error details
 - Sanitize sensitive data
 - Track error patterns
@@ -349,4 +355,3 @@ function logError(error: Error): void {
 - [Core Types](./core.md)
 - [Error Handling Guide](../../guide/error-handling.md)
 - [Troubleshooting](../../guide/troubleshooting.md)
-

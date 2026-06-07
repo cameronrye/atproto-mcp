@@ -216,21 +216,40 @@ export class RemoveFromListTool extends BaseTool {
       this.validateAtUri(params.listUri);
       this.validateActor(params.actor);
 
-      // First, find the list item to delete
+      // List items reference their subject by DID. Resolve the actor to a DID and
+      // page through the whole list so members beyond the first 100 are found and
+      // a handle/DID mismatch does not cause a false "not in list".
       const agent = this.atpClient.getAgent();
-      const listResponse = await this.executeAtpOperation(
-        async () =>
-          await agent.app.bsky.graph.getList({
-            list: params.listUri,
-            limit: 100,
-          }),
-        'getList',
-        { listUri: params.listUri }
-      );
+      const resolvedDid = await this.resolveDid(params.actor);
 
-      const listItem = listResponse.data.items.find(
-        (item: any) => item.subject.did === params.actor || item.subject.handle === params.actor
-      );
+      let listItem: { uri: string } | undefined;
+      let cursor: string | undefined;
+      const MAX_PAGES = 50;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const listResponse = await this.executeAtpOperation(
+          async () =>
+            await agent.app.bsky.graph.getList({
+              list: params.listUri,
+              limit: 100,
+              ...(cursor ? { cursor } : {}),
+            }),
+          'getList',
+          { listUri: params.listUri }
+        );
+
+        const match = listResponse.data.items.find(
+          (item: { subject?: { did?: string }; uri: string }) => item.subject?.did === resolvedDid
+        );
+        if (match) {
+          listItem = match;
+          break;
+        }
+
+        cursor = listResponse.data.cursor;
+        if (!cursor) {
+          break;
+        }
+      }
 
       if (!listItem) {
         return {
@@ -243,12 +262,24 @@ export class RemoveFromListTool extends BaseTool {
         };
       }
 
-      // Delete the list item
+      const rkey = listItem.uri.split('/').pop();
+      if (!rkey) {
+        return {
+          success: false,
+          message: `Could not determine the list-item record for ${params.actor}`,
+          removedFrom: {
+            listUri: params.listUri,
+            actor: params.actor,
+          },
+        };
+      }
+
+      // The listitem record lives in the list owner's (authenticated user's) repo.
       await this.executeAtpOperation(
         async () =>
           await agent.app.bsky.graph.listitem.delete({
-            repo: agent.session?.did || '',
-            rkey: listItem.uri.split('/').pop() || '',
+            repo: agent.session?.did ?? '',
+            rkey,
           }),
         'removeFromList',
         { listUri: params.listUri, actor: params.actor }

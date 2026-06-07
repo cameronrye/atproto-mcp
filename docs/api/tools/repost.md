@@ -9,29 +9,35 @@ Repost content on AT Protocol with optional quote text.
 ## Parameters
 
 ### `uri` (required)
+
 - **Type:** `string`
 - **Description:** AT Protocol URI of the post to repost
 
 ### `cid` (required)
+
 - **Type:** `string`
 - **Description:** Content identifier (CID) of the post
 
 ### `text` (optional)
+
 - **Type:** `string`
-- **Description:** Quote text to add commentary to the repost (creates a quote post)
+- **Constraints:** Maximum 300 characters
+- **Description:** Quote text to add commentary to the repost (creates a quote
+  post)
 
 ## Response
 
 ```typescript
 {
-  uri: string;        // URI of the repost record
-  cid: string;        // CID of the repost record
-  success: boolean;   // Operation success status
-  message: string;    // Success message
+  uri: string; // URI of the repost record
+  cid: string; // CID of the repost record
+  success: boolean; // Operation success status
+  message: string; // Success message
   repostedPost: {
-    uri: string;      // URI of the reposted post
-    cid: string;      // CID of the reposted post
+    uri: string; // URI of the reposted post
+    cid: string; // CID of the reposted post
   }
+  isQuotePost: boolean; // Whether this was a quote post (vs simple repost)
 }
 ```
 
@@ -47,16 +53,18 @@ Repost content on AT Protocol with optional quote text.
 ```
 
 **Response:**
+
 ```json
 {
   "uri": "at://did:plc:myuser/app.bsky.feed.repost/repost123",
   "cid": "bafyreidef456...",
   "success": true,
-  "message": "Post reposted successfully",
+  "message": "Repost created successfully",
   "repostedPost": {
     "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
     "cid": "bafyreiabc123..."
-  }
+  },
+  "isQuotePost": false
 }
 ```
 
@@ -75,6 +83,7 @@ Repost content on AT Protocol with optional quote text.
 ### Common Errors
 
 #### Invalid URI
+
 ```json
 {
   "error": "Invalid AT Protocol URI format",
@@ -82,27 +91,19 @@ Repost content on AT Protocol with optional quote text.
 }
 ```
 
-#### Post Not Found
-```json
-{
-  "error": "Post not found",
-  "code": "NOT_FOUND"
-}
-```
+#### Invalid CID
 
-#### Already Reposted
 ```json
 {
-  "error": "Post is already reposted",
-  "code": "DUPLICATE"
+  "error": "CID must be a valid content identifier",
+  "code": "VALIDATION_ERROR"
 }
 ```
 
 ## Best Practices
 
 - Use quote posts (with `text`) to add your own commentary
-- Store the repost URI if you need to unrepost later
-- Check if you've already reposted before calling this tool
+- Store the returned repost URI if you need to unrepost later
 
 ## Related Tools
 
@@ -112,4 +113,3 @@ Repost content on AT Protocol with optional quote text.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

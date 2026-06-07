@@ -13,22 +13,15 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
+import { ConfigurationError, type IMcpServerConfig, ValidationError } from './types/index.js';
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
 import { type IMcpTool, createTools } from './tools/index.js';
+import { StartStreamingTool } from './tools/implementations/streaming-tools.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
-import {
-  ConnectionPool,
-  type ICacheConfig,
-  type IConnectionPoolConfig,
-  type IPerformanceMetrics,
-  LRUCache,
-  PerformanceMonitor,
-  WebSocketManager,
-} from './utils/performance.js';
+import { type IPerformanceMetrics, PerformanceMonitor } from './utils/performance.js';
 import { type ISecurityConfig, SecurityManager } from './utils/security.js';
 
 /**
@@ -39,14 +32,12 @@ export class AtpMcpServer {
   private atpClient: AtpClient;
   private logger: Logger;
   private configManager: ConfigManager;
-  private connectionPool: ConnectionPool;
-  private cache: LRUCache<unknown>;
-  private wsManager: WebSocketManager;
   private performanceMonitor: PerformanceMonitor;
   private securityManager: SecurityManager;
   private metricsInterval?: NodeJS.Timeout;
   private transport: StdioServerTransport | null = null;
   private isRunning = false;
+  private isShuttingDown = false;
 
   constructor(configOverrides: Partial<IMcpServerConfig> = {}) {
     this.logger = new Logger('AtpMcpServer');
@@ -74,24 +65,7 @@ export class AtpMcpServer {
       // Initialize AT Protocol client
       this.atpClient = new AtpClient(this.configManager.getAtpConfig());
 
-      // Initialize performance components
-      const connectionPoolConfig: IConnectionPoolConfig = {
-        maxConnections: 10,
-        minConnections: 2,
-        acquireTimeoutMs: 5000,
-        idleTimeoutMs: 300000, // 5 minutes
-        maxRetries: 3,
-      };
-
-      const cacheConfig: ICacheConfig = {
-        maxSize: 1000,
-        ttlMs: 300000, // 5 minutes
-        cleanupIntervalMs: 60000, // 1 minute
-      };
-
-      this.connectionPool = new ConnectionPool(connectionPoolConfig, this.logger);
-      this.cache = new LRUCache(cacheConfig, this.logger);
-      this.wsManager = new WebSocketManager(this.logger);
+      // Initialize performance monitoring (process-level memory/uptime metrics)
       this.performanceMonitor = new PerformanceMonitor(this.logger);
 
       // Initialize security manager
@@ -105,11 +79,6 @@ export class AtpMcpServer {
       };
 
       this.securityManager = new SecurityManager(securityConfig, this.logger);
-
-      // Configure performance monitor
-      this.performanceMonitor.setConnectionPool(this.connectionPool);
-      this.performanceMonitor.setCache(this.cache);
-      this.performanceMonitor.setWebSocketManager(this.wsManager);
 
       // Setup server handlers
       this.setupServer();
@@ -165,7 +134,12 @@ export class AtpMcpServer {
         tools: tools.map(tool => ({
           name: tool.schema.method,
           description: tool.schema.description || '',
-          inputSchema: tool.schema.params ? this.zodToJsonSchema(tool.schema.params) : undefined,
+          // MCP requires inputSchema to be a JSON Schema object. For param-less
+          // tools, emit an empty object schema rather than `undefined` (which
+          // violates the Tool shape).
+          inputSchema: tool.schema.params
+            ? this.zodToJsonSchema(tool.schema.params)
+            : { type: 'object', properties: {} },
         })),
       })
     );
@@ -279,6 +253,12 @@ export class AtpMcpServer {
           // client receives the accurate JSON-RPC code.
           if (error instanceof McpError) {
             throw error;
+          }
+
+          // Invalid input is a client-correctable condition: map it to the
+          // spec's InvalidParams (-32602) rather than InternalError (-32603).
+          if (error instanceof ValidationError) {
+            throw new McpError(ErrorCode.InvalidParams, error.message, { tool: toolName });
           }
 
           // Sanitize internal error details before returning to the client.
@@ -453,10 +433,14 @@ export class AtpMcpServer {
    * support for all Zod schema types and proper JSON Schema conversion.
    */
   private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
-    return zodToJsonSchema(schema, {
+    const json = zodToJsonSchema(schema, {
       target: 'jsonSchema7',
       $refStrategy: 'none',
     }) as Record<string, unknown>;
+    // The `$schema` meta key is not part of an MCP inputSchema and some clients
+    // are strict about it; drop it so we emit a clean JSON Schema object.
+    delete json['$schema'];
+    return json;
   }
 
   /**
@@ -467,6 +451,8 @@ export class AtpMcpServer {
       this.logger.warn('Server is already running');
       return;
     }
+
+    this.isShuttingDown = false;
 
     try {
       this.logger.info('Starting AT Protocol MCP Server...');
@@ -491,6 +477,19 @@ export class AtpMcpServer {
 
       // Create and connect transport
       this.transport = new StdioServerTransport();
+
+      // When the MCP client disconnects (stdin closes), the transport closes.
+      // Release resources so the server does not linger with open timers/sockets.
+      this.server.onclose = () => {
+        if (this.isShuttingDown) {
+          return;
+        }
+        this.logger.info('MCP transport closed (client disconnected); cleaning up');
+        void this.cleanup().catch(err =>
+          this.logger.error('Cleanup after transport close failed', err)
+        );
+      };
+
       await this.server.connect(this.transport);
 
       this.isRunning = true;
@@ -541,6 +540,14 @@ export class AtpMcpServer {
    * Cleanup server resources
    */
   private async cleanup(): Promise<void> {
+    // Guard against re-entrancy: cleanup() calls server.close(), which fires the
+    // onclose handler; without this flag a client disconnect during shutdown (or
+    // two concurrent signals) could run cleanup twice.
+    if (this.isShuttingDown) {
+      return;
+    }
+    this.isShuttingDown = true;
+
     const errors: Error[] = [];
 
     try {
@@ -550,13 +557,12 @@ export class AtpMcpServer {
         this.metricsInterval = undefined;
       }
 
-      // Cleanup performance components
-      this.wsManager.disconnectAll();
-      this.cache.destroy();
-      this.connectionPool.cleanup();
-
       // Release security manager background timers (rate-limiter cleanup).
       this.securityManager.destroy();
+
+      // Disconnect the shared firehose client (if a streaming tool opened one)
+      // so its socket and heartbeat timer do not outlive the server.
+      await StartStreamingTool.shutdown();
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
@@ -634,27 +640,6 @@ export class AtpMcpServer {
    */
   public getPerformanceMetrics(): IPerformanceMetrics {
     return this.performanceMonitor.getMetrics();
-  }
-
-  /**
-   * Get cache instance for external use
-   */
-  public getCache(): LRUCache<unknown> {
-    return this.cache;
-  }
-
-  /**
-   * Get connection pool instance for external use
-   */
-  public getConnectionPool(): ConnectionPool {
-    return this.connectionPool;
-  }
-
-  /**
-   * Get WebSocket manager instance for external use
-   */
-  public getWebSocketManager(): WebSocketManager {
-    return this.wsManager;
   }
 
   /**

@@ -9,17 +9,19 @@ Remove a repost from AT Protocol.
 ## Parameters
 
 ### `repostUri` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the repost record to delete (returned from `repost`)
+- **Description:** AT Protocol URI of the repost record to delete (returned from
+  `repost`)
 
 ## Response
 
 ```typescript
 {
-  success: boolean;   // Operation success status
-  message: string;    // Success message
+  success: boolean; // Operation success status
+  message: string; // Success message
   deletedRepost: {
-    uri: string;      // URI of the deleted repost record
+    uri: string; // URI of the deleted repost record
   }
 }
 ```
@@ -35,6 +37,7 @@ Remove a repost from AT Protocol.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -50,6 +53,7 @@ Remove a repost from AT Protocol.
 ### Common Errors
 
 #### Invalid Repost URI
+
 ```json
 {
   "error": "Invalid AT Protocol URI format",
@@ -58,6 +62,7 @@ Remove a repost from AT Protocol.
 ```
 
 #### Repost Not Found
+
 ```json
 {
   "error": "Repost record not found",
@@ -77,4 +82,3 @@ Remove a repost from AT Protocol.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

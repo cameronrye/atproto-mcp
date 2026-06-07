@@ -4,7 +4,8 @@ Learn how to use the AT Protocol MCP Server with practical examples.
 
 ## Understanding the Flow
 
-**Important**: This MCP server is designed for **LLM consumption**, not direct human use. Here's how it works:
+**Important**: This MCP server is designed for **LLM consumption**, not direct
+human use. Here's how it works:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -37,12 +38,15 @@ Learn how to use the AT Protocol MCP Server with practical examples.
 ```
 
 **Key Points:**
-- **You interact with your LLM client** (like Claude Desktop) in natural language
+
+- **You interact with your LLM client** (like Claude Desktop) in natural
+  language
 - **Your LLM client connects to this MCP server** via the MCP protocol
 - **The MCP server translates** LLM requests into AT Protocol API calls
 - **You never directly call** the MCP server's tools or write code
 
-The examples below show what you say to your LLM client and what happens behind the scenes.
+The examples below show what you say to your LLM client and what happens behind
+the scenes.
 
 ## Prerequisites
 
@@ -50,13 +54,15 @@ Before trying these examples, ensure you have:
 
 - **An MCP-compatible LLM client** (e.g., Claude Desktop, or another MCP client)
 - **The AT Protocol MCP Server configured** in your LLM client
-- **(Optional) AT Protocol credentials** for authenticated operations (creating posts, etc.)
+- **(Optional) AT Protocol credentials** for authenticated operations (creating
+  posts, etc.)
 
 ## Getting Started
 
 ### Configuring Your LLM Client
 
-The MCP server is launched automatically by your LLM client. You just need to configure it.
+The MCP server is launched automatically by your LLM client. You just need to
+configure it.
 
 **For Claude Desktop**, add this to your MCP configuration file:
 
@@ -79,22 +85,29 @@ The MCP server is launched automatically by your LLM client. You just need to co
 
 Once configured, restart your LLM client and you're ready to go!
 
-**Note:** As of 2025, the AT Protocol API has changed to require authentication for most endpoints that were previously public, including search, timelines, feeds, and social graphs. Only basic profile viewing and OAuth management work without authentication.
+**Note:** As of 2025, the AT Protocol API has changed to require authentication
+for most endpoints that were previously public, including search, timelines,
+feeds, and social graphs. Only basic profile viewing and OAuth management work
+without authentication.
 
 ## Public Data Access (Limited - No Authentication)
 
-These examples show what you say to your LLM client and what happens behind the scenes. **No authentication required** for these:
+These examples show what you say to your LLM client and what happens behind the
+scenes. **No authentication required** for these:
 
 ### Example 1: View User Profile
 
 **What You Say to Your LLM Client:**
+
 ```
 "Show me the profile for user.bsky.social"
 ```
 
 **What Happens Behind the Scenes:**
 
-Your LLM client understands your request and calls the `get_user_profile` tool via MCP:
+Your LLM client understands your request and calls the `get_user_profile` tool
+via MCP:
+
 ```json
 {
   "actor": "bsky.app"
@@ -102,17 +115,24 @@ Your LLM client understands your request and calls the `get_user_profile` tool v
 ```
 
 **What Your LLM Tells You:**
-> "The @bsky.app account is the official Bluesky account with 50,000 followers. They've made 1,000 posts and follow 100 accounts. Their bio says: 'The official Bluesky account'"
+
+> "The @bsky.app account is the official Bluesky account with 50,000 followers.
+> They've made 1,000 posts and follow 100 accounts. Their bio says: 'The
+> official Bluesky account'"
 
 ## Authenticated Operations
 
-**Note:** As of 2025, most AT Protocol operations require authentication, including searching posts, viewing threads, accessing feeds, and all write operations.
+**Note:** As of 2025, most AT Protocol operations require authentication,
+including searching posts, viewing threads, accessing feeds, and all write
+operations.
 
-These examples require authentication (configured in your LLM client's MCP settings):
+These examples require authentication (configured in your LLM client's MCP
+settings):
 
 ### Example 2: Search Posts
 
 **What You Say:**
+
 ```
 "Search for posts about artificial intelligence from the last week"
 ```
@@ -120,21 +140,25 @@ These examples require authentication (configured in your LLM client's MCP setti
 **What Happens Behind the Scenes:**
 
 Your LLM client calls the `search_posts` tool via MCP:
+
 ```json
 {
   "q": "artificial intelligence",
   "limit": 25,
   "sort": "latest",
-  "since": "2024-01-08T00:00:00Z"
+  "since": "2026-05-30T00:00:00Z"
 }
 ```
 
 **What Your LLM Tells You:**
-> "I found several posts about artificial intelligence from the last week. Here are some highlights: [summarizes the posts in natural language]"
+
+> "I found several posts about artificial intelligence from the last week. Here
+> are some highlights: [summarizes the posts in natural language]"
 
 ### Example 3: Browse a Thread
 
 **What You Say:**
+
 ```
 "Show me the conversation thread for this post: at://..."
 ```
@@ -142,6 +166,7 @@ Your LLM client calls the `search_posts` tool via MCP:
 **What Happens Behind the Scenes:**
 
 Your LLM client calls the `get_thread` tool:
+
 ```json
 {
   "uri": "at://did:plc:abc123.../app.bsky.feed.post/xyz789"
@@ -149,11 +174,14 @@ Your LLM client calls the `get_thread` tool:
 ```
 
 **What Your LLM Tells You:**
-> "This thread has 5 replies. The original post says... The top reply from @user mentions... [summarizes the conversation]"
+
+> "This thread has 5 replies. The original post says... The top reply from @user
+> mentions... [summarizes the conversation]"
 
 ### Example 4: Create a Post
 
 **What You Say:**
+
 ```
 "Create a post saying 'Hello from AT Protocol MCP Server!'"
 ```
@@ -161,6 +189,7 @@ Your LLM client calls the `get_thread` tool:
 **What Happens Behind the Scenes:**
 
 Your LLM client calls the `create_post` tool via MCP:
+
 ```json
 {
   "text": "Hello from AT Protocol MCP Server!",
@@ -169,11 +198,13 @@ Your LLM client calls the `create_post` tool via MCP:
 ```
 
 **What Your LLM Tells You:**
+
 > "I've created your post on Bluesky! It's now live at [provides link or URI]"
 
 ### Example 5: Like a Post
 
 **What You Say:**
+
 ```
 "Like the most recent post from @bsky.app"
 ```
@@ -181,6 +212,7 @@ Your LLM client calls the `create_post` tool via MCP:
 **What Happens Behind the Scenes:**
 
 Your LLM client performs multiple steps:
+
 1. Calls `get_user_profile` to get @bsky.app's information
 2. Searches for their recent posts
 3. Calls `like_post` with the post URI
@@ -192,11 +224,15 @@ Your LLM client performs multiple steps:
 ```
 
 **What Your LLM Tells You:**
-> "I've liked the most recent post from @bsky.app. It was about [summarizes the post content]"
+
+> "I've liked the most recent post from @bsky.app. It was about [summarizes the
+>
+> > post content]"
 
 ### Example 6: Follow a User
 
 **What You Say:**
+
 ```
 "Follow @atproto.com"
 ```
@@ -204,6 +240,7 @@ Your LLM client performs multiple steps:
 **What Happens Behind the Scenes:**
 
 Your LLM client calls the `follow_user` tool:
+
 ```json
 {
   "actor": "atproto.com"
@@ -211,6 +248,7 @@ Your LLM client calls the `follow_user` tool:
 ```
 
 **What Your LLM Tells You:**
+
 > "You're now following @atproto.com!"
 
 ## Using Resources
@@ -220,15 +258,18 @@ MCP Resources provide context data that your LLM can read and understand:
 ### Example 7: Check Your Timeline
 
 **What You Say:**
+
 ```
 "Summarize what's happening in my timeline"
 ```
 
 **What Happens Behind the Scenes:**
 
-Your LLM client reads the `atproto://timeline` MCP resource, which fetches your personalized timeline from AT Protocol.
+Your LLM client reads the `atproto://timeline` MCP resource, which fetches your
+personalized timeline from AT Protocol.
 
 **What Your LLM Tells You:**
+
 ```
 "Your timeline shows several interesting discussions:
 1. AI developments - 5 posts about new AI models from @user1, @user2
@@ -240,6 +281,7 @@ The most engaging post is from @user3 about [topic] with 150 likes..."
 ### Example 8: Check Notifications
 
 **What You Say:**
+
 ```
 "Do I have any new notifications?"
 ```
@@ -249,6 +291,7 @@ The most engaging post is from @user3 about [topic] with 150 likes..."
 Your LLM client reads the `atproto://notifications` MCP resource.
 
 **What Your LLM Tells You:**
+
 ```
 "You have 3 new notifications:
 1. @user1 liked your post about TypeScript
@@ -264,6 +307,7 @@ MCP Prompts help your LLM perform common tasks with better context:
 ### Example 9: Compose a Post
 
 **What You Say:**
+
 ```
 "Help me write a post about TypeScript in a casual tone"
 ```
@@ -271,6 +315,7 @@ MCP Prompts help your LLM perform common tasks with better context:
 **What Happens Behind the Scenes:**
 
 Your LLM client uses the `content_composition` MCP prompt with:
+
 ```json
 {
   "topic": "TypeScript",
@@ -281,6 +326,7 @@ Your LLM client uses the `content_composition` MCP prompt with:
 ```
 
 **What Your LLM Tells You:**
+
 ```
 "Here's a casual post about TypeScript:
 
@@ -295,6 +341,7 @@ Would you like me to post this for you?"
 ### Example 10: Generate a Reply
 
 **What You Say:**
+
 ```
 "Help me reply to this post: 'What's your favorite programming language?'"
 ```
@@ -302,6 +349,7 @@ Would you like me to post this for you?"
 **What Happens Behind the Scenes:**
 
 Your LLM client uses the `reply_template` MCP prompt with:
+
 ```json
 {
   "original_post": "What's your favorite programming language?",
@@ -311,6 +359,7 @@ Your LLM client uses the `reply_template` MCP prompt with:
 ```
 
 **What Your LLM Tells You:**
+
 ```
 "Here's a thoughtful reply:
 
@@ -328,6 +377,7 @@ Your LLM can combine multiple MCP tool calls for complex workflows:
 ### Example 11: Find and Engage
 
 **What You Say:**
+
 ```
 "Find the top post about 'decentralization' and like it"
 ```
@@ -335,11 +385,13 @@ Your LLM can combine multiple MCP tool calls for complex workflows:
 **What Happens Behind the Scenes:**
 
 Your LLM client performs multiple steps:
+
 1. Calls `search_posts({ q: "decentralization", sort: "top", limit: 1 })`
 2. Extracts the post URI from the result
 3. Calls `like_post({ uri: "..." })`
 
 **What Your LLM Tells You:**
+
 ```
 "I found the top post about decentralization by @user.bsky.social
 with 150 likes. It discusses [summarizes content]. I've liked it for you!"
@@ -348,6 +400,7 @@ with 150 likes. It discusses [summarizes content]. I've liked it for you!"
 ### Example 12: Create and Share
 
 **What You Say:**
+
 ```
 "Create a post about my new project and share it"
 ```
@@ -355,12 +408,14 @@ with 150 likes. It discusses [summarizes content]. I've liked it for you!"
 **What Happens Behind the Scenes:**
 
 Your LLM client:
+
 1. Uses `content_composition` prompt to draft the post
 2. Shows you the draft for approval
 3. Calls `create_post` to publish it
 4. Returns the post URI for sharing
 
 **What Your LLM Tells You:**
+
 ```
 "I've drafted this post about your project:
 
@@ -374,6 +429,7 @@ Should I post this? I can also help you share it with specific users."
 ### Example 13: Handling Authentication Errors
 
 **What You Say:**
+
 ```
 "Create a post" (without authentication configured)
 ```
@@ -383,6 +439,7 @@ Should I post this? I can also help you share it with specific users."
 The MCP server returns an authentication error, and your LLM explains:
 
 **What Your LLM Tells You:**
+
 ```
 "I can't create a post because authentication is required.
 To enable this feature, you'll need to add your AT Protocol
@@ -393,6 +450,7 @@ setting that up?"
 ### Example 14: Handling Rate Limits
 
 **What You Say:**
+
 ```
 "Like all posts from @user" (many posts)
 ```
@@ -402,10 +460,11 @@ setting that up?"
 If the rate limit is hit, your LLM explains:
 
 **What Your LLM Tells You:**
+
 ```
-"I've liked 50 posts from @user, but I've hit the AT Protocol
-rate limit. I'll need to wait about 15 minutes before I can
-continue. Would you like me to:
+"I've liked a number of posts from @user, but I've hit the
+rate limit (100 requests per minute per tool). I'll need to
+wait about a minute before I can continue. Would you like me to:
 1. Continue after the rate limit resets
 2. Stop here
 3. Try a different approach?"
@@ -417,31 +476,31 @@ continue. Would you like me to:
 
 When talking to your LLM client:
 
-Bad: "Search for posts"
-Good: "Search for posts about AI from the last week"
+Bad: "Search for posts" Good: "Search for posts about AI from the last week"
 
 The more specific you are, the better your LLM can use the MCP tools.
 
 ### 2. Provide Context
 
-Bad: "Like it"
-Good: "Like the post at at://..." or "Like the post we just found"
+Bad: "Like it" Good: "Like the post at at://..." or "Like the post we just
+found"
 
 ### 3. Use Natural Language Chains
 
-Good: "Find posts about decentralization, then like the top one"
-Good: "Search for @user's recent posts and summarize them"
+Good: "Find posts about decentralization, then like the top one" Good: "Search
+for @user's recent posts and summarize them"
 
 Your LLM will chain multiple MCP tool calls automatically.
 
 ### 4. Let Your LLM Handle Errors
 
-Your LLM client will receive error messages from the MCP server and explain them in natural language. You don't need to understand MCP protocol errors.
+Your LLM client will receive error messages from the MCP server and explain them
+in natural language. You don't need to understand MCP protocol errors.
 
 ### 5. Leverage Resources for Context
 
-Good: "Based on my timeline, suggest what to post about"
-Good: "Summarize my notifications and draft replies"
+Good: "Based on my timeline, suggest what to post about" Good: "Summarize my
+notifications and draft replies"
 
 Your LLM can read MCP resources to provide context-aware assistance.
 
@@ -449,10 +508,9 @@ Your LLM can read MCP resources to provide context-aware assistance.
 
 - **[Social Operations](./social-operations.md)** - Advanced social features
 - **[Content Management](./content-management.md)** - Manage your content
-- **[Real-time Data](./real-time-data.md)** - Streaming and live updates
-- **[API Reference](../api/tools.md)** - Detailed tool documentation
+- **[API Reference](../api/)** - Detailed tool documentation
 
 ---
 
-**Previous**: [Deployment](../guide/deployment.md) ← | **Next**: [Social Operations](./social-operations.md) →
-
+**Previous**: [Deployment](../guide/deployment.md) ← | **Next**:
+[Social Operations](./social-operations.md) →

@@ -320,84 +320,12 @@ export class ErrorSanitizer {
 }
 
 /**
- * Credential manager for secure storage
- */
-export class CredentialManager {
-  private logger: Logger;
-  private credentials: Map<string, string> = new Map();
-
-  constructor(logger: Logger) {
-    this.logger = logger;
-  }
-
-  /**
-   * Store credential securely (in production, this would use proper encryption)
-   */
-  store(key: string, value: string): void {
-    if (!key || !value) {
-      throw new Error('Key and value are required');
-    }
-
-    // In production, this should use proper encryption
-    // For now, we'll just store it in memory with basic obfuscation
-    const obfuscated = Buffer.from(value).toString('base64');
-    this.credentials.set(key, obfuscated);
-
-    this.logger.debug('Credential stored', { key: `${key.substring(0, 8)}***` });
-  }
-
-  /**
-   * Retrieve credential
-   */
-  retrieve(key: string): string | undefined {
-    const obfuscated = this.credentials.get(key);
-    if (!obfuscated) {
-      return undefined;
-    }
-
-    try {
-      return Buffer.from(obfuscated, 'base64').toString();
-    } catch (error) {
-      this.logger.error('Failed to retrieve credential', error as Error, { key });
-      return undefined;
-    }
-  }
-
-  /**
-   * Delete credential
-   */
-  delete(key: string): boolean {
-    const deleted = this.credentials.delete(key);
-    if (deleted) {
-      this.logger.debug('Credential deleted', { key: `${key.substring(0, 8)}***` });
-    }
-    return deleted;
-  }
-
-  /**
-   * Clear all credentials
-   */
-  clear(): void {
-    this.credentials.clear();
-    this.logger.info('All credentials cleared');
-  }
-
-  /**
-   * Get credential count (for monitoring)
-   */
-  getCount(): number {
-    return this.credentials.size;
-  }
-}
-
-/**
  * Security manager that coordinates all security components
  */
 export class SecurityManager {
   private inputSanitizer: InputSanitizer;
   private rateLimiter: RateLimiter;
   private errorSanitizer: ErrorSanitizer;
-  private credentialManager: CredentialManager;
   private config: ISecurityConfig;
   private logger: Logger;
 
@@ -414,7 +342,6 @@ export class SecurityManager {
       logger
     );
     this.errorSanitizer = new ErrorSanitizer(logger, process.env['NODE_ENV'] === 'development');
-    this.credentialManager = new CredentialManager(logger);
   }
 
   /**
@@ -445,17 +372,12 @@ export class SecurityManager {
     return this.errorSanitizer;
   }
 
-  getCredentialManager(): CredentialManager {
-    return this.credentialManager;
-  }
-
   /**
    * Get security metrics
    */
   getMetrics() {
     return {
       rateLimiter: this.rateLimiter.getMetrics(),
-      credentialCount: this.credentialManager.getCount(),
       config: {
         inputSanitizationEnabled: this.config.enableInputSanitization,
         rateLimitEnabled: this.config.enableRateLimit,
