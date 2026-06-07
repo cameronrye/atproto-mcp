@@ -9,10 +9,17 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 import { existsSync } from 'fs';
 
-// Load .env.test if it exists
-const envTestPath = resolve(process.cwd(), '.env.test');
-if (existsSync(envTestPath)) {
-  config({ path: envTestPath });
+// Load .env.test ONLY when integration tests have been explicitly opted into via
+// RUN_INTEGRATION_TESTS=true (set by the `test:integration*` scripts, or by
+// dotenv-cli for the authenticated runs). Previously this loaded unconditionally,
+// so a `.env.test` containing `RUN_INTEGRATION_TESTS=true` would silently turn a
+// plain `vitest run` (and therefore `npm test`/`check`/`prepublishOnly`) into a
+// non-hermetic, real-network suite that could create and delete live Bluesky data.
+if (process.env['RUN_INTEGRATION_TESTS'] === 'true') {
+  const envTestPath = resolve(process.cwd(), '.env.test');
+  if (existsSync(envTestPath)) {
+    config({ path: envTestPath });
+  }
 }
 
 export interface IIntegrationTestConfig {
