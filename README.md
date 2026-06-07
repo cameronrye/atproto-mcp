@@ -38,9 +38,9 @@ Bluesky and other AT Protocol-based social networks.
 with public data access (search posts, view profiles), or add authentication for
 full functionality (write operations, private data, feeds).
 
-> **New in v0.1.1**: Batch operations for bulk actions, advanced analytics and
-> insights, intelligent content discovery, and conversation context tracking for
-> better LLM awareness across interactions!
+> **Recent additions**: Batch operations for bulk actions, advanced analytics
+> and insights, intelligent content discovery, and a conversation-context
+> scratchpad resource.
 
 ## Architecture
 
@@ -77,7 +77,7 @@ server to access AT Protocol functionality.
 
 ## Features
 
-### New in v0.1.1
+### Highlights
 
 - **Batch Operations**: Perform multiple operations in a single call
   (follow/like/repost up to 25 items at once)
@@ -85,8 +85,8 @@ server to access AT Protocol functionality.
   and get content strategy recommendations
 - **Content Discovery**: Find similar users, trending topics, and influential
   voices in your areas of interest
-- **Conversation Context**: Track conversation state across LLM interactions for
-  better context awareness
+- **Conversation Context**: An MCP resource that acts as a scratchpad for
+  conversation state (not auto-populated yet)
 
 ### Core Features
 
@@ -99,7 +99,7 @@ server to access AT Protocol functionality.
 - **MCP Server Compliance**: Built with `@modelcontextprotocol/sdk` following
   MCP specification
 - **Type-Safe**: Written in TypeScript with strict type checking
-- **Comprehensive Tools**: 57 MCP tools for social networking operations
+- **Comprehensive Tools**: 60 MCP tools for social networking operations
 - **Real-time Support** _(experimental)_: WebSocket firehose scaffolding with
   keyword/user buffer scanning — frame decoding is not yet implemented, so no
   live events are delivered yet
@@ -244,7 +244,7 @@ credentials.
 
 ## Available Tools
 
-The server provides **57 MCP tools** across multiple categories. See the
+The server provides **60 MCP tools** across multiple categories. See the
 [complete API documentation](https://cameronrye.github.io/atproto-mcp/api/) for
 detailed information on each tool.
 
@@ -541,50 +541,53 @@ This project is licensed under the MIT License.
 - [Issue Tracker](https://github.com/cameronrye/atproto-mcp/issues)
 - [Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
 
-## Production Deployment
+## Deployment
 
-The AT Protocol MCP Server is production-ready with comprehensive features for
-enterprise deployment:
+This is a **stdio MCP server**: it is normally launched by an MCP client (e.g.
+Claude Desktop) via `npx atproto-mcp` and communicates over stdin/stdout. It
+does not listen on a network port, so there is no HTTP endpoint to expose or
+scale.
 
-### Production Features
+### Built-in safeguards
 
-- **Performance Optimization**: Connection pooling, caching, and WebSocket
-  management
-- **Security Hardening**: Input sanitization, rate limiting, and secure
-  credential storage
-- **Monitoring**: Health checks, metrics, and comprehensive logging
-- **Docker Support**: Multi-stage builds with security best practices
-- **Kubernetes Ready**: Helm charts and deployment manifests
-- **Observability**: Prometheus metrics and Grafana dashboards
+- **Error sanitization**: in `NODE_ENV=production`, internal error details are
+  redacted before being returned to the client.
+- **Rate limiting**: per-tool invocation rate limiting guards against runaway
+  loops.
+- **SSRF protection**: outbound URL/media fetches reject private/internal
+  network destinations and cap response size and time.
+- **Path-traversal protection**: local file reads are confined to an allowed
+  base directory (`ATPROTO_MEDIA_DIR`, default: working directory).
 
-### Docker Deployment
+### Running in Docker
+
+The container runs the same stdio server, so attach to it via your MCP client
+rather than mapping a port:
 
 ```bash
-# Quick start with Docker Compose
-docker-compose up -d
-
-# Or build and run manually
 docker build -t atproto-mcp .
-docker run -d -p 3000:3000 \
-  -e ATPROTO_IDENTIFIER=your.handle \
-  -e ATPROTO_PASSWORD=your-password \
+docker run -i --rm \
+  -e ATPROTO_IDENTIFIER=your.handle.bsky.social \
+  -e ATPROTO_PASSWORD=your-app-password \
   atproto-mcp
 ```
 
-### Environment Configuration
+### Environment configuration
 
 ```bash
-# Copy example environment file
+# Copy the example environment file and edit it (loaded automatically by the CLI)
 cp .env.example .env
+```
 
-# Edit with your credentials
+```dotenv
 ATPROTO_IDENTIFIER=your.handle.bsky.social
 ATPROTO_PASSWORD=your-app-password
 NODE_ENV=production
 LOG_LEVEL=info
 ```
 
-For detailed deployment instructions, see [DEPLOYMENT.md](DEPLOYMENT.md).
+See [.env.example](.env.example) for the full list of variables the server
+reads.
 
 ## Security
 
@@ -595,30 +598,17 @@ practices and policies:
 
 **Before deploying to production:**
 
-1. **Change Default Passwords**
-   - Set `GRAFANA_ADMIN_PASSWORD` environment variable (don't use default)
-   - Configure Redis password if using Redis
-   - Generate strong random keys for `SECURITY_SECRET_KEY`
-
-2. **Configure CORS Properly**
-   - Replace wildcard `*` origins with specific domains
-   - Set `CORS_ORIGINS` in your environment configuration
-   - Example: `CORS_ORIGINS=https://yourdomain.com,https://app.yourdomain.com`
-
-3. **Secure Your Credentials**
+1. **Secure Your Credentials**
    - Never commit `.env` files to version control
-   - Use app passwords instead of main account passwords
+   - Use app passwords instead of your main account password
    - Rotate credentials regularly
-   - Use secret management systems in production (AWS Secrets Manager, HashiCorp
-     Vault, etc.)
+   - Use a secret management system where available (AWS Secrets Manager,
+     HashiCorp Vault, etc.)
 
-4. **Network Security**
-   - Use HTTPS in production
-   - Configure `TRUSTED_PROXIES` if behind a reverse proxy
-   - Enable rate limiting
-   - Restrict access to internal services (Redis, Prometheus, Grafana)
+2. **Run in production mode**
+   - Set `NODE_ENV=production` so returned error messages are sanitized
 
-5. **Keep Dependencies Updated**
+3. **Keep Dependencies Updated**
    ```bash
    pnpm audit
    pnpm update

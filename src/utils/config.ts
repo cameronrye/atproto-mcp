@@ -3,11 +3,36 @@
  * Handles environment variables, command-line arguments, and default settings
  */
 
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
 import { ConfigurationError, type IAtpConfig, type IMcpServerConfig } from '../types/index.js';
 import { Logger } from './logger.js';
 
 const logger = new Logger('Config');
+
+/**
+ * Resolve the package version from package.json so the server never advertises a
+ * stale hardcoded version. Memoized; falls back to '0.0.0' if unreadable.
+ */
+let cachedVersion: string | undefined;
+function getPackageVersion(): string {
+  if (cachedVersion !== undefined) {
+    return cachedVersion;
+  }
+  try {
+    const here = dirname(fileURLToPath(import.meta.url));
+    // src/utils/config.ts -> ../../package.json ; dist/utils/config.js -> ../../package.json
+    const pkg = JSON.parse(readFileSync(join(here, '..', '..', 'package.json'), 'utf8')) as {
+      version?: string;
+    };
+    cachedVersion = pkg.version ?? '0.0.0';
+  } catch {
+    cachedVersion = '0.0.0';
+  }
+  return cachedVersion;
+}
 
 /**
  * Zod schema for AT Protocol configuration validation
@@ -65,7 +90,7 @@ function createDefaultConfig(): IMcpServerConfig {
     port: 3000,
     host: 'localhost',
     name: 'atproto-mcp',
-    version: '0.1.0',
+    version: getPackageVersion(),
     description:
       'AT Protocol MCP Server - Comprehensive interface for LLMs to interact with AT Protocol (supports both authenticated and unauthenticated modes)',
     atproto: {
