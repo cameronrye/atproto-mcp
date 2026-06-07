@@ -98,8 +98,8 @@
     "@types/ws": "^8.18.1",
     "@typescript-eslint/eslint-plugin": "^8.46.4",
     "@typescript-eslint/parser": "^8.46.4",
-    "@vitest/coverage-v8": "^4.0.9",
-    "@vitest/ui": "^4.0.9",
+    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/ui": "^4.1.0",
     "chalk": "^5.6.2",
     "command-exists": "^1.2.9",
     "dotenv": "^17.2.3",
@@ -117,7 +117,7 @@
     "typescript-eslint": "^8.46.4",
     "vitepress": "^1.6.4",
     "vitepress-plugin-mermaid": "^2.0.17",
-    "vitest": "^4.0.9"
+    "vitest": "^4.1.0"
   },
   "lint-staged": {
     "*.{ts,tsx}": [
@@ -134,7 +134,13 @@
       "ajv>fast-uri": ">=3.1.2",
       "@modelcontextprotocol/sdk>ajv": ">=8.18.0",
       "qs": ">=6.15.2",
-      "ws": ">=8.20.1"
+      "ws": ">=8.20.1",
+      "glob": ">=11.1.0",
+      "rollup": ">=4.59.0",
+      "flatted": ">=3.4.2",
+      "@isaacs/brace-expansion": ">=5.0.1",
+      "preact": ">=10.27.3",
+      "uuid": ">=11.1.1"
     }
   }
 }

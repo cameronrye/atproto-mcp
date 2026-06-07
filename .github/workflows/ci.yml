@@ -47,6 +47,12 @@ jobs:
       - name: Build
         run: pnpm run build
 
+      - name: Security audit (production dependencies)
+        # Gate on vulnerabilities in shipped/runtime dependencies only. Dev-only
+        # tooling chains (vitest, vitepress, eslint, etc.) are not published and
+        # would otherwise make this noisy.
+        run: pnpm audit --prod --audit-level=high
+
       - name: Run tests
         run: pnpm run test:coverage
 
