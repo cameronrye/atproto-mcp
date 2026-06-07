@@ -55,8 +55,11 @@ export class AtpOAuthClient extends EventEmitter {
     this.logger = new Logger('AtpOAuthClient');
     this.config = config;
 
-    if (!config.clientId || !config.clientSecret) {
-      throw new AuthenticationError('OAuth requires clientId and clientSecret', undefined, {
+    // AT Protocol OAuth public clients authenticate with PKCE and do NOT use a
+    // client secret, so only clientId is required to build an authorization
+    // request. (Confidential clients may additionally supply a clientSecret.)
+    if (!config.clientId) {
+      throw new AuthenticationError('OAuth requires clientId', undefined, {
         authMethod: 'oauth',
       });
     }
@@ -94,7 +97,11 @@ export class AtpOAuthClient extends EventEmitter {
         timestamp: Date.now(),
       });
 
-      // Generate authorization URL (mock implementation)
+      // Construct a best-effort authorization URL. NOTE: a spec-compliant AT
+      // Protocol OAuth flow discovers the authorization server via protected-
+      // resource / authorization-server metadata and uses pushed authorization
+      // requests (PAR); this heuristic `${service}/oauth/authorize` URL is not a
+      // substitute for that and may not be honored by every PDS.
       const baseUrl = this.config.service.replace(/^https?:\/\//, '');
       const authUrl =
         `https://${baseUrl}/oauth/authorize?` +

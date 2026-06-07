@@ -7,6 +7,23 @@ import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import { AtpOAuthClient } from '../../utils/oauth-client.js';
 
+/**
+ * Resolve OAuth client credentials from the environment.
+ *
+ * The canonical names match the rest of the server's config (`ATPROTO_CLIENT_ID`
+ * / `ATPROTO_CLIENT_SECRET`). The legacy `OAUTH_*` names are accepted as a
+ * fallback for backward compatibility so OAuth is configurable by either scheme.
+ */
+function resolveOAuthClientConfig(service: string) {
+  return {
+    service,
+    authMethod: 'oauth' as const,
+    clientId: process.env['ATPROTO_CLIENT_ID'] ?? process.env['OAUTH_CLIENT_ID'],
+    clientSecret: process.env['ATPROTO_CLIENT_SECRET'] ?? process.env['OAUTH_CLIENT_SECRET'],
+    redirectUri: process.env['ATPROTO_OAUTH_REDIRECT_URI'] ?? process.env['OAUTH_REDIRECT_URI'],
+  };
+}
+
 const StartOAuthFlowSchema = z.object({
   identifier: z.string().min(1, 'Identifier (handle or DID) is required'),
 });
@@ -29,7 +46,11 @@ export class StartOAuthFlowTool extends BaseTool {
   public readonly schema = {
     method: 'start_oauth_flow',
     description:
-      'Start OAuth authorization flow for AT Protocol authentication. Returns authorization URL that user must visit. No authentication required.',
+      'Generate a PKCE OAuth authorization URL for AT Protocol. EXPERIMENTAL: the URL is ' +
+      'constructed heuristically (no authorization-server metadata discovery / PAR) and the ' +
+      'token-exchange step (handle_oauth_callback) is not implemented, so this cannot yet ' +
+      'complete a login. For working auth use app passwords (ATPROTO_IDENTIFIER + ' +
+      'ATPROTO_PASSWORD). No authentication required.',
     params: StartOAuthFlowSchema,
   };
 
@@ -50,15 +71,9 @@ export class StartOAuthFlowTool extends BaseTool {
 
       this.validateActor(params.identifier);
 
-      // Get OAuth configuration from ATP client
-      const config = this.atpClient.getAgent().service;
-      oauthClient = new AtpOAuthClient({
-        service: config.toString(),
-        authMethod: 'oauth',
-        clientId: process.env['OAUTH_CLIENT_ID'],
-        clientSecret: process.env['OAUTH_CLIENT_SECRET'],
-        redirectUri: process.env['OAUTH_REDIRECT_URI'],
-      });
+      // Get OAuth configuration from ATP client + environment
+      const service = this.atpClient.getAgent().service.toString();
+      oauthClient = new AtpOAuthClient(resolveOAuthClientConfig(service));
 
       const authRequest = await oauthClient.startAuthorization(params.identifier);
 
@@ -72,7 +87,10 @@ export class StartOAuthFlowTool extends BaseTool {
         authUrl: authRequest.authUrl,
         state: authRequest.state,
         instructions:
-          'Visit the authorization URL in your browser, complete the OAuth flow, and use the returned authorization code with the handle_oauth_callback tool.',
+          'EXPERIMENTAL: this authorization URL is generated heuristically and the ' +
+          'token-exchange step (handle_oauth_callback) is not implemented, so the flow ' +
+          'cannot currently complete a login. For working authentication, use app passwords ' +
+          '(ATPROTO_IDENTIFIER + ATPROTO_PASSWORD) instead.',
         expiresIn: 1800, // 30 minutes
       };
     } catch (error) {
@@ -88,7 +106,9 @@ export class StartOAuthFlowTool extends BaseTool {
 export class HandleOAuthCallbackTool extends BaseTool {
   public readonly schema = {
     method: 'handle_oauth_callback',
-    description: 'Handle OAuth callback and exchange authorization code for access tokens.',
+    description:
+      'Exchange an OAuth authorization code for access tokens. NOT IMPLEMENTED: token ' +
+      'exchange is not wired in, so this always returns an error. Use app-password auth instead.',
     params: HandleOAuthCallbackSchema,
   };
 
@@ -112,15 +132,9 @@ export class HandleOAuthCallbackTool extends BaseTool {
         state: `${params.state.substring(0, 8)}...`,
       });
 
-      // Get OAuth configuration from ATP client
-      const config = this.atpClient.getAgent().service;
-      oauthClient = new AtpOAuthClient({
-        service: config.toString(),
-        authMethod: 'oauth',
-        clientId: process.env['OAUTH_CLIENT_ID'],
-        clientSecret: process.env['OAUTH_CLIENT_SECRET'],
-        redirectUri: process.env['OAUTH_REDIRECT_URI'],
-      });
+      // Get OAuth configuration from ATP client + environment
+      const service = this.atpClient.getAgent().service.toString();
+      oauthClient = new AtpOAuthClient(resolveOAuthClientConfig(service));
 
       const session = await oauthClient.handleCallback(params.code, params.state);
 
@@ -150,7 +164,9 @@ export class HandleOAuthCallbackTool extends BaseTool {
 export class RefreshOAuthTokensTool extends BaseTool {
   public readonly schema = {
     method: 'refresh_oauth_tokens',
-    description: 'Refresh OAuth access tokens using a refresh token.',
+    description:
+      'Refresh OAuth access tokens using a refresh token. NOT IMPLEMENTED: token refresh is ' +
+      'not wired in, so this always returns an error. Use app-password auth instead.',
     params: RefreshOAuthTokensSchema,
   };
 
@@ -171,15 +187,9 @@ export class RefreshOAuthTokensTool extends BaseTool {
     try {
       this.logger.info('Refreshing OAuth tokens');
 
-      // Get OAuth configuration from ATP client
-      const config = this.atpClient.getAgent().service;
-      oauthClient = new AtpOAuthClient({
-        service: config.toString(),
-        authMethod: 'oauth',
-        clientId: process.env['OAUTH_CLIENT_ID'],
-        clientSecret: process.env['OAUTH_CLIENT_SECRET'],
-        redirectUri: process.env['OAUTH_REDIRECT_URI'],
-      });
+      // Get OAuth configuration from ATP client + environment
+      const service = this.atpClient.getAgent().service.toString();
+      oauthClient = new AtpOAuthClient(resolveOAuthClientConfig(service));
 
       const session = await oauthClient.refreshTokens(params.refreshToken);
 
@@ -209,7 +219,9 @@ export class RefreshOAuthTokensTool extends BaseTool {
 export class RevokeOAuthTokensTool extends BaseTool {
   public readonly schema = {
     method: 'revoke_oauth_tokens',
-    description: 'Revoke OAuth access and refresh tokens to log out.',
+    description:
+      'Revoke OAuth access and refresh tokens to log out. NOT IMPLEMENTED: token revocation ' +
+      'is not wired in, so this always returns an error. Use app-password auth instead.',
     params: RevokeOAuthTokensSchema,
   };
 
@@ -225,15 +237,9 @@ export class RevokeOAuthTokensTool extends BaseTool {
     try {
       this.logger.info('Revoking OAuth tokens');
 
-      // Get OAuth configuration from ATP client
-      const config = this.atpClient.getAgent().service;
-      oauthClient = new AtpOAuthClient({
-        service: config.toString(),
-        authMethod: 'oauth',
-        clientId: process.env['OAUTH_CLIENT_ID'],
-        clientSecret: process.env['OAUTH_CLIENT_SECRET'],
-        redirectUri: process.env['OAUTH_REDIRECT_URI'],
-      });
+      // Get OAuth configuration from ATP client + environment
+      const service = this.atpClient.getAgent().service.toString();
+      oauthClient = new AtpOAuthClient(resolveOAuthClientConfig(service));
 
       await oauthClient.revokeTokens(params.accessToken, params.refreshToken);
 

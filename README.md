@@ -255,12 +255,19 @@ detailed information on each tool.
 - `get_user_profile` - Retrieve basic user information (ENHANCED mode: works
   without auth, provides additional viewer-specific data when authenticated)
 
-**OAuth Management**
+**OAuth Management** _(experimental — token exchange not implemented)_
 
-- `start_oauth_flow` - Initiate OAuth authentication
-- `handle_oauth_callback` - Complete OAuth flow
-- `refresh_oauth_tokens` - Refresh authentication tokens
-- `revoke_oauth_tokens` - Revoke OAuth tokens
+> ⚠️ Only the authorization-URL step is functional. The token-exchange steps
+> (`handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`) are
+> **not implemented** and return an error. For working authentication, use app
+> passwords (`ATPROTO_IDENTIFIER` + `ATPROTO_PASSWORD`).
+
+- `start_oauth_flow` - Generate a PKCE authorization URL (experimental)
+- `handle_oauth_callback` - Complete OAuth flow (not implemented — returns
+  error)
+- `refresh_oauth_tokens` - Refresh authentication tokens (not implemented —
+  returns error)
+- `revoke_oauth_tokens` - Revoke OAuth tokens (not implemented — returns error)
 
 **Note:** As of 2025, the AT Protocol API has changed to require authentication
 for most endpoints that were previously public, including `search_posts`.
@@ -384,11 +391,15 @@ export ATPROTO_PASSWORD="your-app-password"
 atproto-mcp
 ```
 
-### OAuth (Production)
+### OAuth (experimental — not yet functional)
+
+> ⚠️ OAuth token exchange is not implemented, so this cannot complete a login
+> yet. App passwords (above) are the recommended/working method. The variables
+> below configure the experimental authorization-URL generator.
 
 ```bash
 export ATPROTO_CLIENT_ID="your-client-id"
-export ATPROTO_CLIENT_SECRET="your-client-secret"
+export ATPROTO_CLIENT_SECRET="your-client-secret"  # optional for public clients
 atproto-mcp --auth oauth
 ```
 
