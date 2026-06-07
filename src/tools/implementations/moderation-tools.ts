@@ -225,41 +225,19 @@ export class UnblockUserTool extends BaseTool {
 
       this.validateActor(params.actor);
 
-      // getBlocks returns ProfileView entries whose did/handle live at the TOP
-      // level (not under a `subject`), and whose `viewer.blocking` holds the
-      // AT-URI of the block record to delete. Resolve the actor to a DID and
-      // page through the block list to find the matching record.
+      // getProfile returns viewer.blocking — the AT-URI of the block record —
+      // in a single call when the authenticated user is blocking the subject.
+      // This is O(1) and (unlike paging getBlocks) has no upper bound on how
+      // many accounts the user blocks.
       const agent = this.atpClient.getAgent();
       const resolvedDid = await this.resolveDid(params.actor);
 
-      let blockUri: string | undefined;
-      let cursor: string | undefined;
-      const MAX_PAGES = 20;
-      for (let page = 0; page < MAX_PAGES; page++) {
-        const blocksResponse = await this.executeAtpOperation(
-          async () =>
-            await agent.app.bsky.graph.getBlocks({
-              limit: 100,
-              ...(cursor ? { cursor } : {}),
-            }),
-          'getBlocks',
-          { actor: params.actor }
-        );
-
-        const match = blocksResponse.data.blocks.find(
-          (block: { did?: string }) => block.did === resolvedDid
-        ) as { viewer?: { blocking?: string } } | undefined;
-
-        if (match) {
-          blockUri = match.viewer?.blocking;
-          break;
-        }
-
-        cursor = blocksResponse.data.cursor;
-        if (!cursor) {
-          break;
-        }
-      }
+      const profileResponse = await this.executeAtpOperation(
+        async () => agent.getProfile({ actor: resolvedDid }),
+        'getProfile',
+        { actor: params.actor }
+      );
+      const blockUri = profileResponse.data.viewer?.blocking;
 
       if (!blockUri) {
         return {

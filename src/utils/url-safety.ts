@@ -10,6 +10,7 @@
 
 import http from 'node:http';
 import https from 'node:https';
+import zlib from 'node:zlib';
 import { type LookupAddress, type LookupOptions, lookup as dnsLookup } from 'node:dns';
 import { isIP, isIPv4, isIPv6 } from 'node:net';
 import path from 'node:path';
@@ -304,9 +305,22 @@ function performRequest(
           return;
         }
 
+        // node:http does NOT auto-decompress (unlike fetch), so decode per
+        // Content-Encoding. The size cap is applied to the DECOMPRESSED output to
+        // bound memory even against a small but bomb-like compressed payload.
+        const encoding = String(res.headers['content-encoding'] ?? '').toLowerCase();
+        let stream: NodeJS.ReadableStream = res;
+        if (encoding === 'gzip' || encoding === 'x-gzip') {
+          stream = res.pipe(zlib.createGunzip());
+        } else if (encoding === 'deflate') {
+          stream = res.pipe(zlib.createInflate());
+        } else if (encoding === 'br') {
+          stream = res.pipe(zlib.createBrotliDecompress());
+        }
+
         const chunks: Buffer[] = [];
         let total = 0;
-        res.on('data', (chunk: Buffer) => {
+        stream.on('data', (chunk: Buffer) => {
           total += chunk.length;
           if (total > opts.maxBytes) {
             req.destroy();
@@ -319,12 +333,16 @@ function performRequest(
           }
           chunks.push(chunk);
         });
-        res.on('end', () =>
+        stream.on('end', () =>
           finish(() =>
             resolve({ status, contentType, location: null, body: Buffer.concat(chunks) })
           )
         );
-        res.on('error', e => finish(() => reject(e)));
+        stream.on('error', e =>
+          finish(() => reject(e instanceof Error ? e : new Error(String(e))))
+        );
+        // Surface transport errors too (e.g. socket reset before the decompressor sees data).
+        res.on('error', e => finish(() => reject(e instanceof Error ? e : new Error(String(e)))));
       }
     );
 
@@ -336,7 +354,7 @@ function performRequest(
     );
     timer.unref();
 
-    req.on('error', e => finish(() => reject(e)));
+    req.on('error', e => finish(() => reject(e instanceof Error ? e : new Error(String(e)))));
     req.end();
   });
 }

@@ -51,7 +51,11 @@ function loadEnvFile(): void {
         ((value.startsWith('"') && value.endsWith('"')) ||
           (value.startsWith("'") && value.endsWith("'")))
       ) {
+        // Quoted value: take the contents verbatim (a '#' inside quotes is data).
         value = value.slice(1, -1);
+      } else {
+        // Unquoted value: strip a trailing inline comment (whitespace + '#').
+        value = value.replace(/\s+#.*$/, '').trim();
       }
       process.env[key] = value;
       loaded++;
