@@ -18,6 +18,7 @@ import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
 import { type IMcpTool, createTools } from './tools/index.js';
+import { StartStreamingTool } from './tools/implementations/streaming-tools.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
 import {
@@ -557,6 +558,10 @@ export class AtpMcpServer {
 
       // Release security manager background timers (rate-limiter cleanup).
       this.securityManager.destroy();
+
+      // Disconnect the shared firehose client (if a streaming tool opened one)
+      // so its socket and heartbeat timer do not outlive the server.
+      await StartStreamingTool.shutdown();
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }

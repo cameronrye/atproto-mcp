@@ -29,6 +29,16 @@ export interface IFirehoseSubscription {
   onError?: (error: Error) => void;
 }
 
+/**
+ * Whether AT Protocol firehose frame (CAR/DAG-CBOR) decoding is implemented.
+ *
+ * While this is `false`, {@link FirehoseClient.parseFirehoseMessage} decodes
+ * nothing, so no events are ever emitted and the streaming tools' event buffer
+ * stays empty. Tools read this flag so they can tell the caller "not
+ * implemented" instead of presenting an empty buffer as "nothing matched".
+ */
+export const FIREHOSE_DECODING_IMPLEMENTED = false;
+
 export class FirehoseClient extends EventEmitter {
   private ws: WebSocket | null = null;
   private logger: Logger;
@@ -40,6 +50,7 @@ export class FirehoseClient extends EventEmitter {
   private isConnecting = false;
   private isShuttingDown = false;
   private heartbeatInterval: NodeJS.Timeout | null = null;
+  private reconnectTimer: NodeJS.Timeout | null = null;
   private lastSeq: number | null = null;
   private warnedParserNotImplemented = false;
 
@@ -255,9 +266,17 @@ export class FirehoseClient extends EventEmitter {
   }
 
   /**
-   * Schedule reconnection attempt
+   * Schedule reconnection attempt.
+   *
+   * Both the 'close' and 'error' handlers can fire for a single failed
+   * connection, so guard against double-scheduling. The timer is unref'd so a
+   * pending reconnect never keeps the Node process alive on its own.
    */
   private scheduleReconnect(): void {
+    if (this.reconnectTimer || this.isShuttingDown) {
+      return;
+    }
+
     this.reconnectAttempts++;
     const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
 
@@ -266,17 +285,20 @@ export class FirehoseClient extends EventEmitter {
       delay,
     });
 
-    setTimeout(() => {
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
       if (!this.isShuttingDown) {
         this.connect().catch(error => {
           this.logger.error('Reconnection attempt failed', error);
         });
       }
     }, delay);
+    this.reconnectTimer.unref();
   }
 
   /**
-   * Start heartbeat to keep connection alive
+   * Start heartbeat to keep connection alive. The interval is unref'd so it
+   * never keeps the process alive after the rest of the server has shut down.
    */
   private startHeartbeat(): void {
     this.heartbeatInterval = setInterval(() => {
@@ -284,6 +306,7 @@ export class FirehoseClient extends EventEmitter {
         this.ws.ping();
       }
     }, 30000); // Ping every 30 seconds
+    this.heartbeatInterval.unref();
   }
 
   /**
@@ -295,6 +318,11 @@ export class FirehoseClient extends EventEmitter {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
       this.heartbeatInterval = null;
+    }
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
     }
   }
 }
