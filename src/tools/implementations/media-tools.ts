@@ -163,7 +163,7 @@ export class UploadImageTool extends BaseTool {
 
       this.logger.info('Image uploaded successfully', {
         filePath: params.filePath,
-        blobRef: response.data.blob.ref,
+        blobRef: response.data.blob.ref.toString(),
         size: response.data.blob.size,
       });
 
@@ -173,15 +173,16 @@ export class UploadImageTool extends BaseTool {
         image: {
           blob: {
             type: 'blob',
-            ref: response.data?.blob?.ref || '',
+            // blob.ref is a multiformats CID object; stringify it to the human/
+            // AT-readable `bafkrei...` form. Returning the object would serialize
+            // to a useless byte dump and break downstream embed/analysis tools.
+            ref: response.data?.blob?.ref?.toString() ?? '',
             mimeType: response.data?.blob?.mimeType || mimeType,
             size: response.data?.blob?.size || imageData.length,
           },
           alt: params.altText || '',
-          aspectRatio: {
-            width: 1,
-            height: 1, // Default aspect ratio, would need image processing to get actual dimensions
-          },
+          // NOTE: aspect ratio is intentionally omitted — the image is not
+          // decoded here, so reporting a fixed 1:1 ratio would be fabricated.
         },
       };
     } catch (error) {
@@ -288,7 +289,7 @@ export class UploadVideoTool extends BaseTool {
 
             processedCaptions.push({
               lang: caption.lang,
-              file: captionResponse.data?.blob?.ref || '',
+              file: captionResponse.data?.blob?.ref?.toString() ?? '',
             });
           } catch (captionError) {
             this.logger.warn('Failed to upload caption', captionError as Error);
@@ -298,7 +299,7 @@ export class UploadVideoTool extends BaseTool {
 
       this.logger.info('Video uploaded successfully', {
         filePath: params.filePath,
-        blobRef: response.data.blob.ref,
+        blobRef: response.data.blob.ref.toString(),
         size: response.data.blob.size,
         captionCount: processedCaptions?.length || 0,
       });
@@ -309,15 +310,14 @@ export class UploadVideoTool extends BaseTool {
         video: {
           blob: {
             type: 'blob',
-            ref: response.data?.blob?.ref || '',
+            // Stringify the multiformats CID to its `bafkrei...` form (see UploadImageTool).
+            ref: response.data?.blob?.ref?.toString() ?? '',
             mimeType: response.data?.blob?.mimeType || mimeType,
             size: response.data?.blob?.size || videoData.length,
           },
           alt: params.altText || '',
-          aspectRatio: {
-            width: 16,
-            height: 9, // Default aspect ratio, would need video processing to get actual dimensions
-          },
+          // NOTE: aspect ratio is intentionally omitted — the video is not
+          // decoded here, so reporting a fixed 16:9 ratio would be fabricated.
           captions: processedCaptions,
         },
       };
@@ -615,7 +615,8 @@ export class GenerateLinkPreviewTool extends BaseTool {
               thumbBlob = {
                 blob: {
                   type: 'blob',
-                  ref: uploadResponse.data?.blob?.ref || '',
+                  // Stringify the multiformats CID (see UploadImageTool).
+                  ref: uploadResponse.data?.blob?.ref?.toString() ?? '',
                   mimeType: uploadResponse.data?.blob?.mimeType || contentType,
                   size: uploadResponse.data?.blob?.size || imageBuffer.length,
                 },

@@ -53,6 +53,8 @@ export class BatchFollowTool extends BaseTool {
     results: IFollowResult[];
     summary: {
       total: number;
+      processed: number;
+      skipped: number;
       succeeded: number;
       failed: number;
       alreadyFollowing: number;
@@ -169,6 +171,11 @@ export class BatchFollowTool extends BaseTool {
         results,
         summary: {
           total: params.actors.length,
+          // When continueOnError is false the loop stops early; report how many
+          // items were actually processed vs skipped so `total` is not mistaken
+          // for "all processed".
+          processed: results.length,
+          skipped: params.actors.length - results.length,
           succeeded,
           failed,
           alreadyFollowing,
@@ -249,6 +256,8 @@ export class BatchLikeTool extends BaseTool {
     results: ILikeResult[];
     summary: {
       total: number;
+      processed: number;
+      skipped: number;
       succeeded: number;
       failed: number;
       alreadyLiked: number;
@@ -362,6 +371,11 @@ export class BatchLikeTool extends BaseTool {
         results,
         summary: {
           total: params.uris.length,
+          // When continueOnError is false the loop stops early; report how many
+          // items were actually processed vs skipped so `total` is not mistaken
+          // for "all processed".
+          processed: results.length,
+          skipped: params.uris.length - results.length,
           succeeded,
           failed,
           alreadyLiked,
@@ -483,6 +497,8 @@ export class BatchRepostTool extends BaseTool {
     results: IRepostResult[];
     summary: {
       total: number;
+      processed: number;
+      skipped: number;
       succeeded: number;
       failed: number;
       alreadyReposted: number;
@@ -596,6 +612,11 @@ export class BatchRepostTool extends BaseTool {
         results,
         summary: {
           total: params.uris.length,
+          // When continueOnError is false the loop stops early; report how many
+          // items were actually processed vs skipped so `total` is not mistaken
+          // for "all processed".
+          processed: results.length,
+          skipped: params.uris.length - results.length,
           succeeded,
           failed,
           alreadyReposted,

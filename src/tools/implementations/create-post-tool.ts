@@ -47,7 +47,16 @@ const CreatePostSchema = z.object({
         .optional(),
     })
     .optional(),
-  langs: z.array(z.string().length(2, 'Language codes must be 2 characters')).optional(),
+  langs: z
+    .array(
+      z
+        .string()
+        .regex(
+          /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
+          'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
+        )
+    )
+    .optional(),
 });
 
 /**

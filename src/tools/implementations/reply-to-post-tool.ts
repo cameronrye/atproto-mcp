@@ -17,7 +17,16 @@ const ReplyToPostSchema = z.object({
     .max(300, 'Reply text cannot exceed 300 characters'),
   root: z.string().min(1, 'Root post URI is required'),
   parent: z.string().min(1, 'Parent post URI is required'),
-  langs: z.array(z.string().length(2, 'Language codes must be 2 characters')).optional(),
+  langs: z
+    .array(
+      z
+        .string()
+        .regex(
+          /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
+          'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
+        )
+    )
+    .optional(),
 });
 
 /**
