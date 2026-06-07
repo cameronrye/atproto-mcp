@@ -27,8 +27,9 @@ This means there are only two supported deployment shapes today:
 - Node.js 20+ (the published runtime target; CI tests Node 20, 21, and 22)
 - An MCP-compatible client (e.g. Claude Desktop)
 - (Optional) An AT Protocol account with an **app password** for authenticated
-  tools — without it, only public tools such as `search_posts` and
-  `get_user_profile` work
+  tools — without it, only public/enhanced tools such as `get_user_profile`,
+  `get_followers`, and `get_follows` work (`search_posts` requires
+  authentication as of the 2025 AT Protocol API change)
 - (Optional) Docker, if you prefer running the server in a container
 
 ## Quick Start (stdio)
@@ -106,22 +107,23 @@ available. Most tools require authentication.
 
 ### Environment Variables
 
-These are the only environment variables the server reads. Anything not listed
-here (for example a server port/host, Redis, or monitoring settings) is **not**
-consulted.
+The server reads the following environment variables. Unrelated settings (a
+server port/host, Redis, or monitoring infrastructure) are **not** consulted.
 
-| Variable                | Description                                                           | Required |
-| ----------------------- | --------------------------------------------------------------------- | -------- |
-| `ATPROTO_IDENTIFIER`    | Your AT Protocol handle or DID (enables authenticated tools)          | No\*     |
-| `ATPROTO_PASSWORD`      | Your app password                                                     | No\*     |
-| `ATPROTO_SERVICE`       | AT Protocol service (PDS/AppView) URL (default `https://bsky.social`) | No       |
-| `ATPROTO_AUTH_METHOD`   | `app-password` (default) or `oauth` (experimental)                    | No       |
-| `ATPROTO_CLIENT_ID`     | OAuth client ID (experimental auth path only)                         | No       |
-| `ATPROTO_CLIENT_SECRET` | OAuth client secret (experimental auth path only)                     | No       |
-| `MCP_SERVER_NAME`       | Server name advertised to MCP clients (default `atproto-mcp`)         | No       |
-| `MCP_SERVER_PORT`       | Accepted but **reserved/ignored**: stdio transport binds no port      | No       |
-| `MCP_SERVER_HOST`       | Accepted but **reserved/ignored**: stdio transport binds no host      | No       |
-| `LOG_LEVEL`             | `debug` \| `info` \| `warn` \| `error` (default `info`)               | No       |
+| Variable                | Description                                                                            | Required |
+| ----------------------- | -------------------------------------------------------------------------------------- | -------- |
+| `ATPROTO_IDENTIFIER`    | Your AT Protocol handle or DID (enables authenticated tools)                           | No\*     |
+| `ATPROTO_PASSWORD`      | Your app password                                                                      | No\*     |
+| `ATPROTO_SERVICE`       | AT Protocol service (PDS/AppView) URL (default `https://bsky.social`)                  | No       |
+| `ATPROTO_AUTH_METHOD`   | `app-password` (default) or `oauth` (experimental)                                     | No       |
+| `ATPROTO_CLIENT_ID`     | OAuth client ID (experimental auth path only)                                          | No       |
+| `ATPROTO_CLIENT_SECRET` | OAuth client secret (experimental auth path only)                                      | No       |
+| `ATPROTO_MEDIA_DIR`     | Base directory that tool-supplied media file paths must stay within (default: cwd)     | No       |
+| `ATPROTO_RELAY`         | Firehose relay WebSocket URL for experimental streaming (default `wss://bsky.network`) | No       |
+| `MCP_SERVER_NAME`       | Server name advertised to MCP clients (default `atproto-mcp`)                          | No       |
+| `MCP_SERVER_PORT`       | Accepted but **reserved/ignored**: stdio transport binds no port                       | No       |
+| `MCP_SERVER_HOST`       | Accepted but **reserved/ignored**: stdio transport binds no host                       | No       |
+| `LOG_LEVEL`             | `debug` \| `info` \| `warn` \| `error` (default `info`)                                | No       |
 
 \* App-password auth requires `ATPROTO_IDENTIFIER` **and** `ATPROTO_PASSWORD`
 together. Both are optional overall — omit them to run in unauthenticated mode.
@@ -129,6 +131,11 @@ together. Both are optional overall — omit them to run in unauthenticated mode
 `NODE_ENV` is read by the runtime in the usual way: in `development`, error
 messages returned to clients are more detailed; in `production`, they are
 sanitized.
+
+The experimental OAuth path also accepts the legacy fallback names
+`OAUTH_CLIENT_ID` and `OAUTH_CLIENT_SECRET` (aliases for `ATPROTO_CLIENT_ID` /
+`ATPROTO_CLIENT_SECRET`), and reads the redirect URI from
+`ATPROTO_OAUTH_REDIRECT_URI` (falling back to `OAUTH_REDIRECT_URI`).
 
 ### CLI Flags
 

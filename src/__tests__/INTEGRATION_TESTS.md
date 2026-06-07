@@ -5,29 +5,34 @@ Server.
 
 ## ⚠️ Important Note
 
-**Most AT Protocol tools in this server require authentication.** Many endpoints
+**Most AT Protocol tools in this server require authentication.** Some endpoints
 that may have been publicly accessible at one point now expect an authenticated
-session, including:
+session. In particular:
 
-- `get_followers` - typically requires authentication
-- `get_follows` - typically requires authentication
-- `get_thread` - typically requires authentication
-- `get_custom_feed` - typically requires authentication
+- `search_posts` - requires authentication (the AT Protocol search API changed
+  in 2025 to require auth)
+- `get_thread` - requires authentication (PRIVATE)
+- `get_custom_feed` - requires authentication (PRIVATE)
+- `get_followers` / `get_follows` - work unauthenticated against the public
+  AppView (ENHANCED), returning richer viewer-state data when authenticated
 
 (Exact public/private behavior is set by the upstream AT Protocol service and
 can change over time; this suite does not attempt to assert specific HTTP status
 codes for those endpoints.)
 
-These integration tests focus on the one tool that genuinely works without
-authentication:
+These integration tests focus on `get_user_profile`, the simplest tool that
+genuinely works without authentication (the social-graph reads `get_followers` /
+`get_follows` are also unauthenticated/ENHANCED but are not exercised here):
 
 - `get_user_profile` - works without auth (and returns more data when
   authenticated)
 
 Note: `start_oauth_flow` only builds a heuristic PKCE authorization URL, and the
 OAuth-completion tools (`handle_oauth_callback`, `refresh_oauth_tokens`,
-`revoke_oauth_tokens`) are not implemented — they always throw
-`OAUTH_NOT_IMPLEMENTED`. They are therefore not exercised by these tests.
+`revoke_oauth_tokens`) are not implemented — they always fail with an
+`AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is
+not implemented (reaching the client as a JSON-RPC `-32603` Internal Error).
+They are therefore not exercised by these tests.
 
 ## Overview
 
@@ -53,7 +58,9 @@ ensure:
 
 ### Tools Tested
 
-Currently, only one tool works without authentication:
+Currently, this suite exercises one unauthenticated tool (other ENHANCED reads
+such as `get_followers` / `get_follows` also work without auth but are not
+covered here):
 
 1. **get_user_profile** - Profile retrieval (ENHANCED mode)
    - Handle-based lookup
@@ -69,10 +76,12 @@ The following tools are not exercised by the unauthenticated suite — most
 require an authenticated session, and the streaming tools are gated off entirely
 (see below):
 
-- ❌ **search_posts** - public availability depends on the upstream service; not
-  relied upon here
-- ❌ **get_followers** - typically requires authentication
-- ❌ **get_follows** - typically requires authentication
+- ❌ **search_posts** - requires authentication (the AT Protocol search API
+  changed in 2025 to require auth); not exercised by the unauthenticated suite
+- ❌ **get_followers** - works unauthenticated against the public AppView
+  (ENHANCED), but not exercised by this suite
+- ❌ **get_follows** - works unauthenticated against the public AppView
+  (ENHANCED), but not exercised by this suite
 - ❌ **get_thread** - typically requires authentication
 - ❌ **get_custom_feed** - typically requires authentication
 - ❌ All write operations (create_post, like_post, follow_user, etc.)

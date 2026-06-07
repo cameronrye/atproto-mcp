@@ -20,9 +20,17 @@ Desktop). It does **not** listen on a TCP port and exposes no HTTP endpoints.
 
 ## Environment Variables
 
-These are the only environment variables the server reads (defined in
-`ENV_MAPPINGS` in `src/utils/config.ts`), plus `LOG_LEVEL` (read by the logger).
-Any other variable is ignored.
+The `ConfigManager` reads the variables defined in `ENV_MAPPINGS` in
+`src/utils/config.ts` (listed below), plus `LOG_LEVEL` (read by the logger) and
+`NODE_ENV` (used to relax validation under `test`). A few additional variables
+are read directly by specific subsystems: `ATPROTO_MEDIA_DIR` (base directory
+that tool-supplied media file paths must stay within; defaults to the working
+directory), `ATPROTO_RELAY` (firehose relay WebSocket URL; defaults to
+`wss://bsky.network`), and — for the experimental OAuth tools — the OAuth client
+credentials, which accept the `ATPROTO_CLIENT_ID` / `ATPROTO_CLIENT_SECRET`
+names as well as the legacy `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` fallbacks,
+plus a redirect URI via `ATPROTO_OAUTH_REDIRECT_URI` (falling back to
+`OAUTH_REDIRECT_URI`). Other variables are ignored.
 
 ### Authentication
 
@@ -37,8 +45,9 @@ Any other variable is ignored.
 
 \* Required only for authenticated operations. App passwords are the supported
 auth path; see [Authentication](./authentication.md). Without credentials the
-server runs in unauthenticated mode (only public tools such as `search_posts`
-and `get_user_profile` work).
+server runs in unauthenticated mode (only public/enhanced tools such as
+`get_user_profile` work; tools like `search_posts` require authentication, since
+the AT Protocol search API changed in 2025 to require auth).
 
 ### Server
 

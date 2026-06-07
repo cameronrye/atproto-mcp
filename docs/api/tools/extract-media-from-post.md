@@ -127,8 +127,9 @@ Common errors:
 
 When `includeThread: true`:
 
-- Extracts media from all posts in the thread
-- Includes parent posts and replies
+- Extracts media from the main post and its replies
+- Extracts media from the post's replies only (parent/ancestor posts are not
+  fetched or included)
 - Returns array of media grouped by post
 - Useful for archiving or analyzing thread content
 

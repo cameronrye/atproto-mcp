@@ -19,13 +19,18 @@ These tools work in unauthenticated mode against public AT Protocol data:
 
 #### Data Retrieval
 
-- `search_posts` - Search for posts across the network (works unauthenticated)
 - `get_user_profile` - Get public profile information (ENHANCED mode: provides
   additional viewer-specific data when authenticated)
+- `get_followers` - Get a user's follower list (ENHANCED mode: works without
+  authentication, richer viewer data when authenticated)
+- `get_follows` - Get a user's following list (ENHANCED mode: works without
+  authentication, richer viewer data when authenticated)
 
-**Note:** Most other tools require authentication. App passwords are the
-supported auth path — set `ATPROTO_IDENTIFIER` and `ATPROTO_PASSWORD` (generate
-an app password in Bluesky Settings). See [Authentication](./authentication.md).
+**Note:** Most other tools require authentication. `search_posts`, in
+particular, requires authentication (the AT Protocol search API changed in 2025
+to require auth). App passwords are the supported auth path — set
+`ATPROTO_IDENTIFIER` and `ATPROTO_PASSWORD` (generate an app password in Bluesky
+Settings). See [Authentication](./authentication.md).
 
 #### OAuth Management
 
@@ -64,9 +69,9 @@ These tools require authentication to perform write operations:
 
 #### Data Retrieval
 
+- `search_posts` - Search for posts across the network (requires authentication;
+  the AT Protocol search API changed in 2025 to require auth)
 - `get_timeline` - Get personalized timeline
-- `get_followers` - Get follower lists
-- `get_follows` - Get following lists
 - `get_notifications` - Get notifications
 - `get_thread` - View post threads
 - `get_custom_feed` - Access custom feeds
@@ -225,7 +230,7 @@ Each tool has an authentication mode:
 
 - Works without authentication
 - Access to public data only
-- Example: `search_posts`, `get_user_profile`
+- Example: `get_user_profile`, `analyze_image`
 
 ### PRIVATE Mode
 

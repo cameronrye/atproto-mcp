@@ -147,5 +147,5 @@ or engagement stats are requested.
 ## See Also
 
 - [Composite Operations Guide](../../guide/tools-resources.md#composite-operations)
-- [User Operations Guide](../../guide/tools-resources.md#user-operations)
+- [Data Retrieval Guide](../../guide/tools-resources.md#data-retrieval)
 - [Analytics Tools Guide](../../guide/tools-resources.md#analytics--insights)

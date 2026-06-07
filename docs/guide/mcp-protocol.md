@@ -236,8 +236,8 @@ Prompts are templates that help LLMs perform common tasks.
   arguments: [
     {
       name: "topic",
-      description: "Topic to write about",
-      required: false
+      description: "The main topic or subject for the post",
+      required: true
     },
     {
       name: "tone",
@@ -384,19 +384,15 @@ The server advertises its capabilities:
 ```json
 {
   "capabilities": {
-    "tools": {
-      "listChanged": true
-    },
-    "resources": {
-      "subscribe": false,
-      "listChanged": true
-    },
-    "prompts": {
-      "listChanged": true
-    }
+    "tools": {},
+    "resources": {},
+    "prompts": {}
   }
 }
 ```
+
+The server advertises empty capability objects — it does not declare
+`listChanged` or `subscribe` flags.
 
 ## Best Practices
 

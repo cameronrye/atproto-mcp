@@ -25,6 +25,7 @@ View a complete post thread with all replies and context.
 
 - **Type:** `number`
 - **Default:** `80`
+- **Constraints:** 0-10
 - **Description:** Maximum number of parent posts to walk up from the requested
   post
 

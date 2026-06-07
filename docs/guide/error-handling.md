@@ -99,7 +99,8 @@ atproto-mcp
 ```
 
 Without credentials the server still runs, but only public tools (notably
-`search_posts` and `get_user_profile`) work. See
+`get_user_profile`) work; `search_posts` requires authentication (the AT
+Protocol search API changed in 2025 to require auth). See
 [Troubleshooting &rarr; Authentication](./troubleshooting.md#authentication-issues).
 
 ### Invalid Parameters
@@ -275,7 +276,7 @@ To call a tool, send a `tools/call` request after initializing:
 atproto-mcp <<'EOF'
 {"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual-test","version":"0.0.0"}}}
 {"jsonrpc":"2.0","method":"notifications/initialized"}
-{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"search_posts","arguments":{"query":"test"}}}
+{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"get_user_profile","arguments":{"actor":"bsky.app"}}}
 EOF
 ```
 

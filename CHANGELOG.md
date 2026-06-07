@@ -157,7 +157,9 @@ have been re-scoped to match the actual implementation.
 
 ---
 
-[Unreleased]: https://github.com/cameronrye/atproto-mcp/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/cameronrye/atproto-mcp/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/cameronrye/atproto-mcp/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/cameronrye/atproto-mcp/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/cameronrye/atproto-mcp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/cameronrye/atproto-mcp/releases/tag/v0.1.0
 [0.0.1]: https://github.com/cameronrye/atproto-mcp/releases/tag/v0.0.1

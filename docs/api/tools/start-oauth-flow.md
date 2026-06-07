@@ -65,7 +65,8 @@ a user visits the URL and is redirected back with a code, calling
 2. There is no pushed authorization request (PAR).
 3. The authorization-code-to-token exchange in
    [handle_oauth_callback](./handle-oauth-callback.md) is not implemented and
-   always returns `OAUTH_NOT_IMPLEMENTED`.
+   always returns an `AUTHENTICATION_FAILED` error (message: "OAuth token
+   exchange is not implemented...").
 
 ## Related Tools
 

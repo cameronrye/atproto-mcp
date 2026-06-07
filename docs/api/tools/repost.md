@@ -37,6 +37,7 @@ Repost content on AT Protocol with optional quote text.
     uri: string; // URI of the reposted post
     cid: string; // CID of the reposted post
   }
+  isQuotePost: boolean; // Whether this was a quote post (vs simple repost)
 }
 ```
 
@@ -58,11 +59,12 @@ Repost content on AT Protocol with optional quote text.
   "uri": "at://did:plc:myuser/app.bsky.feed.repost/repost123",
   "cid": "bafyreidef456...",
   "success": true,
-  "message": "Post reposted successfully",
+  "message": "Repost created successfully",
   "repostedPost": {
     "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
     "cid": "bafyreiabc123..."
-  }
+  },
+  "isQuotePost": false
 }
 ```
 
@@ -89,12 +91,12 @@ Repost content on AT Protocol with optional quote text.
 }
 ```
 
-#### Post Not Found
+#### Invalid CID
 
 ```json
 {
-  "error": "Post not found",
-  "code": "NOT_FOUND"
+  "error": "CID must be a valid content identifier",
+  "code": "VALIDATION_ERROR"
 }
 ```
 

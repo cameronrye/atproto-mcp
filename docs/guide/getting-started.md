@@ -46,9 +46,12 @@ ignored).
 
 ### 2. Authentication
 
-The server runs unauthenticated (only `search_posts` and `get_user_profile` work
-in that mode). For full functionality, authenticate with an **app password** —
-this is the supported path.
+The server runs unauthenticated, but only public/enhanced tools work in that
+mode (for example `get_user_profile`, `get_followers`, `get_follows`, and
+`analyze_image`). `search_posts` and all other tools require credentials, since
+the AT Protocol search API began requiring authentication in 2025. For full
+functionality, authenticate with an **app password** — this is the supported
+path.
 
 #### App Passwords (Recommended)
 

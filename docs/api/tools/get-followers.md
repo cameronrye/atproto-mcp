@@ -4,9 +4,11 @@ Get the list of users following a specific user.
 
 ## Authentication
 
-**Optional:** Enhanced tool. Works without authentication; when authenticated,
-the AT Protocol API may include viewer-specific relationship state for each
-follower.
+**Optional:** Enhanced tool. Works without authentication. Authentication
+enriches the underlying AT Protocol API call, but this tool only returns the
+profile fields listed in the Response section (did, handle, displayName,
+description, avatar, banner, followersCount, followsCount, postsCount,
+indexedAt) and does not surface viewer-specific relationship state.
 
 ## Parameters
 

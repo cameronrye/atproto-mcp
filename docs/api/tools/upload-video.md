@@ -8,20 +8,25 @@ Upload a video to AT Protocol for use in posts.
 
 ## Parameters
 
-### `video` (required)
-
-- **Type:** `Blob`
-- **Description:** Video file data
-
-### `alt` (optional)
+### `filePath` (required)
 
 - **Type:** `string`
-- **Description:** Alt text for accessibility
+- **Description:** Path to the local video file to upload. Must resolve within
+  the allowed media directory (defaults to the process working directory;
+  override with `ATPROTO_MEDIA_DIR`).
+
+### `altText` (optional)
+
+- **Type:** `string`
+- **Description:** Alt text for accessibility. Maximum 1000 characters.
 
 ### `captions` (optional)
 
-- **Type:** `Array<{ lang: string; file: Blob }>`
-- **Description:** Caption/subtitle files
+- **Type:** `Array<{ lang: string; file: string }>`
+- **Description:** Caption/subtitle files. Each entry has a `lang` (BCP-47
+  language code, at least 2 characters) and a `file` that is a path to the local
+  caption file (e.g. a `.vtt` file within `ATPROTO_MEDIA_DIR` / the working
+  directory).
 
 ## Response
 
@@ -29,17 +34,34 @@ Upload a video to AT Protocol for use in posts.
 {
   success: boolean;
   message: string;
-  blob: {
-    $type: string;
-    ref: {
-      $link: string;
+  video: {
+    blob: {
+      type: string;        // value: 'blob'
+      ref: string;         // stringified CID, e.g. 'bafkrei...'
+      mimeType: string;
+      size: number;
     };
-    mimeType: string;
-    size: number;
+    alt: string;
+    aspectRatio?: {
+      width: number;
+      height: number;
+    };
+    captions?: Array<{
+      lang: string;
+      file: string;        // stringified CID ref of the uploaded VTT blob
+    }>;
   };
-  alt?: string;
 }
 ```
+
+::: tip
+
+`type` is the literal `'blob'`, `ref` is the stringified CID (e.g.
+`bafkrei...`), and each caption `file` is the stringified CID ref of the
+uploaded caption blob. `aspectRatio` is declared optional but is intentionally
+omitted at runtime, since the video is not decoded.
+
+:::
 
 ## Examples
 
@@ -47,8 +69,8 @@ Upload a video to AT Protocol for use in posts.
 
 ```json
 {
-  "video": "<Blob data>",
-  "alt": "Tutorial on using AT Protocol"
+  "filePath": "./videos/tutorial.mp4",
+  "altText": "Tutorial on using AT Protocol"
 }
 ```
 
@@ -56,12 +78,12 @@ Upload a video to AT Protocol for use in posts.
 
 ```json
 {
-  "video": "<Blob data>",
-  "alt": "Conference talk",
+  "filePath": "./videos/talk.mp4",
+  "altText": "Conference talk",
   "captions": [
     {
       "lang": "en",
-      "file": "<VTT Blob data>"
+      "file": "./captions/en.vtt"
     }
   ]
 }

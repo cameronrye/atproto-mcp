@@ -34,7 +34,7 @@ Key capabilities:
 
 - [API Overview](https://cameronrye.github.io/atproto-mcp/api/): Complete API documentation
 
-The server registers **60 tools**. Most require authentication; a small number of read tools (notably `search_posts` and `get_user_profile`) also work in unauthenticated mode. A few tools are stubs/placeholders and are flagged below.
+The server registers **60 tools**. Most require authentication; a small number of public/enhanced tools (notably `get_user_profile`, `get_followers`, and `get_follows`) also work in unauthenticated mode. `search_posts` requires authentication — the AT Protocol search API changed in 2025 to require auth. A few tools are stubs/placeholders and are flagged below.
 
 ### Social Operations
 - [Create Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-post.html): Create text posts on AT Protocol
@@ -93,9 +93,9 @@ The server registers **60 tools**. Most require authentication; a small number o
 
 ### OAuth Authentication (experimental)
 - [Start OAuth Flow](https://cameronrye.github.io/atproto-mcp/api/tools/start-oauth-flow.html): **Experimental** — builds a heuristic PKCE authorization URL only (no AS-metadata discovery/PAR); the flow is a dead end because callback exchange is not implemented
-- [Handle OAuth Callback](https://cameronrye.github.io/atproto-mcp/api/tools/handle-oauth-callback.html): **Not implemented** — always throws `OAUTH_NOT_IMPLEMENTED`
-- [Refresh OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/refresh-oauth-tokens.html): **Not implemented** — always throws `OAUTH_NOT_IMPLEMENTED`
-- [Revoke OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/revoke-oauth-tokens.html): **Not implemented** — always throws `OAUTH_NOT_IMPLEMENTED`
+- [Handle OAuth Callback](https://cameronrye.github.io/atproto-mcp/api/tools/handle-oauth-callback.html): **Not implemented** — always fails with an `AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is not implemented (reaching the client as JSON-RPC `-32603` Internal Error)
+- [Refresh OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/refresh-oauth-tokens.html): **Not implemented** — always fails with an `AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is not implemented (reaching the client as JSON-RPC `-32603` Internal Error)
+- [Revoke OAuth Tokens](https://cameronrye.github.io/atproto-mcp/api/tools/revoke-oauth-tokens.html): **Not implemented** — always fails with an `AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is not implemented (reaching the client as JSON-RPC `-32603` Internal Error)
 
 ### Moderation
 - [Report Content](https://cameronrye.github.io/atproto-mcp/api/tools/report-content.html): Report inappropriate content
@@ -127,7 +127,7 @@ Four resources are registered. Three are functional (and require authentication)
 ### Prompts
 Two prompts are available once authenticated:
 - `content_composition` (args: `topic`, `tone`, `length`, `include_hashtags`)
-- `reply_template` (args: `original_post`, `reply_type`, `relationship`, `tone`)
+- `reply_template` (args: `original_post`, `reply_type`, `relationship`)
 
 ### Types
 - [Core Types](https://cameronrye.github.io/atproto-mcp/api/types/core.html): Core type definitions

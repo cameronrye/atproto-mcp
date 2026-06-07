@@ -49,7 +49,6 @@ illustrative.
       avatar?: string;
     };
     reason: string;  // "like", "repost", "follow", "mention", "reply", "quote"
-    reasonSubject?: string;
     record: any;
     isRead: boolean;
     indexedAt: string;
@@ -94,41 +93,34 @@ computed; it does not change any server-side state.
 
 ## Notification Types
 
+The `reason` field is one of the following values. Note that this tool maps each
+notification to
+`{ uri, cid, author, reason, record, isRead, indexedAt, labels }` only; the AT
+Protocol `reasonSubject` value is not surfaced in the output.
+
 ### `like`
 
 Someone liked your post
-
-- `reasonSubject`: URI of the liked post
 
 ### `repost`
 
 Someone reposted your post
 
-- `reasonSubject`: URI of the reposted post
-
 ### `follow`
 
 Someone followed you
-
-- No `reasonSubject`
 
 ### `mention`
 
 Someone mentioned you in a post
 
-- `reasonSubject`: URI of the post with mention
-
 ### `reply`
 
 Someone replied to your post
 
-- `reasonSubject`: URI of the parent post
-
 ### `quote`
 
 Someone quoted your post
-
-- `reasonSubject`: URI of the quoted post
 
 ## Error Handling
 

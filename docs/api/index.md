@@ -221,7 +221,7 @@ authentication to be available:
 - **`content_composition`** - Compose a post from a topic. Arguments: `topic`,
   `tone`, `length`, `include_hashtags`.
 - **`reply_template`** - Draft a contextual reply. Arguments: `original_post`,
-  `reply_type`, `relationship`, `tone`.
+  `reply_type`, `relationship`.
 
 ## Types
 
@@ -263,18 +263,22 @@ export ATPROTO_CLIENT_SECRET="your-client-secret"
 
 ### Unauthenticated Mode
 
-The server runs without credentials, but only public tools work. In practice
-this is limited to:
+The server runs without credentials, but only public/enhanced tools work. In
+practice this is limited to:
 
-- `search_posts` - Public search
 - `get_user_profile` - Public profile lookup (returns additional viewer-specific
   data when authenticated)
+- `get_followers` / `get_follows` - Follower/following lists (ENHANCED mode:
+  work without auth, enrich the underlying API call when authenticated)
+- `analyze_image`, `generate_alt_text`, and other PUBLIC/ENHANCED rich-media and
+  composite tools
 
-All other tools — including `get_followers`, `get_follows`, `get_thread`,
-`get_timeline`, and `get_custom_feed` — require authentication. The
-OAuth-completion tools (`handle_oauth_callback`, `refresh_oauth_tokens`,
-`revoke_oauth_tokens`) are **not functional** and never succeed regardless of
-authentication state.
+All other tools — including `search_posts`, `get_thread`, `get_timeline`, and
+`get_custom_feed` — require authentication. (`search_posts` previously worked
+unauthenticated, but the AT Protocol search API changed in 2025 to require
+auth.) The OAuth-completion tools (`handle_oauth_callback`,
+`refresh_oauth_tokens`, `revoke_oauth_tokens`) are **not functional** and never
+succeed regardless of authentication state.
 
 ## Error Handling
 

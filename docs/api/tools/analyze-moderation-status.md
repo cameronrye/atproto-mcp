@@ -32,7 +32,7 @@ Tool results are returned as stringified JSON text. The illustrative shape is:
       val: string;
       cts: string;
     }>;
-    blocked?: boolean;        // you block this user (derived from `blocking`)
+    blocked?: boolean | string; // boolean for user subjects; for post subjects this is the author's block-record AT-URI (string) or undefined
     muted?: boolean;          // you mute this user
     blockedBy?: boolean;      // this user blocks you
     blocking?: string;        // AT-URI of your block record, if any
@@ -51,7 +51,9 @@ Tool results are returned as stringified JSON text. The illustrative shape is:
 
 For a **post** subject, only `blocked`, `muted`, and `blockedBy` (reflecting the
 post author's relationship to you) are populated; the list-based fields apply to
-user subjects only.
+user subjects only. Note that for a post subject `blocked` carries the post
+author's block-record AT-URI **string** (or `undefined`) rather than a boolean,
+unlike the user path, which coerces it to a boolean via `!!`.
 
 ## Examples
 

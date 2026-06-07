@@ -8,15 +8,17 @@ Upload an image to AT Protocol for use in posts or profile.
 
 ## Parameters
 
-### `image` (required)
-
-- **Type:** `Blob`
-- **Description:** Image file data
-
-### `alt` (optional)
+### `filePath` (required)
 
 - **Type:** `string`
-- **Description:** Alt text for accessibility
+- **Description:** Path to the local image file to upload. Must resolve within
+  the allowed media directory (defaults to the process working directory;
+  override with `ATPROTO_MEDIA_DIR`).
+
+### `altText` (optional)
+
+- **Type:** `string`
+- **Description:** Alt text for accessibility. Maximum 1000 characters.
 
 ## Response
 
@@ -24,15 +26,19 @@ Upload an image to AT Protocol for use in posts or profile.
 {
   success: boolean;
   message: string;
-  blob: {
-    $type: string;
-    ref: {
-      $link: string;
+  image: {
+    blob: {
+      type: string;        // value: 'blob'
+      ref: string;         // stringified CID, e.g. 'bafkrei...'
+      mimeType: string;
+      size: number;
     };
-    mimeType: string;
-    size: number;
+    alt: string;
+    aspectRatio?: {
+      width: number;
+      height: number;
+    };
   };
-  alt?: string;
 }
 ```
 
@@ -42,8 +48,8 @@ Upload an image to AT Protocol for use in posts or profile.
 
 ```json
 {
-  "image": "<Blob data>",
-  "alt": "A beautiful sunset over the ocean"
+  "filePath": "./images/sunset.jpg",
+  "altText": "A beautiful sunset over the ocean"
 }
 ```
 
@@ -52,16 +58,16 @@ Upload an image to AT Protocol for use in posts or profile.
 ```json
 {
   "success": true,
-  "message": "Image uploaded successfully",
-  "blob": {
-    "$type": "blob",
-    "ref": {
-      "$link": "bafyreiabc123..."
+  "message": "Image uploaded successfully from ./images/sunset.jpg",
+  "image": {
+    "blob": {
+      "type": "blob",
+      "ref": "bafkreiabc123...",
+      "mimeType": "image/jpeg",
+      "size": 245678
     },
-    "mimeType": "image/jpeg",
-    "size": 245678
-  },
-  "alt": "A beautiful sunset over the ocean"
+    "alt": "A beautiful sunset over the ocean"
+  }
 }
 ```
 
@@ -105,10 +111,15 @@ Image file size cannot exceed 1MB
 
 #### Upload Failed
 
+Upload failures, oversized files, and unsupported formats all surface as an
+error with code `TOOL_EXECUTION_ERROR`. The message is the underlying error text
+(e.g. `Image file size cannot exceed 1MB` or the AT client's failure message).
+There is no dedicated `UPLOAD_ERROR` code.
+
 ```json
 {
-  "error": "Failed to upload image",
-  "code": "UPLOAD_ERROR"
+  "error": "<underlying failure message>",
+  "code": "TOOL_EXECUTION_ERROR"
 }
 ```
 

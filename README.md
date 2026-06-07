@@ -35,8 +35,9 @@ direct access to the AT Protocol ecosystem, enabling seamless interaction with
 Bluesky and other AT Protocol-based social networks.
 
 **Supports both authenticated and unauthenticated modes** - Start immediately
-with public data access (search posts, view profiles), or add authentication for
-full functionality (write operations, private data, feeds).
+with public data access (view profiles, fetch follower/following lists), or add
+authentication for full functionality (search, write operations, private data,
+feeds).
 
 > **Recent additions**: Batch operations for bulk actions, advanced analytics
 > and insights, intelligent content discovery, and a conversation-context
@@ -191,6 +192,8 @@ npx atproto-mcp
 
 - View user profiles (`get_user_profile` - works without auth, provides
   additional viewer-specific data when authenticated)
+- View follower/following lists (`get_followers`, `get_follows` - ENHANCED mode:
+  work without auth, enrich the underlying API call when authenticated)
 - Manage OAuth authentication flows (`start_oauth_flow`,
   `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`)
 
@@ -198,7 +201,6 @@ npx atproto-mcp
 
 - Searching posts and hashtags (`search_posts`) - **API changed in 2025 to
   require authentication**
-- Viewing follower/following lists (`get_followers`, `get_follows`)
 - Browsing feeds and threads (`get_thread`, `get_custom_feed`, `get_timeline`)
 - All write operations (create, like, repost, follow, etc.)
 - Resources (timeline, profile, notifications) - these are listed but require
@@ -255,6 +257,20 @@ detailed information on each tool.
 
 - `get_user_profile` - Retrieve basic user information (ENHANCED mode: works
   without auth, provides additional viewer-specific data when authenticated)
+- `get_followers` - Get follower lists (ENHANCED mode: works without auth,
+  enriches the underlying API call when authenticated)
+- `get_follows` - Get following lists (ENHANCED mode: works without auth,
+  enriches the underlying API call when authenticated)
+
+**Rich Media**
+
+- `generate_alt_text` - Generate descriptive alt text for images (PUBLIC mode:
+  no auth required; experimental — returns an alt-text writing
+  template/guidance, does not analyze image pixels)
+- `analyze_image` - Report blob-declared size and MIME type for an image (PUBLIC
+  mode: no auth required; does not decode pixels, so no dimensions/aspect ratio)
+- `extract_media_from_post` - Extract media from posts (ENHANCED mode: works
+  without auth)
 
 **OAuth Management** _(experimental — token exchange not implemented)_
 
@@ -288,8 +304,6 @@ for most endpoints that were previously public, including `search_posts`.
 
 - `search_posts` - Search for posts and content across the network (⚠️ API
   changed in 2025 to require auth)
-- `get_followers` - Get follower lists
-- `get_follows` - Get following lists
 - `get_thread` - View post threads and conversations
 - `get_custom_feed` - Access custom feeds
 - `get_timeline` - Retrieve personalized timelines
@@ -358,14 +372,6 @@ for most endpoints that were previously public, including `search_posts`.
 - `get_user_summary` - Get complete user profile with stats and analysis
 - `get_post_context` - Get post with thread, author, and engagement data
 - `create_thread` - Create multi-post threads in one call
-
-**Rich Media**
-
-- `generate_alt_text` - Generate descriptive alt text for images (experimental —
-  returns an alt-text writing template/guidance; does not analyze image pixels)
-- `analyze_image` - Report blob-declared size and MIME type for an image (does
-  not decode pixels, so no dimensions/aspect ratio)
-- `extract_media_from_post` - Extract all media from posts
 
 **Enhanced Moderation**
 
@@ -502,8 +508,8 @@ npm run test:integration
 
 **What's tested:**
 
-- All public tools (search_posts, get_user_profile, get_followers, get_follows,
-  get_thread, get_custom_feed)
+- Public/enhanced tools (`get_user_profile`, `get_followers`, `get_follows`) and
+  authenticated tools (`search_posts`, `get_thread`, `get_custom_feed`)
 - DID and handle resolution
 - Pagination support
 - Error handling

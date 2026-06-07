@@ -199,6 +199,11 @@ ATPROTO_SERVICE=https://bsky.social
 ATPROTO_CLIENT_ID=your-client-id
 ATPROTO_CLIENT_SECRET=your-client-secret
 ATPROTO_AUTH_METHOD=oauth
+
+# Optional redirect URI (defaults to http://localhost:3000/oauth/callback).
+# The legacy OAUTH_CLIENT_ID / OAUTH_CLIENT_SECRET / OAUTH_REDIRECT_URI names
+# are also accepted as fallbacks.
+ATPROTO_OAUTH_REDIRECT_URI=http://localhost:3000/oauth/callback
 ```
 
 ### Optional
@@ -210,10 +215,15 @@ LOG_LEVEL=info
 
 ::: tip Recognized variables
 
-The server reads only the `MCP_SERVER_*` and `ATPROTO_*` variables documented in
-the [Configuration Guide](../../guide/configuration.md), plus `LOG_LEVEL`.
-`MCP_SERVER_PORT`/`MCP_SERVER_HOST` are accepted but ignored under the stdio
-transport.
+The `ConfigManager` reads the `MCP_SERVER_*` and `ATPROTO_*` variables
+documented in the [Configuration Guide](../../guide/configuration.md), plus
+`LOG_LEVEL` and `NODE_ENV`. A few additional variables are read directly by
+specific subsystems: `ATPROTO_MEDIA_DIR` (base directory for tool-supplied media
+paths) and `ATPROTO_RELAY` (firehose relay URL), and — for the experimental
+OAuth tools — the legacy `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` fallbacks
+plus the redirect URI via `ATPROTO_OAUTH_REDIRECT_URI` (falling back to
+`OAUTH_REDIRECT_URI`). `MCP_SERVER_PORT`/`MCP_SERVER_HOST` are accepted but
+ignored under the stdio transport.
 
 :::
 

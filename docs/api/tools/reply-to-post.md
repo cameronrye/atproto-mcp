@@ -105,12 +105,16 @@ Reply to an existing post on AT Protocol with proper threading support.
 }
 ```
 
-#### Post Not Found
+#### Unable to Resolve Parent/Root Post
+
+When the parent or root CID cannot be resolved, the tool throws a generic error
+wrapped as `TOOL_EXECUTION_ERROR` (there is no `NOT_FOUND` code in this
+codebase):
 
 ```json
 {
-  "error": "Parent post not found",
-  "code": "NOT_FOUND"
+  "error": "Could not resolve the CID for at://did:plc:.../app.bsky.feed.post/...: <underlying error>. A reply requires the real CID of the parent and root posts.",
+  "code": "TOOL_EXECUTION_ERROR"
 }
 ```
 

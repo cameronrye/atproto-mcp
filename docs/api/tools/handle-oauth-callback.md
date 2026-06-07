@@ -6,8 +6,10 @@ Exchange an OAuth authorization code for AT Protocol access tokens.
 
 `handle_oauth_callback` is registered and visible to MCP clients but is **not
 functional** — the authorization-code-for-token exchange is not implemented, so
-this tool **always** returns an error (`OAUTH_NOT_IMPLEMENTED`) rather than
-creating a session. See [Experimental & Roadmap](../../guide/experimental.md).
+this tool **always** returns an authentication error (code
+`AUTHENTICATION_FAILED`) whose message explains that token exchange is not
+implemented, rather than creating a session. See
+[Experimental & Roadmap](../../guide/experimental.md).
 
 :::
 
@@ -38,13 +40,15 @@ This tool cannot complete a login. For working authentication, use
 
 Even when `state` matches a pending authorization started by
 [start_oauth_flow](./start-oauth-flow.md), the server does not perform a real
-token exchange. The call validates the state binding and then throws, so the
-result is always an error:
+token exchange. The call validates the state binding and then throws an
+`AuthenticationError`, so the result is always an error. The long "OAuth token
+exchange is not implemented..." text is the error **message**; the error
+**code** is `AUTHENTICATION_FAILED` (with HTTP status 401):
 
 ```json
 {
   "error": "OAuth token exchange is not implemented. Use app-password authentication (ATPROTO_IDENTIFIER + ATPROTO_PASSWORD), or complete the OAuth flow with a real AT Protocol authorization server. This server can generate an authorization URL (start_oauth_flow) but cannot yet exchange the authorization code for tokens.",
-  "code": "OAUTH_NOT_IMPLEMENTED"
+  "code": "AUTHENTICATION_FAILED"
 }
 ```
 

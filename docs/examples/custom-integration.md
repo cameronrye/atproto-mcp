@@ -78,8 +78,10 @@ async function callTool<T = unknown>(
 
 Most tools require authentication. Set `ATPROTO_IDENTIFIER` and
 `ATPROTO_PASSWORD` (an app password from Bluesky **Settings → App Passwords**)
-in the environment of the spawned server process. Without credentials only
-public tools — notably `search_posts` and `get_user_profile` — are available.
+in the environment of the spawned server process. Without credentials only the
+public/enhanced tools — notably `get_user_profile` (and `get_followers` /
+`get_follows`) — are available. `search_posts` requires authentication: the AT
+Protocol search API changed in 2025 to require auth.
 
 :::
 
@@ -194,14 +196,16 @@ app.listen(3000, () => {
 ### Account Backup
 
 Pages through a user's posts with `search_posts` and saves a profile snapshot
-with `get_user_profile`. Both tools work without authentication, which makes
-this a good public-data example.
+with `get_user_profile`. `get_user_profile` is an enhanced tool that works
+without authentication, but `search_posts` requires authentication (the AT
+Protocol search API changed in 2025 to require auth), so credentials must be set
+in the spawned server's environment for the backup loop below.
 
 ::: warning
 
-`search_posts` requires a non-empty `q`. An empty query does **not** return all
-of an author's posts — combine a query term with the `author` filter, and page
-with `cursor`.
+`search_posts` requires authentication **and** a non-empty `q`. An empty query
+does **not** return all of an author's posts — combine a query term with the
+`author` filter, and page with `cursor`.
 
 :::
 

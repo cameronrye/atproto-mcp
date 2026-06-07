@@ -104,22 +104,16 @@ record:
 }
 ```
 
-#### Cannot Follow Self
-
-```json
-{
-  "error": "Cannot follow yourself",
-  "code": "INVALID_OPERATION"
-}
-```
-
 #### Rate Limit Exceeded
 
+When this server's per-tool limit is exceeded, the tool returns a generic
+internal error (there is no `RATE_LIMIT_EXCEEDED` code or `retryAfter` from the
+per-tool limiter):
+
 ```json
 {
-  "error": "Rate limit exceeded. Please try again later.",
-  "code": "RATE_LIMIT_EXCEEDED",
-  "retryAfter": 60
+  "error": "Rate limit exceeded for tool \"follow_user\". Please slow down and retry shortly.",
+  "code": "InternalError"
 }
 ```
 
@@ -145,8 +139,13 @@ instead of looping over this tool.
 ## Rate Limiting
 
 This server applies a per-tool rate limit of **100 requests per minute**. When
-the limit is exceeded, the tool returns a `RATE_LIMIT_EXCEEDED` error with a
-`retryAfter` value indicating seconds to wait.
+the limit is exceeded, the tool returns a generic internal error with the
+message
+`Rate limit exceeded for tool "follow_user". Please slow down and retry shortly.`
+(no `retryAfter` value). Note: a separate `RATE_LIMIT_EXCEEDED` code with a
+`retryAfter` value is only surfaced when the upstream AT Protocol API itself
+returns HTTP 429 — that is a different mechanism from this server's per-tool
+limiter.
 
 ## Related Tools
 

@@ -18,17 +18,18 @@ Generate a link preview card for a URL to embed in posts.
 ```typescript
 {
   success: boolean;
+  message: string;
   preview: {
     uri: string;
     title: string;
     description: string;
     thumb?: {
-      $type: string;
-      ref: {
-        $link: string;
+      blob: {
+        type: string;      // 'blob'
+        ref: string;       // stringified CID
+        mimeType: string;
+        size: number;
       };
-      mimeType: string;
-      size: number;
     };
   }
 }
@@ -49,17 +50,18 @@ Generate a link preview card for a URL to embed in posts.
 ```json
 {
   "success": true,
+  "message": "Link preview generated for https://example.com/article",
   "preview": {
     "uri": "https://example.com/article",
     "title": "Understanding AT Protocol",
     "description": "A comprehensive guide to the AT Protocol architecture and features",
     "thumb": {
-      "$type": "blob",
-      "ref": {
-        "$link": "bafyreiabc123..."
-      },
-      "mimeType": "image/jpeg",
-      "size": 45678
+      "blob": {
+        "type": "blob",
+        "ref": "bafyreiabc123...",
+        "mimeType": "image/jpeg",
+        "size": 45678
+      }
     }
   }
 }
@@ -112,21 +114,22 @@ The tool:
 
 #### URL Not Accessible
 
-```json
-{
-  "error": "Failed to fetch URL",
-  "code": "FETCH_ERROR"
-}
-```
-
-#### No Preview Data
+A non-2xx response throws `Failed to fetch URL: <status>`, which surfaces with
+code `TOOL_EXECUTION_ERROR`. There is no dedicated `FETCH_ERROR` code.
 
 ```json
 {
-  "error": "No preview data found for URL",
-  "code": "NO_PREVIEW_DATA"
+  "error": "Failed to fetch URL: 404",
+  "code": "TOOL_EXECUTION_ERROR"
 }
 ```
+
+#### Missing Preview Metadata
+
+There is no "no preview data" error. When `og:title`, `og:description`, and
+`og:image` are missing, the tool still returns success: the title falls back to
+the URL hostname, the description falls back to an empty string, and the
+thumbnail is omitted.
 
 ## Best Practices
 

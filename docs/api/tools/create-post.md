@@ -179,7 +179,23 @@ Returns an object with the following properties:
 }
 ```
 
-#### Rate Limit Exceeded
+#### Rate Limit Exceeded (this server's per-tool limit)
+
+When this server's own per-tool limit is exceeded, the tool returns an MCP error
+with code `InternalError` and no machine-readable `retryAfter` value:
+
+```json
+{
+  "error": "Rate limit exceeded for tool \"create_post\". Please slow down and retry shortly.",
+  "code": "InternalError"
+}
+```
+
+#### Rate Limit Exceeded (upstream Bluesky API)
+
+Separately, if the upstream Bluesky API returns an HTTP 429, the tool surfaces a
+`RATE_LIMIT_EXCEEDED` error that includes a `retryAfter` value (seconds to wait)
+derived from the response's `retry-after` header:
 
 ```json
 {
@@ -223,8 +239,14 @@ Returns an object with the following properties:
 ## Rate Limiting
 
 This server applies a per-tool rate limit of **100 requests per minute**. When
-the limit is exceeded, the tool returns a `RATE_LIMIT_EXCEEDED` error with a
-`retryAfter` value indicating seconds to wait.
+this server's own limit is exceeded, the tool returns an MCP error with code
+`InternalError` and a message like
+`Rate limit exceeded for tool "create_post". Please slow down and retry shortly.`
+(no machine-readable `retryAfter` value).
+
+Separately, if the upstream Bluesky API returns an HTTP 429, the tool surfaces a
+`RATE_LIMIT_EXCEEDED` error that includes a `retryAfter` value (seconds to wait)
+derived from the response's `retry-after` header.
 
 ## Related Tools
 

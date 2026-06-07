@@ -19,17 +19,23 @@ applications.
 The server runs **without authentication**, but only a small set of public tools
 work in this mode. This makes it useful for:
 
-- Searching public posts
 - Viewing public profile information
+- Inspecting social graphs and post context
 - Quick prototyping before setting up authentication
 
 Available operations without authentication:
 
-- `search_posts` — search public posts
 - `get_user_profile` — view public profiles (returns additional data when
   authenticated)
+- `get_followers` / `get_follows` — view social graphs (richer viewer-state data
+  when authenticated)
+- `analyze_image` / `generate_alt_text` — vision-based media tools
+- `get_post_context`, `find_similar_users`, and other public/enhanced discovery
+  tools
 
-Most other tools require authentication. See
+`search_posts` requires authentication — the AT Protocol search API changed in
+2025 to require auth — so it does **not** work in unauthenticated mode. Most
+other tools also require authentication. See
 [Authentication](./authentication.md) for setup.
 
 ### Optional Authentication
@@ -138,9 +144,11 @@ package directly.
 
 If you're using LLM clients for research:
 
-- **Public Data Access**: Public post search and profile lookups work without
-  authentication
-- **Search**: Search public posts with filters via natural language
+- **Public Data Access**: Profile lookups, social-graph reads, and post-context
+  tools work without authentication
+- **Search**: Search posts with filters via natural language (requires
+  authentication, since the AT Protocol search API changed in 2025 to require
+  auth)
 - **Data Export**: Easy access to structured social media data through LLM
   queries
 - **Ethical**: Respects user privacy and platform guidelines

@@ -33,14 +33,25 @@ illustrative.
       handle: string;
       displayName?: string;
       avatar?: string;
+      description?: string;
+      followersCount?: number;
+      followsCount?: number;
+      postsCount?: number;
     };
-    text: string;
-    embed?: any;
-    replyCount: number;
-    repostCount: number;
-    likeCount: number;
+    record: {
+      text: string;
+      createdAt: string;
+      reply?: { root: { uri: string; cid: string }; parent: { uri: string; cid: string } };
+      embed?: any;
+      langs?: string[];
+      labels?: any;
+      tags?: string[];
+    };
+    replyCount?: number;
+    repostCount?: number;
+    likeCount?: number;
     indexedAt: string;
-    createdAt: string;
+    viewer?: { repost?: string; like?: string };
   };
   thread?: {
     parent?: Post;

@@ -74,7 +74,9 @@ pnpm store prune
 App passwords are the supported authentication path. Set `ATPROTO_IDENTIFIER`
 (your handle or DID) and `ATPROTO_PASSWORD` (an **app password**, not your main
 account password). Without credentials the server still starts, but only public
-tools work (notably `search_posts` and `get_user_profile`).
+tools work (notably `get_user_profile`). `search_posts` requires authentication
+(the AT Protocol search API changed in 2025 to require auth), so it is not
+available without credentials.
 
 ### Authentication Failed
 

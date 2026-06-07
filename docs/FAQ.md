@@ -137,11 +137,16 @@ authentication, so unauthenticated mode only exposes public read-only tools.
 
 - `get_user_profile` - View public profiles (provides additional viewer-specific
   data when authenticated)
-- `search_posts` - Search public posts
+- `get_followers` / `get_follows` - View social graphs (return richer
+  viewer-state data when authenticated)
+- `analyze_image` / `generate_alt_text` - Vision-based media tools
+- `get_post_context`, `find_similar_users`, and other public/enhanced discovery
+  tools
 
 **Tools that require authentication:**
 
-- `get_followers` / `get_follows` - View social graphs
+- `search_posts` - Search posts (the AT Protocol search API changed in 2025 to
+  require authentication)
 - `get_thread` - Read conversations
 - `get_custom_feed` - Browse feeds
 - All write operations (posting, following, liking, etc.) and most other data
