@@ -4,49 +4,62 @@ This guide covers authentication methods for the AT Protocol MCP Server.
 
 ## Overview
 
-The AT Protocol MCP Server supports **three modes of operation**:
+The AT Protocol MCP Server supports **two practical modes of operation**:
 
-1. **Unauthenticated Mode** - Access public data without credentials
-2. **App Password Authentication** - Simple authentication for development
-3. **OAuth Authentication** - Secure authentication for production
+1. **Unauthenticated Mode** - Access a small set of public tools without
+   credentials
+2. **App Password Authentication** - The supported path for full functionality
+
+OAuth is also present but **experimental and not implemented end-to-end** — see
+[OAuth Authentication](#oauth-authentication-experimental) below.
+
+::: tip Recommended
+
+Use **app passwords**. They are the supported authentication path and unlock the
+full tool set. OAuth cannot currently complete a login.
+
+:::
 
 ## Unauthenticated Mode
 
 ### When to Use
 
-Perfect for:
-- Accessing public AT Protocol data
-- Read-only applications
-- Quick prototyping
-- Research and analysis
+Useful for:
+
+- Quick prototyping against public data
 - LLM clients that don't need write access
+- Trying the server before creating an app password
 
 ### Available Operations
 
-Without authentication, you can:
+Most tools require authentication. Without credentials, only the **public**
+tools work — notably:
 
-- Search posts and hashtags
-- View user profiles
-- Get follower/following lists
-- Browse public feeds
-- View post threads
-- Access public timelines
+- `search_posts` — search public posts
+- `get_user_profile` — view a user's public profile
+
+Some tools provide enhanced data when authenticated but still run
+unauthenticated (returning public data). Everything that writes (posting,
+liking, following, messaging, etc.) and anything that reads your own account
+state (timeline, notifications, conversations) requires authentication.
 
 ### Setup
 
-No setup required! Just start the server:
+No setup required. Just start the server:
 
 ```bash
 atproto-mcp
 ```
 
-The server will automatically work in unauthenticated mode.
+The server automatically runs in unauthenticated mode when no credentials are
+provided.
 
 ## App Password Authentication
 
 ### When to Use
 
 Recommended for:
+
 - Development and testing
 - Personal projects
 - Single-user applications
@@ -92,7 +105,8 @@ atproto-mcp
 
 #### Method 3: MCP Client Configuration
 
-For Claude Desktop (`~/Library/Application Support/Claude/claude_desktop_config.json`):
+For Claude Desktop
+(`~/Library/Application Support/Claude/claude_desktop_config.json`):
 
 ```json
 {
@@ -129,133 +143,70 @@ atproto-mcp --log-level debug
 - **Use different passwords** for different environments
 - **Revoke unused passwords** in Bluesky settings
 
-## OAuth Authentication
+## OAuth Authentication (Experimental)
 
-### When to Use
+::: warning Experimental — not implemented
 
-Recommended for:
-- Production applications
-- Multi-user systems
-- Public-facing services
-- Applications requiring user consent
+OAuth is **not functional end-to-end**. `start_oauth_flow` builds a heuristic
+PKCE authorization URL, but the rest of the flow is a **dead end**:
+`handle_oauth_callback`, `refresh_oauth_tokens`, and `revoke_oauth_tokens`
+**always throw `OAUTH_NOT_IMPLEMENTED`**. There is no token exchange, so OAuth
+cannot produce an authenticated session. Use
+**[app passwords](#app-password-authentication)** instead. See
+[Experimental & Roadmap](./experimental.md).
 
-### Prerequisites
-
-OAuth support in AT Protocol is currently in development. When available, you'll need:
-
-1. **OAuth Client ID** - From AT Protocol OAuth registration
-2. **OAuth Client Secret** - From AT Protocol OAuth registration
-3. **Redirect URI** - Your application's callback URL
+:::
 
 ### Configuration
+
+OAuth uses only a client ID and client secret, supplied via `ATPROTO_CLIENT_ID`
+and `ATPROTO_CLIENT_SECRET`:
 
 ```bash
 export ATPROTO_CLIENT_ID="your-client-id"
 export ATPROTO_CLIENT_SECRET="your-client-secret"
-export ATPROTO_REDIRECT_URI="https://your-app.com/callback"
 atproto-mcp --auth oauth
 ```
 
-### OAuth Flow
+::: tip
 
-The server implements the standard OAuth 2.0 flow:
+There is **no** `ATPROTO_REDIRECT_URI` variable — the server does not read it.
+`start_oauth_flow` derives a redirect heuristically and never performs
+Authorization-Server metadata discovery or PAR.
 
-```
-1. User initiates login
-   ↓
-2. Server redirects to AT Protocol OAuth
-   ↓
-3. User authorizes application
-   ↓
-4. AT Protocol redirects back with code
-   ↓
-5. Server exchanges code for tokens
-   ↓
-6. Server stores access & refresh tokens
-   ↓
-7. User is authenticated
-```
+:::
 
-### Using OAuth Tools
+### OAuth Tools (current behavior)
 
-The server provides MCP tools for OAuth management:
+| Tool                    | Current behavior                                                                                      |
+| ----------------------- | ----------------------------------------------------------------------------------------------------- |
+| `start_oauth_flow`      | Builds a heuristic PKCE authorization URL. No metadata discovery / PAR. The flow cannot be completed. |
+| `handle_oauth_callback` | Always throws `OAUTH_NOT_IMPLEMENTED` (no token exchange).                                            |
+| `refresh_oauth_tokens`  | Always throws `OAUTH_NOT_IMPLEMENTED`.                                                                |
+| `revoke_oauth_tokens`   | Always throws `OAUTH_NOT_IMPLEMENTED`.                                                                |
 
-#### Start OAuth Flow
-
-```typescript
-// Through your LLM client
-"Start the OAuth authentication flow"
-```
-
-This returns an authorization URL for the user to visit.
-
-#### Handle OAuth Callback
-
-```typescript
-// After user authorizes
-"Handle OAuth callback with code: abc123..."
-```
-
-#### Refresh Tokens
-
-```typescript
-// Refresh expired access tokens
-"Refresh my OAuth tokens"
-```
-
-#### Revoke Tokens
-
-```typescript
-// Log out and revoke tokens
-"Revoke my OAuth tokens"
-```
-
-### Token Management
-
-The server automatically:
-- Stores tokens securely in memory
-- Refreshes expired access tokens
-- Handles token revocation
-- Manages session state
+Because the callback exchange is unimplemented, starting the flow leads nowhere.
+Track progress on the [Experimental & Roadmap](./experimental.md) page.
 
 ## Authentication Modes Comparison
 
-| Feature | Unauthenticated | App Password | OAuth |
-|---------|----------------|--------------|-------|
-| **Setup Complexity** | None | Simple | Complex |
-| **Security** | N/A | Medium | High |
-| **Use Case** | Public data | Development | Production |
-| **User Consent** | N/A | Not required | Required |
-| **Token Refresh** | N/A | Not needed | Automatic |
-| **Multi-user** | Yes | No | Yes |
-| **Write Operations** | No | Yes | Yes |
-| **Production Ready** | Yes | Limited | Yes |
+| Feature              | Unauthenticated   | App Password       | OAuth (experimental) |
+| -------------------- | ----------------- | ------------------ | -------------------- |
+| **Setup Complexity** | None              | Simple             | N/A — not usable     |
+| **Use Case**         | Public tools only | Full functionality | Not yet functional   |
+| **Write Operations** | No                | Yes                | No (flow incomplete) |
+| **Status**           | Supported         | Supported          | Not implemented      |
 
 ## Switching Between Modes
 
 ### From Unauthenticated to Authenticated
 
-Simply add credentials and restart:
+Add app-password credentials and restart:
 
 ```bash
 export ATPROTO_IDENTIFIER="your-handle.bsky.social"
 export ATPROTO_PASSWORD="your-app-password"
 atproto-mcp
-```
-
-### From App Password to OAuth
-
-Update configuration and restart:
-
-```bash
-# Remove app password variables
-unset ATPROTO_IDENTIFIER
-unset ATPROTO_PASSWORD
-
-# Set OAuth variables
-export ATPROTO_CLIENT_ID="your-client-id"
-export ATPROTO_CLIENT_SECRET="your-client-secret"
-atproto-mcp --auth oauth
 ```
 
 ## Troubleshooting
@@ -265,6 +216,7 @@ atproto-mcp --auth oauth
 **Problem**: "Authentication failed" error
 
 **Solutions**:
+
 ```bash
 # Verify credentials
 echo $ATPROTO_IDENTIFIER
@@ -282,6 +234,7 @@ atproto-mcp --log-level debug
 **Problem**: "Invalid password" error
 
 **Solutions**:
+
 - Verify you're using an **app password**, not your main password
 - Check for typos or extra spaces
 - Generate a new app password
@@ -292,23 +245,26 @@ atproto-mcp --log-level debug
 **Problem**: "Session expired" error
 
 **Solutions**:
-```bash
-# Restart the server to create new session
-atproto-mcp
 
-# For OAuth, refresh tokens
-# (automatic in most cases)
+```bash
+# Restart the server to create a new session
+atproto-mcp
 ```
+
+App-password sessions are re-established on startup; restarting the server is
+the simplest fix.
 
 ### Rate Limiting
 
 **Problem**: "Rate limit exceeded" error
 
+The server enforces a per-tool limit of **100 requests per minute per tool**.
+
 **Solutions**:
-- Wait for the rate limit window to reset
+
+- Wait for the 60-second window to reset
 - Reduce request frequency
-- Implement exponential backoff
-- Check rate limit headers in logs
+- Implement exponential backoff in your client
 
 ## Security Considerations
 
@@ -321,10 +277,9 @@ atproto-mcp
 
 ### Network Security
 
-- Always use HTTPS in production
-- Configure proper CORS origins
-- Use trusted proxies configuration
-- Enable rate limiting
+- The server talks to the AT Protocol service over HTTPS
+- It communicates with MCP clients over stdio (no network listener to harden)
+- A built-in per-tool rate limit (100 requests/minute) is always on
 
 ### Access Control
 
@@ -348,5 +303,5 @@ atproto-mcp
 
 ---
 
-**Previous**: [Configuration](./configuration.md) ← | **Next**: [MCP Protocol](./mcp-protocol.md) →
-
+**Previous**: [Configuration](./configuration.md) ← | **Next**:
+[MCP Protocol](./mcp-protocol.md) →

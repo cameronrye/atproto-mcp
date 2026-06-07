@@ -1,116 +1,87 @@
 # track_users
 
-Track activity from specific users in the firehose stream. Returns recent events from the specified users.
+Scan the in-memory firehose event buffer for activity from specific users.
+
+::: danger Not implemented
+
+`track_users` is registered and visible to MCP clients but scans a buffer that
+is **never populated** — firehose decoding is not implemented
+(`FIREHOSE_DECODING_IMPLEMENTED = false`), so there is never any user activity
+to match. The response includes `firehoseDecodingImplemented: false` and an
+explanatory `note`. See [Experimental & Roadmap](../../guide/experimental.md).
+
+:::
 
 ## Authentication
 
-**Optional** - This tool works without authentication but requires the firehose to be started first using `start_streaming`.
+**Optional:** No authentication is performed.
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `users` | `string[]` | Yes | - | Array of user DIDs or handles to track. At least one user is required. |
-| `limit` | `number` | No | `20` | Maximum number of events to return. Must be between 1 and 100. |
-| `eventTypes` | `string[]` | No | `['post']` | Types of events to track. Options: `post`, `like`, `repost`, `follow`, `profile`. |
+| Parameter    | Type       | Required | Default    | Description                                                                                   |
+| ------------ | ---------- | -------- | ---------- | --------------------------------------------------------------------------------------------- |
+| `users`      | `string[]` | Yes      | —          | User identifiers to track (at least one required). Matched against each event's `repo` (DID). |
+| `limit`      | `number`   | No       | `20`       | Maximum number of events to return (1–100).                                                   |
+| `eventTypes` | `string[]` | No       | `['post']` | Event types to include: `post`, `like`, `repost`, `follow`, `profile`.                        |
 
-## Response
+::: tip Matching is by DID
 
-```typescript
-{
-  success: boolean;
-  users: string[];
-  events: Array<{
-    user: string;
-    eventType: string;
-    collection: string;
-    operation: string;
-    record?: any;
-    seq: number;
-    time: string;
-    receivedAt: string;
-  }>;
-  totalEvents: number;
-  totalScanned: number;
-}
-```
+Users are matched against the event's `repo` field, which is a DID. Handles
+(e.g. `alice.bsky.social`) are not resolved to DIDs, so to match in principle
+you would pass a DID. This is moot while the buffer is empty.
 
-## Examples
-
-### Track User Posts
-
-```json
-{
-  "users": ["alice.bsky.social"],
-  "limit": 10
-}
-```
-
-### Track Multiple Users (All Event Types)
-
-```json
-{
-  "users": ["alice.bsky.social", "bob.bsky.social", "did:plc:xyz123"],
-  "limit": 50,
-  "eventTypes": ["post", "like", "repost", "follow"]
-}
-```
-
-### Track User Engagement Only
-
-```json
-{
-  "users": ["influencer.bsky.social"],
-  "eventTypes": ["like", "repost"],
-  "limit": 25
-}
-```
-
-## Error Handling
-
-Common errors:
-
-- **`InvalidRequest`**: No users provided or invalid parameters
-- **`StreamingNotStarted`**: Firehose streaming must be started first using `start_streaming`
-- **`RateLimitExceeded`**: Too many requests in a short period
-
-## Best Practices
-
-1. **Start Streaming First**: Always call `start_streaming` before using this tool
-2. **Use DIDs for Reliability**: DIDs are permanent, handles can change
-3. **Filter Event Types**: Specify only the event types you need to reduce noise
-4. **Adjust Limit**: Start with a smaller limit and increase as needed
-5. **Buffer Size**: The tool scans the event buffer, which has a maximum size - older events may be dropped
-6. **Track Key Accounts**: Monitor influential users or competitors for insights
-7. **Combine with Keywords**: Use `monitor_keywords` alongside this tool for comprehensive monitoring
+:::
 
 ## Event Types
 
-- **`post`**: New posts created by the user (collection: `app.bsky.feed.post`)
-- **`like`**: Posts liked by the user (collection: `app.bsky.feed.like`)
-- **`repost`**: Posts reposted by the user (collection: `app.bsky.feed.repost`)
-- **`follow`**: Users followed by the user (collection: `app.bsky.graph.follow`)
-- **`profile`**: Profile updates (collection: `app.bsky.actor.profile`)
+Each event type maps to a collection:
 
-## Rate Limiting
+- `post` → `app.bsky.feed.post`
+- `like` → `app.bsky.feed.like`
+- `repost` → `app.bsky.feed.repost`
+- `follow` → `app.bsky.graph.follow`
+- `profile` → `app.bsky.actor.profile`
 
-This tool reads from the local event buffer and is not subject to AT Protocol API rate limits. However, the firehose connection itself has limits:
+## Behavior
 
-- Maximum 1 concurrent firehose connection per client
-- Event buffer size is limited (typically 1000 events)
-- Older events are dropped as new ones arrive
+The tool scans the shared in-memory event buffer (max 100 events, FIFO) for
+events whose `repo` is one of the tracked users and whose collection matches the
+requested event types. Because the firehose never decodes any frames, the buffer
+is always empty and there are never any events.
+
+## Response
+
+Tool results are returned as stringified JSON text. The shape is illustrative:
+
+```json
+{
+  "success": true,
+  "firehoseDecodingImplemented": false,
+  "note": "AT Protocol firehose frame (CAR/DAG-CBOR) decoding is not implemented in this build, so no live events are ever decoded into the buffer. Empty results here mean \"streaming is not available\", not \"no activity\".",
+  "users": ["did:plc:xyz123"],
+  "events": [],
+  "totalEvents": 0,
+  "totalScanned": 0
+}
+```
+
+`events` is always empty and `totalScanned` is always `0`. The `note` field is
+present whenever `firehoseDecodingImplemented` is `false`.
+
+## Errors
+
+An empty `users` array fails schema validation before execution.
 
 ## Related Tools
 
-- **[start_streaming](./start-streaming.md)** - Start the firehose stream (required before using this tool)
-- **[stop_streaming](./stop-streaming.md)** - Stop the firehose stream
-- **[get_streaming_status](./get-streaming-status.md)** - Check firehose connection status
-- **[get_recent_events](./get-recent-events.md)** - Get recent events from the buffer
-- **[monitor_keywords](#monitor-keywords)** - Monitor keywords in the firehose
-- **[get_user_profile](./get-user-profile.md)** - Get detailed user profile information
+- **[start_streaming](./start-streaming.md)** — Start streaming (currently not
+  implemented)
+- **[get_recent_events](./get-recent-events.md)** — Read the (empty) event
+  buffer
+- **[monitor_keywords](./monitor-keywords.md)** — Scan the buffer for keywords
+- **[get_user_profile](./get-user-profile.md)** — Get a user's profile (a
+  functional alternative)
 
 ## See Also
 
-- [Streaming Tools Guide](../../guide/tools-resources.md#streaming--real-time)
-- [AT Protocol Firehose Documentation](https://docs.bsky.app/docs/advanced-guides/firehose)
-
+- [Experimental & Roadmap](../../guide/experimental.md)

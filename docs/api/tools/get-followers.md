@@ -4,25 +4,33 @@ Get the list of users following a specific user.
 
 ## Authentication
 
-**Optional:** Public tool (works without authentication)
+**Optional:** Enhanced tool. Works without authentication; when authenticated,
+the AT Protocol API may include viewer-specific relationship state for each
+follower.
 
 ## Parameters
 
 ### `actor` (required)
+
 - **Type:** `string`
 - **Description:** User identifier (DID or handle)
 
 ### `limit` (optional)
+
 - **Type:** `number`
 - **Default:** `50`
 - **Constraints:** 1-100
 - **Description:** Maximum number of followers to return
 
 ### `cursor` (optional)
+
 - **Type:** `string`
 - **Description:** Pagination cursor from previous response
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
@@ -33,22 +41,15 @@ Get the list of users following a specific user.
     displayName?: string;
     description?: string;
     avatar?: string;
+    banner?: string;
+    followersCount?: number;
+    followsCount?: number;
+    postsCount?: number;
     indexedAt?: string;
-    viewer?: {
-      muted?: boolean;
-      blockedBy?: boolean;
-      following?: string;
-      followedBy?: string;
-    };
   }>;
-  subject: {
-    did: string;
-    handle: string;
-    displayName?: string;
-    avatar?: string;
-  };
   cursor?: string;
   hasMore: boolean;
+  actor: string;            // the requested actor (DID or handle)
 }
 ```
 
@@ -78,6 +79,7 @@ Get the list of users following a specific user.
 ### Common Errors
 
 #### Invalid Actor
+
 ```json
 {
   "error": "Actor (DID or handle) is required",
@@ -86,6 +88,7 @@ Get the list of users following a specific user.
 ```
 
 #### User Not Found
+
 ```json
 {
   "error": "User not found",
@@ -93,11 +96,10 @@ Get the list of users following a specific user.
 }
 ```
 
-## Best Practices
+## Pagination
 
-- Use pagination for users with many followers
-- Cache follower lists for short periods
-- Respect privacy settings
+Pass the `cursor` from the previous response to page through users with many
+followers, and check `hasMore` before requesting another page.
 
 ## Related Tools
 
@@ -108,4 +110,3 @@ Get the list of users following a specific user.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

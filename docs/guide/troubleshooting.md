@@ -1,18 +1,28 @@
 # Troubleshooting
 
-Common issues and solutions for the AT Protocol MCP Server.
+Common issues and fixes for the AT Protocol MCP Server.
 
-## Installation Issues
+This server speaks the
+[Model Context Protocol](https://modelcontextprotocol.io/) over **stdio only** —
+it is launched by your MCP client (Claude Desktop, an IDE, your own script) and
+communicates over stdin/stdout. It does **not** bind a network port, so there is
+no HTTP endpoint, no `localhost:3000`, and no `/health` URL to curl.
+
+This page is symptom &rarr; fix. For error codes and recovery patterns, see
+[Error Handling](./error-handling.md).
+
+## Installation & Build Issues
 
 ### Node.js Version Error
 
-**Problem**: Error about Node.js version being too old
+**Symptom**: An error about the Node.js version being too old.
 
 ```
 Error: The engine "node" is incompatible with this module
 ```
 
-**Solution**:
+**Fix**: This project requires Node.js 20 or newer.
+
 ```bash
 # Check current version
 node --version
@@ -22,24 +32,17 @@ curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
 nvm install 20
 nvm use 20
 
-# Verify installation
-node --version  # Should show v20.x.x
+# Verify
+node --version  # Should show v20.x.x or newer
 ```
 
 ### Permission Denied (Global Install)
 
-**Problem**: Permission errors when installing globally
+**Symptom**: `EACCES: permission denied` when installing globally.
 
-```
-EACCES: permission denied
-```
+**Fix**: Configure npm to install global packages without `sudo`.
 
-**Solution**:
 ```bash
-# Option 1: Use sudo (not recommended)
-sudo npm install -g atproto-mcp
-
-# Option 2: Configure npm to install globally without sudo (recommended)
 mkdir ~/.npm-global
 npm config set prefix '~/.npm-global'
 echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
@@ -47,473 +50,303 @@ source ~/.bashrc
 npm install -g atproto-mcp
 ```
 
-### Build Errors
+### Build Errors (from source)
 
-**Problem**: Errors during build from source
+**Symptom**: Errors such as `Cannot find module 'typescript'` when building from
+source.
 
-```
-Error: Cannot find module 'typescript'
-```
+**Fix**: Reinstall dependencies cleanly. This project uses `pnpm`.
 
-**Solution**:
 ```bash
 # Clean and reinstall
-rm -rf node_modules package-lock.json
-npm install
-
-# Clear npm cache
-npm cache clean --force
-
-# Try with different package manager
+rm -rf node_modules
 pnpm install
+
+# Rebuild
+pnpm build
+
+# If problems persist, clear the package manager cache
+pnpm store prune
 ```
 
 ## Authentication Issues
 
+App passwords are the supported authentication path. Set `ATPROTO_IDENTIFIER`
+(your handle or DID) and `ATPROTO_PASSWORD` (an **app password**, not your main
+account password). Without credentials the server still starts, but only public
+tools work (notably `search_posts` and `get_user_profile`).
+
 ### Authentication Failed
 
-**Problem**: "Authentication failed" error when starting server
+**Symptom**: An "authentication failed" / `AUTHENTICATION_FAILED` error at
+startup.
 
-**Checklist**:
+**Fix**: Work through this checklist.
+
 ```bash
-# 1. Verify credentials are set
+# 1. Confirm the variables are actually set in this shell
 echo $ATPROTO_IDENTIFIER
 echo $ATPROTO_PASSWORD
 
-# 2. Check for typos or extra spaces
-# Remove quotes if present
+# 2. Set them cleanly (no surrounding quotes, no trailing spaces/newlines)
 export ATPROTO_IDENTIFIER=your-handle.bsky.social
-export ATPROTO_PASSWORD=your-app-password
+export ATPROTO_PASSWORD=xxxx-xxxx-xxxx-xxxx
 
-# 3. Verify service URL
-echo $ATPROTO_SERVICE  # Should be https://bsky.social
+# 3. Confirm the service URL (defaults to https://bsky.social)
+echo $ATPROTO_SERVICE
 
-# 4. Test with debug logging
+# 4. Re-run with debug logging to see the underlying error
 atproto-mcp --log-level debug
 ```
+
+Note: when launching via an MCP client, environment variables must be set in
+that client's config (for example the `env` block of
+`claude_desktop_config.json`), not just in your interactive shell.
 
 ### Invalid App Password
 
-**Problem**: "Invalid password" error
+**Symptom**: An "invalid password" error even though the handle is correct.
 
-**Solutions**:
-1. **Verify you're using an app password**, not your main account password
-2. **Generate a new app password**:
-   - Go to Bluesky Settings → App Passwords
-   - Create new password
-   - Copy and use immediately
-3. **Check for revoked passwords** in Bluesky settings
-4. **Ensure no extra characters** (spaces, quotes, newlines)
+**Fix**:
+
+1. Make sure you are using an **app password**, not your main account password.
+2. Generate a fresh one: Bluesky **Settings &rarr; App Passwords &rarr; Add App
+   Password**, then copy it immediately.
+3. Check the **App Passwords** list for any password you have since revoked.
+4. Remove any stray characters (spaces, quotes, newlines) introduced when
+   copying.
 
 ### Session Expired
 
-**Problem**: "Session expired" error during operation
+**Symptom**: A session/authentication error appears after the server has been
+running for a while.
 
-**Solution**:
+**Fix**: Restart the server (or have your MCP client restart it). On startup it
+re-authenticates from `ATPROTO_IDENTIFIER` / `ATPROTO_PASSWORD` and establishes
+a new session.
+
 ```bash
-# Restart the server to create a new session
-# The server will automatically re-authenticate
 atproto-mcp
 ```
 
-## Connection Issues
+## MCP Client Connection Issues
 
-### Port Already in Use
-
-**Problem**: "Port 3000 is already in use"
-
-**Solution**:
-```bash
-# Option 1: Use a different port
-atproto-mcp --port 8080
-
-# Option 2: Find and kill the process using port 3000
-# macOS/Linux
-lsof -ti:3000 | xargs kill -9
-
-# Windows
-netstat -ano | findstr :3000
-taskkill /PID <PID> /F
-```
-
-### Cannot Connect to AT Protocol Service
-
-**Problem**: Network errors or timeouts
-
-**Checklist**:
-```bash
-# 1. Check internet connectivity
-ping bsky.social
-
-# 2. Verify service URL
-curl https://bsky.social/xrpc/_health
-
-# 3. Check for proxy settings
-echo $HTTP_PROXY
-echo $HTTPS_PROXY
-
-# 4. Test with custom service URL
-atproto-mcp --service https://bsky.social
-
-# 5. Check firewall settings
-# Ensure outbound HTTPS (443) is allowed
-```
+Because the transport is stdio, "connection" problems are almost always about
+how the client launches the process, not about networking.
 
 ### MCP Client Can't Connect
 
-**Problem**: LLM client can't connect to MCP server
+**Symptom**: Your LLM client reports that it cannot start or reach the server.
 
-**Solutions**:
+**Fix**:
+
 ```bash
-# 1. Verify server is running
-ps aux | grep atproto-mcp
+# 1. Confirm the binary resolves and runs at all
+atproto-mcp --version
 
-# 2. Check server logs
+# 2. Run it directly with debug logging and watch the startup logs.
+#    Logs go to stderr, so they will not corrupt the stdio JSON-RPC stream.
 atproto-mcp --log-level debug
 
-# 3. Verify client configuration
-# For Claude Desktop:
+# 3. Inspect the client config. For Claude Desktop (macOS):
 cat ~/Library/Application\ Support/Claude/claude_desktop_config.json
-
-# 4. Test server manually
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | atproto-mcp
 ```
 
-## Rate Limiting Issues
+A minimal Claude Desktop entry looks like:
+
+```json
+{
+  "mcpServers": {
+    "atproto": {
+      "command": "atproto-mcp",
+      "env": {
+        "ATPROTO_IDENTIFIER": "your-handle.bsky.social",
+        "ATPROTO_PASSWORD": "xxxx-xxxx-xxxx-xxxx"
+      }
+    }
+  }
+}
+```
+
+Common causes:
+
+- `command` is not on the client's `PATH` (use an absolute path, or the full
+  path to `node` plus the script).
+- Credentials are set in your shell but not in the client config's `env` block.
+- Something is writing to **stdout** other than JSON-RPC. Keep diagnostics on
+  stderr; debug logging already goes there.
+
+::: tip Test the server by hand
+
+You can drive the stdio server manually for a quick sanity check. The MCP
+protocol requires an `initialize` handshake before any other request, and every
+message needs the JSON-RPC envelope (`jsonrpc`, `id`). See
+[Error Handling &rarr; Testing tools manually](./error-handling.md#testing-tools-manually)
+for a working snippet.
+
+:::
+
+### Cannot Reach the AT Protocol Service
+
+**Symptom**: Network errors or timeouts talking to Bluesky.
+
+**Fix**:
+
+```bash
+# 1. Basic connectivity
+ping bsky.social
+
+# 2. Point at a specific service if needed (default is https://bsky.social)
+atproto-mcp --service https://bsky.social
+
+# 3. Check proxy settings if you are behind one
+echo $HTTP_PROXY
+echo $HTTPS_PROXY
+
+# 4. Ensure outbound HTTPS (443) is allowed by your firewall
+```
+
+## Rate Limiting
+
+The server applies a per-tool rate limit of **100 requests per minute** (a
+60-second sliding window, counted independently for each tool). Exceeding it
+returns a JSON-RPC internal error whose message says the rate limit was
+exceeded.
 
 ### Rate Limit Exceeded
 
-**Problem**: "Rate limit exceeded" errors
+**Symptom**: `Rate limit exceeded for tool "<name>"` errors.
 
-**Solutions**:
-```bash
-# 1. Wait for rate limit window to reset (5 minutes)
+**Fix**:
 
-# 2. Reduce request frequency
-# Implement delays between requests
+- Slow down: the window is 60 seconds per tool, so brief pauses clear it.
+- Spread work across tools where it makes sense, since the limit is counted per
+  tool.
+- In your client, add backoff/retry around tool calls. See
+  [Error Handling](./error-handling.md#rate-limit-exceeded) for an example
+  client-side backoff pattern.
 
-# 3. Enable caching
-export CACHE_ENABLED=true
-export CACHE_TTL=300
+Keep in mind Bluesky itself also enforces platform-side rate limits; persistent
+`429`-style failures may originate upstream rather than from this server.
 
-# 4. Check rate limit headers in logs
-atproto-mcp --log-level debug
-```
-
-### Too Many Requests
-
-**Problem**: Hitting rate limits frequently
-
-**Solutions**:
-1. **Implement exponential backoff** in your application
-2. **Cache responses** when possible
-3. **Batch operations** instead of individual requests
-4. **Monitor rate limit headers** and adjust accordingly
-
-## Docker Issues
-
-### Container Won't Start
-
-**Problem**: Docker container exits immediately
-
-**Solution**:
-```bash
-# Check container logs
-docker logs atproto-mcp
-
-# Common issues:
-# 1. Missing environment variables
-docker run -e ATPROTO_IDENTIFIER=... -e ATPROTO_PASSWORD=... atproto-mcp
-
-# 2. Port conflict
-docker run -p 8080:3000 atproto-mcp
-
-# 3. Volume permission issues
-docker run -v $(pwd)/config:/app/config:ro atproto-mcp
-```
-
-### Docker Compose Fails
-
-**Problem**: docker-compose up fails
-
-**Solution**:
-```bash
-# 1. Check .env file exists
-ls -la .env
-
-# 2. Validate docker-compose.yml
-docker-compose config
-
-# 3. Rebuild containers
-docker-compose down
-docker-compose up -d --build
-
-# 4. Check logs
-docker-compose logs -f atproto-mcp
-```
-
-### Cannot Access Container
-
-**Problem**: Can't access services in Docker container
-
-**Solution**:
-```bash
-# 1. Check container is running
-docker ps
-
-# 2. Verify port mapping
-docker port atproto-mcp
-
-# 3. Test from inside container
-docker exec -it atproto-mcp sh
-curl http://localhost:3000/health
-
-# 4. Check network settings
-docker network inspect bridge
-```
-
-## Tool Execution Issues
+## Tool & Resource Issues
 
 ### Tool Not Found
 
-**Problem**: "Method not found" error when calling tool
+**Symptom**: An "unknown tool" / `Invalid params` error when calling a tool.
 
-**Solution**:
-```bash
-# 1. List available tools
-# Through LLM client: "What tools are available?"
+**Fix**:
 
-# 2. Check tool name spelling
-# Tool names use snake_case: create_post, not createPost
-
-# 3. Verify authentication for private tools
-# Some tools require authentication
-
-# 4. Check server logs
-atproto-mcp --log-level debug
-```
+- Ask your client to list tools (for example, "What tools are available?"). The
+  server exposes 60 tools.
+- Tool names are `snake_case` (`create_post`, not `createPost`).
+- Some tools require authentication; without credentials they are unavailable.
+  See [Authentication Issues](#authentication-issues).
 
 ### Invalid Parameters
 
-**Problem**: "Invalid params" error
+**Symptom**: An `Invalid params` (`-32602`) error.
 
-**Solution**:
-```bash
-# 1. Check parameter requirements
-# Through LLM client: "What parameters does create_post need?"
+**Fix**: Each tool validates its arguments with a schema, and the error message
+names the offending field.
 
-# 2. Validate parameter types
-# text: string, limit: number, etc.
+- Check the parameter types and required fields for the tool (see the
+  [Tools reference](../api/index)).
+- For `create_post` and replies, `text` must be non-empty and within Bluesky's
+  300-character limit.
+- Language fields (`langs`) expect BCP-47 codes such as `en`, `en-US`, or
+  `pt-BR`.
 
-# 3. Check parameter constraints
-# Post text: max 300 characters
-# Limit: 1-100
+### Some Tools Are "Not Implemented"
 
-# 4. Review error message for details
-# Error message includes field name and constraint
-```
+**Symptom**: A tool returns `status: "not_implemented"`, an empty result, or
+guidance text instead of doing the work.
 
-### Tool Execution Timeout
+**Fix**: This is expected for the experimental/placeholder tools, not a bug:
 
-**Problem**: Tool execution times out
+- The streaming tools (`start_streaming`, `get_recent_events`,
+  `monitor_keywords`, and friends) are stubs — firehose decoding is not wired
+  up.
+- The OAuth completion tools (`handle_oauth_callback`, `refresh_oauth_tokens`,
+  `revoke_oauth_tokens`) intentionally fail; only `start_oauth_flow` builds a
+  URL, and the flow is a dead end.
+- `generate_alt_text` returns writing guidance, not a vision-model analysis.
+- The `atproto://conversation-context` resource is a placeholder and reads as
+  empty.
 
-**Solution**:
-```bash
-# 1. Increase timeout
-export REQUEST_TIMEOUT=60000  # 60 seconds
+See [Experimental & Roadmap](./experimental.md) for the full list and current
+status.
 
-# 2. Check network connectivity
-ping bsky.social
+### Resource Not Available or Read Fails
 
-# 3. Verify AT Protocol service status
-curl https://bsky.social/xrpc/_health
+**Symptom**: A resource cannot be listed or read.
 
-# 4. Try again later
-# Service might be experiencing issues
-```
+**Fix**:
 
-## Resource Issues
-
-### Resource Not Available
-
-**Problem**: "Resource not available" error
-
-**Solution**:
-```bash
-# 1. Verify authentication
-# Resources require authentication
-export ATPROTO_IDENTIFIER=...
-export ATPROTO_PASSWORD=...
-
-# 2. Check resource URI
-# Correct format: atproto://timeline
-
-# 3. List available resources
-# Through LLM client: "What resources are available?"
-```
-
-### Resource Read Failed
-
-**Problem**: Error reading resource content
-
-**Solution**:
-```bash
-# 1. Check authentication status
-atproto-mcp --log-level debug
-
-# 2. Verify session is active
-# Restart server if session expired
-
-# 3. Check AT Protocol service status
-curl https://bsky.social/xrpc/_health
-```
-
-## Performance Issues
-
-### Slow Response Times
-
-**Problem**: Server responds slowly
-
-**Solutions**:
-```bash
-# 1. Enable caching
-export CACHE_ENABLED=true
-export CACHE_TTL=300
-
-# 2. Increase connection pool
-export CONNECTION_POOL_SIZE=20
-
-# 3. Check system resources
-top  # Check CPU and memory usage
-
-# 4. Monitor network latency
-ping bsky.social
-```
-
-### High Memory Usage
-
-**Problem**: Server using too much memory
-
-**Solutions**:
-```bash
-# 1. Reduce cache size
-export CACHE_MAX_SIZE=50  # MB
-
-# 2. Limit connection pool
-export CONNECTION_POOL_SIZE=5
-
-# 3. Restart server periodically
-# Implement health checks and auto-restart
-
-# 4. Check for memory leaks
-# Monitor memory usage over time
-```
-
-## Configuration Issues
-
-### Environment Variables Not Loading
-
-**Problem**: Environment variables not being read
-
-**Solution**:
-```bash
-# 1. Verify .env file location
-ls -la .env
-
-# 2. Check file permissions
-chmod 600 .env
-
-# 3. Verify variable names
-# Use ATPROTO_IDENTIFIER, not ATPROTO_USERNAME
-
-# 4. Restart server after changes
-atproto-mcp
-```
-
-### Configuration File Not Found
-
-**Problem**: "Configuration file not found" error
-
-**Solution**:
-```bash
-# 1. Check config directory
-ls -la config/
-
-# 2. Copy example config
-cp config/production.json.example config/production.json
-
-# 3. Verify NODE_ENV
-echo $NODE_ENV
-
-# 4. Use default configuration
-# Server works without custom config
-```
+- The functional resources (`atproto://timeline`, `atproto://profile`,
+  `atproto://notifications`) call the real API and require authentication — set
+  your credentials.
+- Use the exact URI form, e.g. `atproto://timeline`.
+- If reads fail after a long session, the session may have expired; restart the
+  server.
 
 ## Debugging Tips
 
 ### Enable Debug Logging
 
+The `--log-level` flag (or the `LOG_LEVEL` environment variable) controls
+verbosity. Logs are written to **stderr**, so they will not interfere with the
+stdio JSON-RPC stream on stdout.
+
 ```bash
 # Maximum verbosity
-LOG_LEVEL=debug atproto-mcp
-
-# Or via environment variable
-export LOG_LEVEL=debug
-atproto-mcp
-```
-
-### Check Server Health
-
-```bash
-# For Docker deployments
-curl http://localhost:3000/health
-
-# Expected response:
-# {"status":"healthy","timestamp":"...","version":"0.1.0"}
-```
-
-### Validate Configuration
-
-```bash
-# Check all environment variables
-env | grep ATPROTO
-
-# Test configuration
-atproto-mcp --help
-```
-
-### Test Individual Components
-
-```bash
-# Test authentication
 atproto-mcp --log-level debug
 
-# Test specific tool
-echo '{"method":"tools/call","params":{"name":"search_posts","arguments":{"q":"test"}}}' | atproto-mcp
+# Or via environment variable
+LOG_LEVEL=debug atproto-mcp
 ```
+
+### Verify Configuration
+
+```bash
+# Print the AT Protocol environment variables
+env | grep ATPROTO
+
+# Confirm the CLI runs and show available flags
+atproto-mcp --help
+
+# Show the version
+atproto-mcp --version
+```
+
+The configuration-validation smoke check (`dist/health-check.js`) loads the
+package, builds and validates the config, and checks this process's heap. It is
+**process-local** — it binds no port and does not probe a running server.
 
 ## Getting Help
 
-If you're still experiencing issues:
+If you are still stuck:
 
-1. **Search existing issues**: [GitHub Issues](https://github.com/cameronrye/atproto-mcp/issues)
-2. **Check discussions**: [GitHub Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
-3. **Review documentation**: [Full Documentation](https://cameronrye.github.io/atproto-mcp)
-4. **Create an issue**: Include:
+1. **Search existing issues**:
+   [GitHub Issues](https://github.com/cameronrye/atproto-mcp/issues)
+2. **Check discussions**:
+   [GitHub Discussions](https://github.com/cameronrye/atproto-mcp/discussions)
+3. **Review the docs**:
+   [Full Documentation](https://cameronrye.github.io/atproto-mcp)
+4. **Open an issue** and include:
    - Server version (`atproto-mcp --version`)
    - Node.js version (`node --version`)
    - Operating system
    - Error messages (sanitize credentials!)
-   - Steps to reproduce
-   - Relevant logs
+   - Steps to reproduce and relevant logs
 
 ## Next Steps
 
-- **[Error Handling](./error-handling.md)** - Handle errors properly
-- **[Deployment](./deployment.md)** - Deploy to production
-- **[Contributing](../contributing.md)** - Report bugs or contribute fixes
+- **[Error Handling](./error-handling.md)** — Error codes and recovery patterns
+- **[Deployment](./deployment.md)** — Run it in production
+- **[Contributing](../contributing.md)** — Report bugs or contribute fixes
 
 ---
 
-**Previous**: [Error Handling](./error-handling.md) ← | **Next**: [Deployment](./deployment.md) →
-
+**Previous**: [Error Handling](./error-handling.md) &larr; | **Next**:
+[Deployment](./deployment.md) &rarr;

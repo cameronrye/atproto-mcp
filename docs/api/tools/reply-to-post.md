@@ -9,36 +9,43 @@ Reply to an existing post on AT Protocol with proper threading support.
 ## Parameters
 
 ### `text` (required)
+
 - **Type:** `string`
-- **Constraints:** 
+- **Constraints:**
   - Minimum length: 1 character
   - Maximum length: 300 characters
 - **Description:** The text content of the reply
 
 ### `root` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the root post in the thread (the first post)
+- **Description:** AT Protocol URI of the root post in the thread (the first
+  post)
 
 ### `parent` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the immediate parent post you're replying to
+- **Description:** AT Protocol URI of the immediate parent post you're replying
+  to
 
 ### `langs` (optional)
+
 - **Type:** `string[]`
-- **Description:** Array of ISO 639-1 language codes
+- **Description:** Array of BCP-47 language tags (e.g. `"en"`, `"en-US"`,
+  `"pt-BR"`)
 - **Example:** `["en", "es"]`
 
 ## Response
 
 ```typescript
 {
-  uri: string;        // URI of the created reply
-  cid: string;        // Content identifier of the reply
-  success: boolean;   // Operation success status
-  message: string;    // Success message
+  uri: string; // URI of the created reply
+  cid: string; // Content identifier of the reply
+  success: boolean; // Operation success status
+  message: string; // Success message
   replyTo: {
-    root: string;     // Root post URI
-    parent: string;   // Parent post URI
+    root: string; // Root post URI
+    parent: string; // Parent post URI
   }
 }
 ```
@@ -81,6 +88,7 @@ Reply to an existing post on AT Protocol with proper threading support.
 ### Common Errors
 
 #### Missing Root or Parent
+
 ```json
 {
   "error": "Root post URI is required",
@@ -89,6 +97,7 @@ Reply to an existing post on AT Protocol with proper threading support.
 ```
 
 #### Invalid URI Format
+
 ```json
 {
   "error": "Invalid AT Protocol URI format",
@@ -97,6 +106,7 @@ Reply to an existing post on AT Protocol with proper threading support.
 ```
 
 #### Post Not Found
+
 ```json
 {
   "error": "Parent post not found",
@@ -107,11 +117,13 @@ Reply to an existing post on AT Protocol with proper threading support.
 ## Best Practices
 
 ### Threading
+
 - **Root:** Always set to the first post in the thread
 - **Parent:** Set to the immediate post you're replying to
 - For direct replies to the original post, `root` and `parent` are the same
 
 ### Content
+
 - Keep replies focused and relevant to the parent post
 - Use @mentions to notify specific users
 - Consider thread context when replying
@@ -124,5 +136,4 @@ Reply to an existing post on AT Protocol with proper threading support.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-- [Threading Guide](../../guide/tools-resources.md#threading)
-
+- [Tools & Resources Guide](../../guide/tools-resources.md#social-operations)

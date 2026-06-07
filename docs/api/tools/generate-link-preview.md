@@ -9,6 +9,7 @@ Generate a link preview card for a URL to embed in posts.
 ## Parameters
 
 ### `url` (required)
+
 - **Type:** `string`
 - **Description:** URL to generate preview for
 
@@ -44,6 +45,7 @@ Generate a link preview card for a URL to embed in posts.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -66,6 +68,7 @@ Generate a link preview card for a URL to embed in posts.
 ## How It Works
 
 The tool:
+
 1. Fetches the URL
 2. Extracts Open Graph or meta tags
 3. Downloads and uploads the preview image
@@ -74,25 +77,32 @@ The tool:
 ## Extracted Data
 
 ### Title
+
 - Open Graph: `og:title`
 - Fallback: `<title>` tag
 - Max length: 300 characters
 
 ### Description
+
 - Open Graph: `og:description`
 - Fallback: `<meta name="description">`
 - Max length: 1000 characters
 
 ### Image
-- Open Graph: `og:image`
-- Fallback: First large image on page
-- Automatically resized and optimized
+
+- Open Graph: `og:image` only (if the page has no `og:image`, the preview is
+  returned without a thumbnail)
+- The image is downloaded over an SSRF-safe fetch (capped at 1MB) and uploaded
+  **as-is** — it is not resized, re-encoded, or otherwise optimized
+- If the `og:image` is larger than 1MB or cannot be fetched, the thumbnail is
+  omitted
 
 ## Error Handling
 
 ### Common Errors
 
 #### Invalid URL
+
 ```json
 {
   "error": "Invalid URL format",
@@ -101,6 +111,7 @@ The tool:
 ```
 
 #### URL Not Accessible
+
 ```json
 {
   "error": "Failed to fetch URL",
@@ -109,6 +120,7 @@ The tool:
 ```
 
 #### No Preview Data
+
 ```json
 {
   "error": "No preview data found for URL",
@@ -119,22 +131,26 @@ The tool:
 ## Best Practices
 
 ### URL Validation
+
 - Validate URLs before generating previews
 - Handle redirects appropriately
 - Check for HTTPS when possible
 
 ### Caching
+
 - Cache preview data for frequently shared URLs
 - Set reasonable cache expiration (24 hours)
 - Invalidate cache for dynamic content
 
 ### Performance
+
 - Generate previews asynchronously
 - Show loading state to users
 - Implement timeout for slow URLs
 - Provide fallback for failed previews
 
 ### User Experience
+
 - Allow users to edit preview data
 - Show preview before posting
 - Provide option to remove preview
@@ -143,11 +159,13 @@ The tool:
 ## Use Cases
 
 ### Social Sharing
+
 - Share articles with rich previews
 - Display website information
 - Enhance link visibility
 
 ### Content Curation
+
 - Create link collections
 - Build reading lists
 - Share resources
@@ -155,10 +173,10 @@ The tool:
 ## Related Tools
 
 - **[create_post](./create-post.md)** - Create posts with link embeds
-- **[create_rich_text_post](./create-rich-text-post.md)** - Create posts with rich formatting
+- **[create_rich_text_post](./create-rich-text-post.md)** - Create posts with
+  rich formatting
 
 ## See Also
 
 - [Content Management Examples](../../examples/content-management.md)
 - [Link Preview Guide](../../guide/tools-resources.md#link-previews)
-

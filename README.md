@@ -16,7 +16,7 @@
 ![Node.js](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen?logo=node.js)
 ![pnpm](https://img.shields.io/badge/pnpm-10.17.1-orange?logo=pnpm)
 ![AT Protocol](https://img.shields.io/badge/AT_Protocol-0.17.7-7856ff)
-![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.22.0-blue)
+![MCP SDK](https://img.shields.io/badge/MCP_SDK-1.29.0-blue)
 
 ![GitHub stars](https://img.shields.io/github/stars/cameronrye/atproto-mcp?style=social)
 ![npm downloads](https://img.shields.io/npm/dm/atproto-mcp)
@@ -201,13 +201,14 @@ npx atproto-mcp
 - Viewing follower/following lists (`get_followers`, `get_follows`)
 - Browsing feeds and threads (`get_thread`, `get_custom_feed`, `get_timeline`)
 - All write operations (create, like, repost, follow, etc.)
-- Resources (timeline, profile, notifications) - these are listed but will
-  return an error when accessed without authentication
-- Prompts (content composition, reply templates) - these are listed but will
-  return an error when accessed without authentication
+- Resources (timeline, profile, notifications) - these are listed but require
+  authentication to return data (the `conversation-context` scratchpad resource
+  is readable without auth and simply returns near-empty placeholder content)
+- Prompts (content composition, reply templates) - these are listed but require
+  authentication to be available
 
 **Important:** All tools, resources, and prompts are listed by the MCP server
-regardless of authentication state. Tools and resources that require
+regardless of authentication state. Most tools and resources that require
 authentication will return a clear error message when called without proper
 credentials.
 
@@ -360,8 +361,10 @@ for most endpoints that were previously public, including `search_posts`.
 
 **Rich Media**
 
-- `generate_alt_text` - Generate descriptive alt text for images
-- `analyze_image` - Analyze image metadata and properties
+- `generate_alt_text` - Generate descriptive alt text for images (experimental —
+  returns an alt-text writing template/guidance; does not analyze image pixels)
+- `analyze_image` - Report blob-declared size and MIME type for an image (does
+  not decode pixels, so no dimensions/aspect ratio)
 - `extract_media_from_post` - Extract all media from posts
 
 **Enhanced Moderation**

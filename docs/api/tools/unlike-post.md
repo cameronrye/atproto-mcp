@@ -9,17 +9,19 @@ Remove a like from a post on AT Protocol.
 ## Parameters
 
 ### `likeUri` (required)
+
 - **Type:** `string`
-- **Description:** AT Protocol URI of the like record to delete (returned from `like_post`)
+- **Description:** AT Protocol URI of the like record to delete (returned from
+  `like_post`)
 
 ## Response
 
 ```typescript
 {
-  success: boolean;   // Operation success status
-  message: string;    // Success message
+  success: boolean; // Operation success status
+  message: string; // Success message
   deletedLike: {
-    uri: string;      // URI of the deleted like record
+    uri: string; // URI of the deleted like record
   }
 }
 ```
@@ -35,6 +37,7 @@ Remove a like from a post on AT Protocol.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -50,6 +53,7 @@ Remove a like from a post on AT Protocol.
 ### Common Errors
 
 #### Invalid Like URI
+
 ```json
 {
   "error": "Invalid AT Protocol URI format",
@@ -58,6 +62,7 @@ Remove a like from a post on AT Protocol.
 ```
 
 #### Like Not Found
+
 ```json
 {
   "error": "Like record not found",
@@ -77,4 +82,3 @@ Remove a like from a post on AT Protocol.
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-

@@ -4,7 +4,8 @@ Branded types and AT Protocol identifiers used throughout the server.
 
 ## Branded Types
 
-Branded types provide type safety for AT Protocol identifiers, preventing accidental misuse of strings.
+Branded types provide type safety for AT Protocol identifiers, preventing
+accidental misuse of strings.
 
 ### DID (Decentralized Identifier)
 
@@ -17,12 +18,14 @@ type DID = string & { readonly __brand: 'DID' };
 **Format:** `did:plc:` followed by base32-encoded identifier
 
 **Examples:**
+
 ```typescript
-const userDid: DID = "did:plc:abc123xyz789" as DID;
-const repoDid: DID = "did:plc:def456uvw012" as DID;
+const userDid: DID = 'did:plc:abc123xyz789' as DID;
+const repoDid: DID = 'did:plc:def456uvw012' as DID;
 ```
 
 **Characteristics:**
+
 - Permanent (never changes)
 - Globally unique
 - Cryptographically verifiable
@@ -39,13 +42,17 @@ type ATURI = string & { readonly __brand: 'ATURI' };
 **Format:** `at://[DID]/[collection]/[rkey]`
 
 **Examples:**
+
 ```typescript
-const postUri: ATURI = "at://did:plc:abc123/app.bsky.feed.post/xyz789" as ATURI;
-const likeUri: ATURI = "at://did:plc:abc123/app.bsky.feed.like/like123" as ATURI;
-const followUri: ATURI = "at://did:plc:abc123/app.bsky.graph.follow/follow456" as ATURI;
+const postUri: ATURI = 'at://did:plc:abc123/app.bsky.feed.post/xyz789' as ATURI;
+const likeUri: ATURI =
+  'at://did:plc:abc123/app.bsky.feed.like/like123' as ATURI;
+const followUri: ATURI =
+  'at://did:plc:abc123/app.bsky.graph.follow/follow456' as ATURI;
 ```
 
 **Components:**
+
 - **DID**: Repository identifier
 - **Collection**: Record type (e.g., `app.bsky.feed.post`)
 - **Record Key (rkey)**: Unique record identifier
@@ -61,13 +68,15 @@ type NSID = string & { readonly __brand: 'NSID' };
 **Format:** Reverse domain notation with segments
 
 **Examples:**
+
 ```typescript
-const postType: NSID = "app.bsky.feed.post" as NSID;
-const likeType: NSID = "app.bsky.feed.like" as NSID;
-const profileType: NSID = "app.bsky.actor.profile" as NSID;
+const postType: NSID = 'app.bsky.feed.post' as NSID;
+const likeType: NSID = 'app.bsky.feed.like' as NSID;
+const profileType: NSID = 'app.bsky.actor.profile' as NSID;
 ```
 
 **Common NSIDs:**
+
 - `app.bsky.feed.post` - Posts
 - `app.bsky.feed.like` - Likes
 - `app.bsky.feed.repost` - Reposts
@@ -86,12 +95,14 @@ type CID = string & { readonly __brand: 'CID' };
 **Format:** Base32-encoded multihash
 
 **Examples:**
+
 ```typescript
-const postCid: CID = "bafyreiabc123xyz789..." as CID;
-const imageCid: CID = "bafkreidef456uvw012..." as CID;
+const postCid: CID = 'bafyreiabc123xyz789...' as CID;
+const imageCid: CID = 'bafkreidef456uvw012...' as CID;
 ```
 
 **Characteristics:**
+
 - Content-addressed (hash of content)
 - Immutable
 - Verifiable
@@ -114,6 +125,7 @@ interface IAtpSession {
 **Description:** Authenticated session information.
 
 **Fields:**
+
 - `did` - User's DID
 - `handle` - User's handle
 - `accessJwt` - Access token (2 hour lifetime)
@@ -139,6 +151,7 @@ interface IAtpProfile {
 **Description:** User profile information.
 
 **Fields:**
+
 - `did` - User's DID (required)
 - `handle` - User's handle (required)
 - `displayName` - Display name
@@ -182,6 +195,7 @@ interface IAtpPost {
 **Description:** Post data structure.
 
 **Fields:**
+
 - `uri` - Post URI
 - `cid` - Post CID
 - `author` - Post author profile
@@ -198,78 +212,90 @@ interface IAtpPost {
 - `indexedAt` - Index timestamp
 - `viewer` - Viewer-specific data (when authenticated)
 
-## Type Guards
+## Validators and Type Guards
 
-### Validating Branded Types
+The server exports a validator and a type guard for each branded type.
+
+The `validate*` functions **throw** on invalid input and return the value
+narrowed to the branded type. The `is*` functions are non-throwing type guards
+that return a boolean.
 
 ```typescript
-function isDID(value: string): value is DID {
-  return value.startsWith('did:');
-}
+// Throwing validators (cast + runtime validation)
+validateDID(value: string): DID;     // requires 'did:method:identifier'
+validateATURI(value: string): ATURI; // requires 'at://authority/collection/rkey'
+validateCID(value: string): CID;     // alphanumeric, length >= 10
+validateNSID(value: string): NSID;   // reverse-DNS, >= 3 segments
 
-function isATURI(value: string): value is ATURI {
-  return value.startsWith('at://');
-}
+// Non-throwing type guards
+isDID(value: unknown): value is DID;
+isATURI(value: unknown): value is ATURI;
+isCID(value: unknown): value is CID;
+isNSID(value: unknown): value is NSID;
+```
 
-function isCID(value: string): value is CID {
-  return value.startsWith('bafy') || value.startsWith('bafk');
+**Example:**
+
+```typescript
+// Throws if invalid
+const did = validateDID('did:plc:abc123xyz789');
+
+// Narrows without throwing
+if (isATURI(input)) {
+  // input is ATURI here
 }
 ```
 
 ## Usage Examples
 
+::: tip Tools are snake_case MCP tools
+
+The MCP tools exposed by this server use snake_case names (`get_followers`,
+`like_post`, `reply_to_post`, ...). The camelCase calls below are illustrative
+TypeScript using the branded types; they are not the MCP tool names.
+
+:::
+
 ### Working with DIDs
 
 ```typescript
-// Store user DID
+// A DID is a permanent reference; store it rather than the handle
 const userDid: DID = profile.did;
-
-// Use in API calls
-const followers = await getFollowers({ actor: userDid });
 ```
 
 ### Working with AT URIs
 
 ```typescript
-// Store post URI
+// A post is referenced by its AT URI plus CID
 const postUri: ATURI = post.uri;
-
-// Use for operations
-await likePost({ uri: postUri, cid: post.cid });
-await replyToPost({ 
-  text: "Great post!",
-  root: postUri,
-  parent: postUri
-});
+const postCid: CID = post.cid;
 ```
 
 ### Working with CIDs
 
 ```typescript
-// Verify content integrity
-const expectedCid: CID = post.cid;
-const actualCid: CID = calculateCID(post.record);
-
-if (expectedCid === actualCid) {
-  console.log('Content verified');
-}
+// CIDs are content-addressed and immutable — useful for integrity checks
+const cid: CID = post.cid;
 ```
 
 ## Best Practices
 
 ### Type Safety
+
 - Use branded types for all AT Protocol identifiers
 - Don't cast strings to branded types without validation
 - Implement type guards for runtime validation
 - Use TypeScript strict mode
 
 ### Identifier Storage
+
 - Store DIDs for permanent references
 - Store AT URIs for resource references
 - Store CIDs for content verification
 - Don't rely on handles (they can change)
 
 ### Validation
+
 - Validate format before casting to branded types
 - Check for null/undefined values
 - Handle invalid identifiers gracefully
@@ -281,4 +307,3 @@ if (expectedCid === actualCid) {
 - [Parameter Types](./parameters.md)
 - [Error Types](./errors.md)
 - [AT Protocol Specification](https://atproto.com/specs/at-uri-scheme)
-

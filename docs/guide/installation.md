@@ -46,6 +46,7 @@ npx atproto-mcp
 ```
 
 This is perfect for:
+
 - Quick testing
 - One-time usage
 - CI/CD pipelines
@@ -105,60 +106,46 @@ npm run dev
 
 ## Docker Installation
 
-### Using Docker Compose (Recommended)
+Because the server speaks MCP over **stdio**, the Docker image is normally
+launched _interactively_ by your MCP client (which attaches to the container's
+stdin/stdout), not run as a long-lived detached daemon.
 
-The easiest way to run with Docker:
+### Building and Running the Image
 
 ```bash
-# Clone the repository
+# Clone and build the image
 git clone https://github.com/cameronrye/atproto-mcp.git
 cd atproto-mcp
-
-# Copy environment file
-cp .env.example .env
-
-# Edit .env with your credentials (optional)
-nano .env
-
-# Start all services
-docker-compose up -d
-```
-
-This starts:
-- AT Protocol MCP Server
-- Redis (for caching)
-- Prometheus (for metrics)
-- Grafana (for monitoring)
-
-### Using Docker Directly
-
-Run a single container:
-
-```bash
-# Pull the image
-docker pull ghcr.io/cameronrye/atproto-mcp:latest
-
-# Run the container
-docker run -d \
-  --name atproto-mcp \
-  -p 3000:3000 \
-  -e ATPROTO_IDENTIFIER=your.handle \
-  -e ATPROTO_PASSWORD=your-password \
-  ghcr.io/cameronrye/atproto-mcp:latest
-```
-
-### Building Docker Image Locally
-
-```bash
-# Build the image
 docker build -t atproto-mcp .
 
-# Run the container
-docker run -d \
-  --name atproto-mcp \
-  -p 3000:3000 \
+# Run the container over stdio (-i keeps stdin open for the MCP client)
+docker run -i --rm \
+  -e ATPROTO_IDENTIFIER=your.handle \
+  -e ATPROTO_PASSWORD=your-app-password \
   atproto-mcp
 ```
+
+Point your MCP client at `docker run -i --rm ... atproto-mcp` as the server
+command. See [Deployment](./deployment.md) for a complete client-configuration
+example.
+
+::: tip stdio transport
+
+The server communicates over the stdio transport and does not bind a network
+port, so no `-p`/port publishing is required. The `Dockerfile` includes an
+`EXPOSE 3000` line, but it is vestigial — nothing listens on that port.
+
+:::
+
+::: warning About `docker-compose.yml`
+
+The repository ships a `docker-compose.yml` that also defines Redis, Prometheus,
+and Grafana sidecars. These are leftover scaffolding — the server does **not**
+read any caching or metrics configuration and exposes no metrics endpoint — so
+they are not part of a normal deployment. Ignore (or delete) them and use
+`docker run -i` as shown above.
+
+:::
 
 ## Verification
 
@@ -189,27 +176,22 @@ You should see output like:
 ```
 [INFO] AT Protocol MCP Server starting...
 [INFO] Server initialized successfully
-[INFO] Registered 30 tools, 3 resources, 2 prompts
+[INFO] Registered 60 tools, 4 resources, 2 prompts
 [INFO] Server ready on stdio transport
 ```
 
-### Health Check (Docker)
+### Health Check
 
-If running with Docker:
+The server uses the **stdio transport** and does not expose an HTTP endpoint.
+The bundled health check is a process-local smoke check that loads the package,
+builds and validates the configuration, and checks this process's heap — it does
+not bind a port or probe a running server:
 
 ```bash
-curl http://localhost:3000/health
+node dist/health-check.js
 ```
 
-Expected response:
-
-```json
-{
-  "status": "healthy",
-  "timestamp": "2024-01-01T00:00:00.000Z",
-  "version": "0.1.0"
-}
-```
+A successful run exits with status `0`.
 
 ## Troubleshooting Installation
 
@@ -270,25 +252,15 @@ docker ps
 # View container logs
 docker logs atproto-mcp
 
-# Restart containers
-docker-compose restart
-
-# Rebuild containers
-docker-compose up -d --build
+# Rebuild the image after pulling changes
+docker build -t atproto-mcp .
 ```
 
-### Port Already in Use
+### Ports
 
-If port 3000 is already in use:
-
-```bash
-# Use a different port
-atproto-mcp --port 8080
-
-# Or find what's using port 3000
-lsof -i :3000  # macOS/Linux
-netstat -ano | findstr :3000  # Windows
-```
+The server uses the stdio transport and does **not** bind a network port, so
+"port already in use" errors do not apply to the server process itself. The
+`--port`/`--host` flags are accepted for compatibility but are ignored.
 
 ## Updating
 
@@ -307,12 +279,9 @@ npm update atproto-mcp
 ### Docker
 
 ```bash
-# Pull latest image
-docker pull ghcr.io/cameronrye/atproto-mcp:latest
-
-# Restart containers
-docker-compose down
-docker-compose up -d
+# Pull the latest source and rebuild the image
+git pull origin main
+docker build -t atproto-mcp .
 ```
 
 ### From Source
@@ -340,14 +309,11 @@ npm uninstall atproto-mcp
 ### Docker
 
 ```bash
-# Stop and remove containers
-docker-compose down
+# Stop and remove the container (if one is running)
+docker rm -f atproto-mcp
 
-# Remove images
+# Remove the image
 docker rmi atproto-mcp
-
-# Remove volumes (optional, deletes data)
-docker-compose down -v
 ```
 
 ## Next Steps
@@ -360,5 +326,5 @@ Now that you have the server installed:
 
 ---
 
-**Previous**: [Introduction](./introduction.md) ← | **Next**: [Quick Start](./getting-started.md) →
-
+**Previous**: [Introduction](./introduction.md) ← | **Next**:
+[Quick Start](./getting-started.md) →

@@ -1,44 +1,68 @@
 # discover_communities
 
-Discover communities and groups of users around specific topics or interests. Identifies clusters of users who frequently interact around a topic.
+Discover clusters of users who interact around a topic. Searches recent posts
+for the topic, groups the authors by reply interactions, and returns each
+cluster that meets the minimum size.
 
 ## Authentication
 
-**Enhanced** - This tool works without authentication but provides better results when authenticated.
+**Enhanced** - This tool works without authentication but returns richer results
+when authenticated.
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `topic` | `string` | Yes | - | Topic to discover communities around. |
-| `maxResults` | `number` | No | `20` | Maximum number of communities to return. Must be between 1 and 50. |
-| `minCommunitySize` | `number` | No | `5` | Minimum number of core members in a community. Must be 2 or greater. |
-| `includeMetrics` | `boolean` | No | `true` | Whether to include detailed community metrics. |
+| Parameter          | Type      | Required | Default | Description                                                                         |
+| ------------------ | --------- | -------- | ------- | ----------------------------------------------------------------------------------- |
+| `topic`            | `string`  | Yes      | -       | Topic to discover communities around (used as the post search query).               |
+| `maxResults`       | `number`  | No       | `20`    | Maximum number of communities to return. Must be between 1 and 50.                  |
+| `minCommunitySize` | `number`  | No       | `5`     | Minimum number of members a cluster must have to be returned. Must be 2 or greater. |
+| `includeMetrics`   | `boolean` | No       | `true`  | Whether to include the `metrics` object on each community.                          |
+
+## How It Works
+
+1. Searches recent posts matching `topic` (`app.bsky.feed.searchPosts`, up to
+   100 posts).
+2. Groups posts by author, tracking each author's post count and engagement.
+3. Reads reply parents to build interaction edges between authors.
+4. Clusters authors that reply to one another, keeping clusters that meet
+   `minCommunitySize`.
+
+::: tip Derived labels
+
+A community's `name` is a generated label (`"<topic> Community N"`), and its
+`description` is a generated sentence built from real cluster data (member count
+and the top contributors' handles). They are summaries of the discovered
+cluster, not group names that exist on Bluesky.
+
+:::
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
   success: boolean;
   communities: Array<{
-    name: string;
+    name: string;     // generated label, e.g. "web development Community 1"
     topic: string;
-    size: number;
+    size: number;     // number of members in the cluster
     coreMembers: Array<{
       did: string;
       handle: string;
       displayName?: string;
       avatar?: string;
-      followersCount: number;
-      postsCount: number;
-      relevanceScore: number;
+      followersCount: number;  // from the search result's author profile
+      postsCount: number;      // posts about the topic in this sample
+      relevanceScore: number;  // engagement + postCount-weighted
     }>;
-    activityLevel: 'high' | 'medium' | 'low';
-    description: string;
+    activityLevel: 'high' | 'medium' | 'low';  // from avg posts per member
+    description: string;  // generated summary sentence
     metrics?: {
       avgFollowerCount: number;
       totalPosts: number;
-      interconnectedness: number;
+      interconnectedness: number;  // reply interactions / member count
     };
   }>;
   insights: string[];
@@ -57,7 +81,7 @@ Discover communities and groups of users around specific topics or interests. Id
 }
 ```
 
-### Find Large Active Communities
+### Larger Clusters Only
 
 ```json
 {
@@ -68,7 +92,7 @@ Discover communities and groups of users around specific topics or interests. Id
 }
 ```
 
-### Quick Community Discovery
+### Quick Discovery (No Metrics)
 
 ```json
 {
@@ -83,56 +107,46 @@ Discover communities and groups of users around specific topics or interests. Id
 Common errors:
 
 - **`InvalidRequest`**: Invalid topic or parameters
-- **`NoCommunitiesFound`**: No communities found for the specified topic
 - **`RateLimitExceeded`**: Too many requests in a short period
 
-## Best Practices
-
-1. **Use Specific Topics**: More specific topics yield better-defined communities
-2. **Adjust Community Size**: Lower `minCommunitySize` for niche topics, raise for mainstream topics
-3. **Review Core Members**: Check core members to verify community relevance
-4. **Join Conversations**: Engage with community members to become part of the community
-5. **Track Activity Level**: Focus on high-activity communities for more engagement
-6. **Monitor Interconnectedness**: Higher interconnectedness indicates stronger communities
-7. **Explore Multiple Topics**: Discover communities across different interests
+When no clusters meet the criteria, `communities` is empty and `insights`
+suggests trying a more popular topic or lowering `minCommunitySize`.
 
 ## Community Metrics
 
-- **Size**: Total number of core members in the community
-- **Activity Level**: Based on posting frequency and engagement
-  - **High**: Very active, frequent posts and interactions
-  - **Medium**: Moderately active, regular engagement
-  - **Low**: Less active, occasional posts
-- **Interconnectedness**: How connected community members are (0-100)
-  - Higher values indicate members frequently interact with each other
-- **Relevance Score**: How relevant each member is to the topic (0-100)
+- **Size**: Number of members in the cluster.
+- **Activity Level**: Derived from average posts per member within the sample.
+  - **High**: average >= 3 posts per member
+  - **Medium**: average between 1.5 and 3
+  - **Low**: average < 1.5
+- **Interconnectedness**: Reply interactions divided by member count. A larger
+  value means members reply to one another more within the sample. (This is a
+  ratio, not a 0-100 percentage.)
+- **Relevance Score**: Per-member ranking from topic engagement plus post count;
+  used to order `coreMembers`.
 
 ## Core Members
 
-Core members are identified based on:
-- Frequent posting about the topic
-- High engagement with topic-related content
-- Connections with other topic-focused users
-- Influence within the topic area
+`coreMembers` lists the top members of a cluster (up to 10), ranked by relevance
+score. Membership and engagement are derived from the sampled topic posts, so
+they reflect this snapshot rather than long-term community activity.
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol API rate limits:
-
-- 3,000 requests per hour for authenticated users
-- 300 requests per hour for unauthenticated users
-- May require multiple API calls to analyze communities
+Calls are rate limited per tool: 100 requests per minute per tool. This tool
+performs one post search per request.
 
 ## Related Tools
 
-- **[find_influential_users](#find-influential-users)** - Find influential users in a topic area
-- **[find_similar_users](#find-similar-users)** - Find users similar to a given user
-- **[discover_trending](#discover-trending)** - Discover trending topics
-- **[recommend_content](#recommend-content)** - Get personalized content recommendations
+- **[find_influential_users](./find-influential-users.md)** - Find influential
+  users in a topic area
+- **[find_similar_users](./find-similar-users.md)** - Find users similar to a
+  given user
+- **[discover_trending](./discover-trending.md)** - Surface hashtags and posts
+  from your timeline
 - **[search_posts](./search-posts.md)** - Search for posts on specific topics
 
 ## See Also
 
 - [Content Discovery Guide](../../guide/tools-resources.md#content-discovery)
-- [User Operations Guide](../../guide/tools-resources.md#user-operations)
-
+- [Social Operations Guide](../../guide/tools-resources.md#social-operations)

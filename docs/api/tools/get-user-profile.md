@@ -4,19 +4,24 @@ Retrieve detailed user profile information from AT Protocol.
 
 ## Authentication
 
-**Optional:** Enhanced mode (Public tool with enhanced features when authenticated)
+**Optional:** Enhanced mode (Public tool with enhanced features when
+authenticated)
 
-This tool works without authentication for public profiles, but provides additional viewer-specific information when authenticated.
+This tool works without authentication for public profiles, but provides
+additional viewer-specific information when authenticated.
 
 ### Authentication Behavior Details
 
 **Unauthenticated Mode:**
-- Returns basic profile information: handle, display name, description, avatar, banner
+
+- Returns basic profile information: handle, display name, description, avatar,
+  banner
 - Returns public statistics: followers count, following count, posts count
 - Returns labels and indexed timestamps
 - Does NOT include viewer-specific data
 
 **Authenticated Mode:**
+
 - Returns all basic information from unauthenticated mode
 - PLUS viewer-specific data in the `viewer` object:
   - `viewer.following`: URI if you follow this user
@@ -25,11 +30,15 @@ This tool works without authentication for public profiles, but provides additio
   - `viewer.blocking`: URI if you've blocked this user
   - `viewer.blockedBy`: Boolean indicating if this user has blocked you
 
-**Note:** The difference in returned data comes from the AT Protocol API itself. This tool calls the same `agent.getProfile()` method in both modes, but the AT Protocol API provides viewer-specific information only when the request includes authentication credentials.
+**Note:** The difference in returned data comes from the AT Protocol API itself.
+This tool calls the same `agent.getProfile()` method in both modes, but the AT
+Protocol API provides viewer-specific information only when the request includes
+authentication credentials.
 
 ## Parameters
 
 ### `actor` (required)
+
 - **Type:** `string`
 - **Description:** User identifier - can be either a DID or handle
 - **Examples:**
@@ -37,6 +46,9 @@ This tool works without authentication for public profiles, but provides additio
   - Handle: `user.bsky.social`
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
@@ -49,16 +61,15 @@ This tool works without authentication for public profiles, but provides additio
     description?: string;     // Bio/description
     avatar?: string;          // Avatar image URL
     banner?: string;          // Banner image URL
-    
+
     // Statistics
     followersCount?: number;  // Number of followers
     followsCount?: number;    // Number of users followed
     postsCount?: number;      // Number of posts
-    
+
     // Metadata
     indexedAt?: string;       // When profile was indexed
-    createdAt?: string;       // Account creation date
-    
+
     // Viewer-specific (only when authenticated)
     viewer?: {
       muted?: boolean;        // Whether you've muted this user
@@ -67,7 +78,7 @@ This tool works without authentication for public profiles, but provides additio
       following?: string;     // URI of your follow record
       followedBy?: string;    // URI of their follow record
     };
-    
+
     // Moderation labels
     labels?: Array<{
       src: string;            // Label source
@@ -91,6 +102,7 @@ This tool works without authentication for public profiles, but provides additio
 ```
 
 **Response (Unauthenticated):**
+
 ```json
 {
   "success": true,
@@ -104,12 +116,13 @@ This tool works without authentication for public profiles, but provides additio
     "followersCount": 1234,
     "followsCount": 567,
     "postsCount": 890,
-    "indexedAt": "2024-01-15T10:30:00.000Z"
+    "indexedAt": "2026-01-15T10:30:00.000Z"
   }
 }
 ```
 
 **Response (Authenticated):**
+
 ```json
 {
   "success": true,
@@ -123,7 +136,7 @@ This tool works without authentication for public profiles, but provides additio
     "followersCount": 1234,
     "followsCount": 567,
     "postsCount": 890,
-    "indexedAt": "2024-01-15T10:30:00.000Z",
+    "indexedAt": "2026-01-15T10:30:00.000Z",
     "viewer": {
       "muted": false,
       "blockedBy": false,
@@ -147,6 +160,7 @@ This tool works without authentication for public profiles, but provides additio
 ### Common Errors
 
 #### Invalid Actor
+
 ```json
 {
   "error": "Actor (DID or handle) is required",
@@ -155,6 +169,7 @@ This tool works without authentication for public profiles, but provides additio
 ```
 
 #### User Not Found
+
 ```json
 {
   "error": "User not found",
@@ -163,6 +178,7 @@ This tool works without authentication for public profiles, but provides additio
 ```
 
 #### Profile Unavailable
+
 ```json
 {
   "error": "Profile is not available",
@@ -170,48 +186,20 @@ This tool works without authentication for public profiles, but provides additio
 }
 ```
 
-## Best Practices
+## Notes
 
 ### Actor Identifiers
-- **Handles** are user-friendly but can change
-- **DIDs** are permanent identifiers
-- Cache DIDs for reliable lookups
-- Handle resolution may fail if handle changes
 
-### Caching
-- Profile data can be cached for short periods (5-15 minutes)
-- Statistics (followers, posts) change frequently
-- Avatar and banner URLs are relatively stable
-- Viewer data should not be cached across users
+- **Handles** are user-friendly but can change over time.
+- **DIDs** are permanent identifiers; prefer them for reliable, stable lookups.
+- Handle resolution may fail if a handle has changed.
 
-### Privacy Considerations
-- Respect user privacy settings
-- Check `blockedBy` before attempting interactions
-- Handle blocked/muted users appropriately
-- Don't expose viewer data to other users
+### Viewer Data
 
-### Performance
-- Batch profile requests when possible
-- Use DIDs for faster lookups
-- Cache profile data appropriately
-- Monitor rate limits for bulk operations
-
-## Use Cases
-
-### User Discovery
-- Display user information in search results
-- Show profile previews on hover
-- Build user directories
-
-### Relationship Management
-- Check if you follow a user
-- Verify mutual follows
-- Detect blocks or mutes
-
-### Analytics
-- Track follower growth
-- Monitor engagement metrics
-- Analyze user activity
+- `viewer.*` fields are only populated when the request is authenticated.
+- Check `viewer.blockedBy` / `viewer.blocking` before attempting interactions.
+- Viewer state is specific to the authenticated account and is not meaningful
+  across users.
 
 ## Related Tools
 
@@ -226,4 +214,3 @@ This tool works without authentication for public profiles, but provides additio
 
 - [Social Operations Examples](../../examples/social-operations.md)
 - [Authentication Guide](../../guide/authentication.md)
-

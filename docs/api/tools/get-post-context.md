@@ -1,21 +1,26 @@
 # get_post_context
 
-Get post with thread, author, and engagement data. Combines post details, thread context, author profile, and engagement metrics in a single call.
+Get post with thread, author, and engagement data. Combines post details, thread
+context, author profile, and engagement metrics in a single call.
 
 ## Authentication
 
-**Enhanced** - This tool works without authentication but provides additional data when authenticated.
+**Enhanced** - This tool works without authentication but provides additional
+data when authenticated.
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `uri` | `string` | Yes | - | AT-URI of the post to get context for. |
-| `includeThread` | `boolean` | No | `true` | Whether to include thread context (parent and replies). |
-| `includeAuthorProfile` | `boolean` | No | `true` | Whether to include detailed author profile. |
-| `includeEngagement` | `boolean` | No | `true` | Whether to calculate engagement metrics. |
+| Parameter              | Type      | Required | Default | Description                                             |
+| ---------------------- | --------- | -------- | ------- | ------------------------------------------------------- |
+| `uri`                  | `string`  | Yes      | -       | AT-URI of the post to get context for.                  |
+| `includeThread`        | `boolean` | No       | `true`  | Whether to include thread context (parent and replies). |
+| `includeAuthorProfile` | `boolean` | No       | `true`  | Whether to include detailed author profile.             |
+| `includeEngagement`    | `boolean` | No       | `true`  | Whether to calculate engagement metrics.                |
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
@@ -100,25 +105,15 @@ Get post with thread, author, and engagement data. Combines post details, thread
 
 Common errors:
 
-- **`InvalidRequest`**: Invalid URI or parameters
-- **`InvalidAtUri`**: URI is not a valid AT-URI
-- **`PostNotFound`**: Post does not exist or has been deleted
-- **`PostBlocked`**: Post is from a blocked user or blocked by author
-- **`RateLimitExceeded`**: Too many requests in a short period
-
-## Best Practices
-
-1. **Use for Analysis**: Get complete context before responding to posts
-2. **Include Thread**: Set `includeThread: true` to understand conversation context
-3. **Check Author**: Include author profile to verify credibility
-4. **Monitor Engagement**: Track engagement metrics to identify viral posts
-5. **Cache Results**: Store context to avoid repeated API calls
-6. **Verify Timing**: Check `ageHours` to understand post recency
-7. **Review Replies**: Examine thread replies for additional context
+- **Invalid AT-URI**: The `uri` is not a valid `at://` post URI
+- **Post not found or blocked**: The post does not exist, was deleted, or is
+  blocked
+- Errors are returned as MCP error objects; the exact wording may vary.
 
 ## Thread Context
 
 The thread object provides:
+
 - **parent**: Immediate parent post (if this is a reply)
 - **root**: Root post of the thread (if part of a conversation)
 - **replies**: Direct replies to this post
@@ -126,9 +121,13 @@ The thread object provides:
 
 ## Engagement Metrics
 
-- **totalEngagement**: Sum of likes, reposts, and replies
-- **engagementRate**: Engagement per hour since posting
-- **ageHours**: Hours since the post was created
+Computed from the post's real counts when `includeEngagement` is true:
+
+- **totalEngagement**: Sum of `likeCount`, `repostCount`, and `replyCount`
+- **engagementRate**: `totalEngagement / ageHours` — a time-velocity metric
+  (engagement per hour since posting), **not** engagement relative to follower
+  count. If `ageHours` is 0 or negative, it falls back to `totalEngagement`.
+- **ageHours**: Hours since the post's `createdAt`
 
 ## Use Cases
 
@@ -142,22 +141,22 @@ The thread object provides:
 ## AT-URI Format
 
 AT-URIs must follow this format:
+
 ```
 at://did:plc:USER_DID/app.bsky.feed.post/POST_ID
 ```
 
 Example:
+
 ```
 at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3k7qe4smwe22t
 ```
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol API rate limits:
-
-- 3,000 requests per hour for authenticated users
-- 300 requests per hour for unauthenticated users
-- May require multiple API calls depending on parameters
+Subject to the server's per-tool limit of 100 requests per minute. A single call
+may issue multiple AT Protocol requests (`getPostThread`, plus `getProfile` when
+`includeAuthorProfile` is true).
 
 ## Related Tools
 
@@ -171,4 +170,3 @@ This tool is subject to AT Protocol API rate limits:
 
 - [Composite Operations Guide](../../guide/tools-resources.md#composite-operations)
 - [Data Retrieval Guide](../../guide/tools-resources.md#data-retrieval)
-

@@ -1,418 +1,119 @@
 # AT Protocol
 
-Understanding the Authenticated Transfer Protocol and how it powers decentralized social networking.
+A short background page on the Authenticated Transfer Protocol (atproto) — just
+enough context to understand what this MCP server talks to. For authoritative,
+up-to-date details, follow the links to the official documentation rather than
+relying on this summary.
 
 ## What is AT Protocol?
 
-The **Authenticated Transfer Protocol (AT Protocol or atproto)** is an open, decentralized protocol for large-scale distributed social applications. It was created by Bluesky to enable a new generation of social networks where users own their data and identity.
+The **Authenticated Transfer Protocol (AT Protocol or atproto)** is an open,
+decentralized protocol for large-scale social applications, created by Bluesky.
+Users own their identity and data, and can move between services without losing
+their social graph or content.
 
-## Core Principles
+This MCP server is a client of the AT Protocol: it authenticates against a
+Personal Data Server (by default `bsky.social`) and exposes protocol operations
+as MCP tools, resources, and prompts.
 
-### 1. Decentralization
+If you want to understand the protocol itself in depth, start here:
 
-No single company controls the network. Anyone can:
-- Run their own Personal Data Server (PDS)
-- Create their own applications
-- Build custom algorithms and feeds
-- Host their own data
+- [AT Protocol overview](https://atproto.com) — concepts, specifications, and
+  guides
+- [Lexicon reference](https://atproto.com/lexicons) — the schemas that define
+  records
+- [Bluesky API reference](https://docs.bsky.app) — the `app.bsky.*` endpoints
+  this server calls
+- [`@atproto/api` SDK](https://www.npmjs.com/package/@atproto/api) — the
+  official client library
 
-### 2. Portability
+## Core concepts (and the tools that use them)
 
-Users can move between services without losing:
-- Their social graph (followers/following)
-- Their content and posts
-- Their identity and reputation
-- Their application data
+The table below maps the AT Protocol building blocks to the MCP tools this
+server exposes. See the [API Reference](../api/index.md) for the full catalog of
+60 tools.
 
-### 3. Interoperability
+| AT Protocol concept                                                  | What it is                                                                                                            | Related MCP tools                                                                                                                                                        |
+| -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Identity** — DIDs (`did:plc:...`) and handles (`name.bsky.social`) | A portable, cryptographic account identifier plus a human-readable handle that maps to it                             | [`get_user_profile`](../api/tools/get-user-profile.md), [`update_profile`](../api/tools/update-profile.md)                                                               |
+| **Records** — typed entries in your repository                       | Posts, follows, likes, etc., each described by a [Lexicon](https://atproto.com/lexicons) such as `app.bsky.feed.post` | [`create_post`](../api/tools/create-post.md), [`like_post`](../api/tools/like-post.md), [`repost`](../api/tools/repost.md), [`follow_user`](../api/tools/follow-user.md) |
+| **Feeds & timelines** — aggregated views over records                | The home timeline and other feeds assembled by App Views                                                              | [`get_timeline`](../api/tools/get-timeline.md), [`search_posts`](../api/tools/search-posts.md)                                                                           |
+| **Embeds & blobs** — images, video, external links                   | Media is uploaded as blobs and referenced from a post's `embed`                                                       | [`upload_image`](../api/tools/upload-image.md)                                                                                                                           |
+| **Moderation** — mutes, blocks, reports, labels                      | Per-user and service-level moderation primitives                                                                      | [`mute_user`](../api/tools/mute-user.md), [`block_user`](../api/tools/block-user.md), [`report_content`](../api/tools/report-content.md)                                 |
 
-Different applications can work with the same data:
-- Multiple clients can access the same account
-- Third-party apps can build on the protocol
-- Custom feeds and algorithms can be shared
-- Data is accessible across services
+### Identifiers worth knowing
 
-## Architecture
+- **DID** — `did:plc:abc123...`: the stable account identifier that survives
+  handle and PDS changes.
+- **Handle** — `name.bsky.social` or a custom domain: a human-readable alias for
+  a DID.
+- **AT-URI** — `at://did:plc:abc123.../app.bsky.feed.post/xyz789`: addresses a
+  single record as `at://<DID>/<collection>/<record-key>`.
+- **CID** — a content-addressed hash of a record, used to pin and verify an
+  exact version.
 
-```
-┌─────────────────────────────────────────────┐
-│           Applications Layer                │
-│  (Bluesky, Custom Clients, Bots, etc.)     │
-└──────────────────┬──────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────┐
-│         AT Protocol Layer                   │
-│  - Identity (DIDs)                          │
-│  - Data Repositories (Repos)                │
-│  - Lexicons (Schemas)                       │
-│  - Federation (XRPC)                        │
-└──────────────────┬──────────────────────────┘
-                   │
-┌──────────────────▼──────────────────────────┐
-│        Infrastructure Layer                 │
-│  - Personal Data Servers (PDS)              │
-│  - Relays (BGS)                             │
-│  - App Views                                │
-│  - Feed Generators                          │
-└─────────────────────────────────────────────┘
-```
-
-## Key Components
-
-### Personal Data Server (PDS)
-
-Your personal data server hosts your:
-- Account and identity
-- Posts and content
-- Social graph
-- Application data
-
-**Default PDS**: `bsky.social` (run by Bluesky)
-**Custom PDS**: You can run your own!
-
-### Decentralized Identifiers (DIDs)
-
-Every account has a unique DID:
-- Format: `did:plc:abc123...`
-- Cryptographically secure
-- Portable across services
-- Resolves to your current PDS
-
-### Handles
-
-Human-readable identifiers:
-- Format: `username.bsky.social`
-- Can use custom domains: `username.com`
-- Maps to your DID
-- Can be changed without losing identity
-
-### Repositories (Repos)
-
-Your data is stored in a repository:
-- Merkle tree structure (like Git)
-- Cryptographically signed
-- Versioned and auditable
-- Portable and exportable
-
-### Lexicons
-
-Schemas that define data structures:
-- `app.bsky.feed.post` - Post records
-- `app.bsky.actor.profile` - Profile data
-- `app.bsky.graph.follow` - Follow relationships
-- Custom lexicons for new features
-
-### XRPC (Cross-system RPC)
-
-HTTP-based RPC protocol:
-- RESTful API design
-- JSON request/response
-- Authentication via JWT
-- Rate limiting and quotas
-
-## Data Model
-
-### Records
-
-Everything is a record with:
-
-```typescript
-{
-  $type: string;        // Lexicon type
-  createdAt: string;    // ISO 8601 timestamp
-  // ... type-specific fields
-}
-```
-
-### Example: Post Record
-
-```typescript
-{
-  $type: "app.bsky.feed.post",
-  text: "Hello AT Protocol!",
-  createdAt: "2024-01-01T12:00:00Z",
-  langs: ["en"],
-  reply: {
-    root: { uri: "...", cid: "..." },
-    parent: { uri: "...", cid: "..." }
-  },
-  embed: {
-    $type: "app.bsky.embed.images",
-    images: [...]
-  }
-}
-```
-
-### AT-URIs
-
-Unique identifiers for records:
-
-```
-at://did:plc:abc123.../app.bsky.feed.post/xyz789
-│   │                  │                    │
-│   └─ DID             └─ Collection        └─ Record Key
-└─ Protocol
-```
-
-### CIDs (Content Identifiers)
-
-Content-addressed identifiers:
-- Based on IPFS CIDs
-- Cryptographic hash of content
-- Ensures data integrity
-- Enables verification
-
-## Federation
-
-### How It Works
-
-```
-1. User creates post on their PDS
-   ↓
-2. PDS signs and stores the record
-   ↓
-3. PDS sends event to Relay (BGS)
-   ↓
-4. Relay broadcasts to subscribers
-   ↓
-5. App Views index the data
-   ↓
-6. Other users see the post
-```
-
-### Components
-
-**Relay (BGS - Big Graph Service)**
-- Aggregates data from all PDSs
-- Provides firehose of all events
-- Enables global search and discovery
-
-**App View**
-- Indexes data for specific use cases
-- Provides query APIs
-- Implements business logic
-- Can be specialized (e.g., video, music)
-
-**Feed Generator**
-- Custom algorithm services
-- Generate personalized feeds
-- Can be created by anyone
-- Discoverable and shareable
+For the precise formats and rules, see the
+[AT Protocol specifications](https://atproto.com/specs/at-uri-scheme).
 
 ## Authentication
 
-### Session Management
+This server connects to a Personal Data Server and signs requests on your
+behalf.
 
-```
-1. Login with identifier + password
-   ↓
-2. Receive access token + refresh token
-   ↓
-3. Use access token for API calls
-   ↓
-4. Refresh when access token expires
-```
+### App passwords (recommended)
 
-### App Passwords
+App passwords are the supported authentication path. Create one in Bluesky
+**Settings → App Passwords**, then provide it to the server via
+`ATPROTO_IDENTIFIER` and `ATPROTO_PASSWORD`. App passwords are scoped, can be
+revoked individually, and never expose your main password. See
+[Authentication](./authentication.md) for setup.
 
-Special passwords for third-party apps:
-- Limited scope
-- Can be revoked individually
-- Don't expose main password
-- Recommended for integrations
+Run without credentials and only the public tools work (notably
+[`search_posts`](../api/tools/search-posts.md) and
+[`get_user_profile`](../api/tools/get-user-profile.md)); most tools require
+authentication.
 
-### OAuth (Coming Soon)
+### OAuth (experimental)
 
-Standard OAuth 2.0 flow:
-- User consent required
-- Scoped permissions
-- Token-based access
-- Secure for public apps
+AT Protocol supports OAuth 2.0, and Bluesky has shipped it. In this server,
+OAuth is **experimental and incomplete**:
+[`start_oauth_flow`](../api/tools/start-oauth-flow.md) builds a PKCE
+authorization URL, but callback exchange and token refresh/revocation are not
+implemented and will throw. Use app passwords for working authentication. See
+[Experimental & Roadmap](./experimental.md) for the current state.
 
-## Common Operations
+## Rate limits
 
-### Creating a Post
+The AT Protocol enforces its own rate limits at the PDS, separate from this
+server's per-tool limiting. The published numbers change over time, so do not
+hard-code them — see the official
+[Bluesky rate limits documentation](https://docs.bsky.app/docs/advanced-guides/rate-limits)
+for current values.
 
-```typescript
-await agent.post({
-  text: "Hello world!",
-  createdAt: new Date().toISOString()
-});
-```
+This server additionally applies a local limit of 100 requests per minute per
+tool. When you hit a limit (local or upstream), back off and retry. See
+[Error Handling](./error-handling.md) for handling rate-limit responses.
 
-### Following a User
+## Where to go deeper
 
-```typescript
-await agent.follow("did:plc:abc123...");
-```
+The protocol covers much more than this server uses — federation (relays, App
+Views, feed generators), the firehose, custom Lexicons, labeling services, and
+rich-text facets. Rather than restate it here (and risk drifting out of date),
+consult the authoritative sources:
 
-### Searching Posts
-
-```typescript
-await agent.app.bsky.feed.searchPosts({
-  q: "artificial intelligence",
-  limit: 25
-});
-```
-
-### Getting Timeline
-
-```typescript
-await agent.getTimeline({
-  limit: 50,
-  cursor: "..."
-});
-```
-
-## Rate Limits
-
-AT Protocol implements rate limiting:
-
-| Operation | Limit | Window |
-|-----------|-------|--------|
-| Reads | 3000 | 5 minutes |
-| Writes | 300 | 5 minutes |
-| Auth | 30 | 5 minutes |
-
-**Best Practices**:
-- Implement exponential backoff
-- Cache responses when possible
-- Batch operations when available
-- Monitor rate limit headers
-
-## Moderation
-
-### Labeling System
-
-Content can be labeled:
-- By the author
-- By moderators
-- By labeling services
-- By users (personal labels)
-
-### Moderation Actions
-
-- **Hide**: Remove from feeds
-- **Warn**: Show warning before viewing
-- **Blur**: Blur images/content
-- **Report**: Flag for review
-
-### Labeling Services
-
-Third-party moderation:
-- Subscribe to labeling services
-- Custom moderation rules
-- Community-driven moderation
-- Transparent and auditable
-
-## Advanced Features
-
-### Rich Text
-
-Posts support rich formatting:
-- **Mentions**: `@username.bsky.social`
-- **Links**: Automatic link detection
-- **Hashtags**: `#topic`
-- **Facets**: Structured text annotations
-
-### Embeds
-
-Posts can embed:
-- **Images**: Up to 4 images
-- **External Links**: With preview cards
-- **Quotes**: Quote other posts
-- **Records**: Embed any record type
-
-### Threads
-
-Threaded conversations:
-- Reply chains
-- Root post tracking
-- Thread context
-- Conversation trees
-
-### Custom Feeds
-
-Algorithmic feeds:
-- Created by anyone
-- Published as feed generators
-- Discoverable in-app
-- Can be subscribed to
-
-## Development Resources
-
-### Official SDK
-
-```bash
-npm install @atproto/api
-```
-
-### Documentation
-
-- [AT Protocol Docs](https://atproto.com)
-- [Lexicon Browser](https://atproto.com/lexicons)
-- [API Reference](https://docs.bsky.app)
-
-### Tools
-
-- **ATP CLI**: Command-line tool
-- **Lexicon Validator**: Schema validation
-- **PDS Admin**: Server management
-- **Feed Generator Kit**: Build custom feeds
-
-## Comparison with Other Protocols
-
-| Feature | AT Protocol | ActivityPub | Nostr |
-|---------|-------------|-------------|-------|
-| **Identity** | DIDs | URLs | Public keys |
-| **Data Model** | Repos | Objects | Events |
-| **Federation** | Relays | Server-to-server | Relays |
-| **Portability** | High | Medium | High |
-| **Scalability** | High | Medium | High |
-
-## Future Developments
-
-### Roadmap
-
-- **OAuth Support**: Standard authentication
-- **Video Support**: Native video hosting
-- **Direct Messages**: Private messaging
-- **Groups**: Community features
-- **Payments**: Micropayments and tipping
-
-### Ecosystem Growth
-
-- More PDS implementations
-- Custom app views
-- Specialized clients
-- Third-party services
-- Developer tools
-
-## Best Practices
-
-### For Developers
-
-- Use official SDKs
-- Respect rate limits
-- Implement proper error handling
-- Cache responses appropriately
-- Follow lexicon specifications
-
-### For Users
-
-- Use app passwords for third-party apps
-- Verify app permissions
-- Back up your data
-- Consider running your own PDS
-- Participate in moderation
+- [How it works](https://atproto.com/guides/overview) — federation,
+  repositories, and data flow
+- [Lexicon](https://atproto.com/guides/lexicon) — defining and extending schemas
+- [Bluesky API reference](https://docs.bsky.app) — the endpoints behind these
+  tools
 
 ## Next Steps
 
 - **[Tools & Resources](./tools-resources.md)** - Explore MCP tools
-- **[Examples](../examples/basic-usage.md)** - See AT Protocol in action
-- **[API Reference](../api/tools.md)** - Detailed API documentation
+- **[Examples](../examples/basic-usage.md)** - See the tools in action
+- **[API Reference](../api/index.md)** - Detailed tool documentation
 
 ---
 
-**Previous**: [MCP Protocol](./mcp-protocol.md) ← | **Next**: [Tools & Resources](./tools-resources.md) →
-
+**Previous**: [MCP Protocol](./mcp-protocol.md) ← | **Next**:
+[Tools & Resources](./tools-resources.md) →

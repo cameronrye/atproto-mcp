@@ -9,10 +9,12 @@ Upload an image to AT Protocol for use in posts or profile.
 ## Parameters
 
 ### `image` (required)
+
 - **Type:** `Blob`
 - **Description:** Image file data
 
 ### `alt` (optional)
+
 - **Type:** `string`
 - **Description:** Alt text for accessibility
 
@@ -46,6 +48,7 @@ Upload an image to AT Protocol for use in posts or profile.
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -71,33 +74,37 @@ Upload an image to AT Protocol for use in posts or profile.
 
 ## Size Limits
 
-- **Maximum file size:** 1MB
-- **Recommended dimensions:** 
-  - Posts: 1000x1000px or smaller
-  - Avatar: 400x400px
-  - Banner: 1500x500px
+- **Maximum file size:** 1MB — enforced by the tool; files larger than
+  `1024 * 1024` bytes are rejected before upload.
+
+The tool reads a local file path and uploads the bytes as-is. It does **not**
+inspect, resize, or re-encode the image, so it has no notion of pixel
+dimensions. (Bluesky may downscale large images for display, but that is a
+platform behavior, not something this tool controls.)
 
 ## Error Handling
 
 ### Common Errors
 
-#### Invalid Format
-```json
-{
-  "error": "Unsupported image format",
-  "code": "VALIDATION_ERROR"
-}
+The tool surfaces errors as messages (returned as stringified JSON text
+content). The exact text:
+
+#### Unsupported Format
+
+```text
+Unsupported image format: <extension>
 ```
 
+Only `.jpg`, `.jpeg`, `.png`, `.gif`, and `.webp` are accepted.
+
 #### File Too Large
-```json
-{
-  "error": "Image size exceeds 1MB limit",
-  "code": "VALIDATION_ERROR"
-}
+
+```text
+Image file size cannot exceed 1MB
 ```
 
 #### Upload Failed
+
 ```json
 {
   "error": "Failed to upload image",
@@ -108,18 +115,21 @@ Upload an image to AT Protocol for use in posts or profile.
 ## Best Practices
 
 ### Image Optimization
+
 - Compress images before uploading
 - Use appropriate format (JPEG for photos, PNG for graphics)
 - Resize to appropriate dimensions
 - Remove EXIF data for privacy
 
 ### Accessibility
+
 - Always provide descriptive alt text
 - Describe the content and context
 - Keep alt text under 1000 characters
 - Don't start with "Image of" or "Picture of"
 
 ### Performance
+
 - Upload images before creating posts
 - Cache blob references for reuse
 - Implement retry logic for failed uploads
@@ -135,4 +145,3 @@ Upload an image to AT Protocol for use in posts or profile.
 
 - [Content Management Examples](../../examples/content-management.md)
 - [Media Best Practices](../../guide/tools-resources.md#media)
-

@@ -1,6 +1,6 @@
 # unmute_user
 
-Unmute a previously muted user to see their content again.
+Unmute a previously muted user to restore their content in your feeds.
 
 ## Authentication
 
@@ -9,19 +9,22 @@ Unmute a previously muted user to see their content again.
 ## Parameters
 
 ### `actor` (required)
+
 - **Type:** `string`
 - **Description:** User identifier (DID or handle) to unmute
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
   message: string;
   unmutedUser: {
-    did: string;
-    handle?: string;
-  }
+    actor: string;   // echoes the actor you passed in
+    did?: string;
+  };
 }
 ```
 
@@ -35,43 +38,24 @@ Unmute a previously muted user to see their content again.
 }
 ```
 
-**Response:**
+**Response (illustrative):**
+
 ```json
 {
   "success": true,
-  "message": "User unmuted successfully",
+  "message": "User user.bsky.social has been unmuted. Their content will now appear in your feeds.",
   "unmutedUser": {
-    "did": "did:plc:abc123xyz789",
-    "handle": "user.bsky.social"
+    "actor": "user.bsky.social"
   }
 }
 ```
 
 ## Error Handling
 
-### Common Errors
-
-#### User Not Muted
-```json
-{
-  "success": true,
-  "message": "User was not muted"
-}
-```
-
-#### User Not Found
-```json
-{
-  "error": "User not found",
-  "code": "NOT_FOUND"
-}
-```
-
-## Best Practices
-
-- Provide easy access to muted users list
-- Allow bulk unmute operations
-- Show unmute confirmation
+An `actor` that is neither a DID nor a handle raises a `VALIDATION_ERROR` before
+any network call. Unmuting is idempotent on the server, so unmuting a user who
+was not muted still succeeds. Other failures surface as the underlying AT
+Protocol error.
 
 ## Related Tools
 
@@ -79,5 +63,4 @@ Unmute a previously muted user to see their content again.
 
 ## See Also
 
-- [Moderation Guide](../../guide/tools-resources.md#moderation)
-
+- [Moderation Tools](../../guide/tools-resources.md#moderation)

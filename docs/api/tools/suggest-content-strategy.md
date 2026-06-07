@@ -1,29 +1,52 @@
 # suggest_content_strategy
 
-Analyze past post performance and suggest content strategy including best posting times, engaging content types, topic recommendations, and optimization tips.
+Analyze past post performance and suggest content strategy including best
+posting times, engaging content types, topic recommendations, and optimization
+tips.
 
 ## Authentication
 
-**Required** - This tool requires authentication to analyze post performance and generate recommendations.
+**Required** - This tool requires authentication to analyze post performance and
+generate recommendations.
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `actor` | `string` | No | (authenticated user) | User DID or handle to analyze. Defaults to authenticated user if not specified. |
-| `analyzePosts` | `number` | No | `50` | Number of recent posts to analyze. Must be between 10 and 100. |
-| `includeTimingAnalysis` | `boolean` | No | `true` | Whether to analyze best posting times. |
-| `includeTopicAnalysis` | `boolean` | No | `true` | Whether to analyze topic performance. |
+| Parameter               | Type      | Required | Default              | Description                                                                     |
+| ----------------------- | --------- | -------- | -------------------- | ------------------------------------------------------------------------------- |
+| `actor`                 | `string`  | No       | (authenticated user) | User DID or handle to analyze. Defaults to authenticated user if not specified. |
+| `analyzePosts`          | `number`  | No       | `50`                 | Number of recent posts to analyze. Must be between 10 and 100.                  |
+| `includeTimingAnalysis` | `boolean` | No       | `true`               | Whether to analyze best posting times.                                          |
+| `includeTopicAnalysis`  | `boolean` | No       | `true`               | Whether to analyze topic performance.                                           |
 
 ## Response
+
+Tool results are returned as stringified JSON text content. The shape below is
+illustrative:
 
 ```typescript
 {
   success: boolean;
   actor: string;
-  strategy: {
+  analysis: {
+    totalPostsAnalyzed: number;
+    // mean of per-post engagement velocity (see below)
+    avgEngagementRate: number;
+    bestPerformingPosts: Array<{
+      uri: string;
+      text: string;
+      engagement: number;
+      createdAt: string;
+    }>;
+    worstPerformingPosts: Array<{
+      uri: string;
+      text: string;
+      engagement: number;
+      createdAt: string;
+    }>;
+  };
+  recommendations: {
     bestPostingTimes?: string[];
-    contentTypes: Array<{
+    contentTypes?: Array<{
       type: string;
       avgEngagement: number;
       recommendation: string;
@@ -34,11 +57,6 @@ Analyze past post performance and suggest content strategy including best postin
       avgEngagement: number;
     }>;
     optimizationTips: string[];
-  };
-  summary: {
-    postsAnalyzed: number;
-    avgEngagementRate: number;
-    timeRange: { start: string; end: string };
   };
 }
 ```
@@ -80,50 +98,60 @@ Common errors:
 - **`AuthenticationRequired`**: Must be authenticated to use this tool
 - **`InvalidRequest`**: Invalid actor or parameters
 - **`ActorNotFound`**: Specified user does not exist
-- **`InsufficientData`**: Not enough posts to generate meaningful recommendations
+- **`InsufficientData`**: Not enough posts to generate meaningful
+  recommendations
 - **`RateLimitExceeded`**: Too many requests in a short period
-
-## Best Practices
-
-1. **Analyze Sufficient Data**: Use at least 50 posts for reliable recommendations
-2. **Regular Updates**: Run monthly to adapt to changing audience preferences
-3. **Test Recommendations**: Implement suggestions gradually and measure results
-4. **Track Changes**: Compare strategies over time to measure improvement
-5. **Combine with Engagement Analysis**: Use alongside `analyze_engagement` for deeper insights
-6. **Act on Timing**: Schedule important posts during recommended times
-7. **Diversify Content**: Balance different content types based on performance
 
 ## Understanding Strategy Recommendations
 
-- **Best Posting Times**: Hours when your posts get highest engagement (based on historical data)
-- **Content Types**: Performance comparison of text-only, media, links, and thread posts
-- **Topics**: Keywords and hashtags that drive the most engagement
-- **Optimization Tips**: Actionable recommendations to improve content performance
+Per-post engagement is computed as a weighted sum,
+`likes + (replies x 2) + (reposts x 3)`. The **engagement rate** used throughout
+is that engagement divided by the number of hours since the post was created (an
+engagement **velocity**, not engagement relative to follower count).
+`avgEngagementRate` is the mean of those per-post rates.
+
+- **Best Posting Times**: Up to three hours (in local time of the post
+  timestamps) with the highest average engagement velocity. Only present when
+  `includeTimingAnalysis` is true.
+- **Content Types**: Average engagement velocity per category (see below), each
+  with a recommendation that flags whether the category is above or below the
+  overall average.
+- **Topics**: Keywords (4+ letters) and hashtags appearing in at least two
+  posts, ranked by average engagement velocity. Only present when
+  `includeTopicAnalysis` is true.
+- **Optimization Tips**: Actionable notes derived from timing, average post
+  length, and the share of posts that include media.
 
 ## Content Types Analyzed
 
-- **withMedia**: Posts with images or videos
-- **withLinks**: Posts containing external links
-- **textOnly**: Plain text posts without media or links
-- **threads**: Multi-post threads or conversations
+Each post is bucketed into exactly one category:
+
+- **withMedia**: Posts whose record carries an embed.
+- **threads**: Non-media posts whose text contains an `@` mention (a heuristic
+  for replies/conversations).
+- **textOnly**: Remaining plain-text posts.
+- **withLinks**: Tracked internally but only surfaced when posts fall into this
+  bucket.
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol API rate limits:
-
-- 3,000 requests per hour for authenticated users
-- May require multiple API calls depending on the number of posts analyzed
+Each tool is rate limited to 100 requests per minute per tool by this server.
+Underlying AT Protocol / Bluesky API limits also apply; analyzing more posts via
+`analyzePosts` may issue additional upstream calls.
 
 ## Related Tools
 
-- **[analyze_engagement](#analyze-engagement)** - Analyze engagement patterns across posts
-- **[analyze_network](#analyze-network)** - Analyze your social network and connections
-- **[discover_trending](#discover-trending)** - Discover trending topics and posts
-- **[find_influential_users](#find-influential-users)** - Find influential users to engage with
+- **[analyze_engagement](./analyze-engagement.md)** - Analyze engagement
+  patterns across posts
+- **[analyze_network](./analyze-network.md)** - Analyze your social network and
+  connections
+- **[discover_trending](./discover-trending.md)** - Discover trending topics and
+  posts
+- **[find_influential_users](./find-influential-users.md)** - Find influential
+  users to engage with
 - **[get_timeline](./get-timeline.md)** - View your timeline posts
 
 ## See Also
 
 - [Analytics Tools Guide](../../guide/tools-resources.md#analytics--insights)
-- [Content Strategy Guide](../../guide/tools-resources.md#content-discovery)
-
+- [Content Discovery Guide](../../guide/tools-resources.md#content-discovery)

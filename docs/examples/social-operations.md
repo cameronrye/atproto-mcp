@@ -2,13 +2,32 @@
 
 Practical examples for common social networking operations on AT Protocol.
 
-These examples show how an LLM interacts with the AT Protocol MCP Server tools using JSON-formatted parameters.
+These examples show how an LLM interacts with the AT Protocol MCP Server tools
+using JSON-formatted parameters.
+
+::: tip Response shapes are illustrative
+
+Tool results are returned as **stringified JSON text content**, not a guaranteed
+structured schema. The `Response (JSON)` blocks below (including fields like
+`followersCount`, `viewer.following`, and `likeCount`) illustrate the kind of
+data a tool surfaces; exact field names, presence, and structure may differ.
+
+:::
+
+::: info Basics covered elsewhere
+
+The simplest forms of `create_post`, `like_post`, `follow_user`, `search_posts`,
+and `get_thread` are introduced in [Basic Usage](./basic-usage.md). This page
+focuses on the richer variants, workflows, and social-graph operations.
+
+:::
 
 ## Creating Posts
 
 ### Simple Text Post
 
 **User Request:**
+
 ```
 "Create a post saying 'Hello from AT Protocol!'"
 ```
@@ -16,6 +35,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Hello from AT Protocol!"
@@ -23,6 +43,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -35,6 +56,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Post with Multiple Languages
 
 **User Request:**
+
 ```
 "Create a bilingual post saying 'Hello world! Bonjour le monde!' in English and French"
 ```
@@ -42,6 +64,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Hello world! Bonjour le monde!",
@@ -52,6 +75,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Post with Images
 
 **User Request:**
+
 ```
 "Create a post with the text 'Check out this amazing photo!' and attach the sunset image"
 ```
@@ -59,6 +83,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Check out this amazing photo!",
@@ -73,11 +98,13 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 }
 ```
 
-**Note:** Images are typically uploaded first using the `upload_image` tool, then referenced in the post.
+**Note:** Images are typically uploaded first using the `upload_image` tool,
+then referenced in the post.
 
 ### Post with Link Preview
 
 **User Request:**
+
 ```
 "Create a post about the AT Protocol overview article at https://atproto.com/guides/overview"
 ```
@@ -85,6 +112,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `create_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Interesting article about AT Protocol",
@@ -103,6 +131,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Reply to a Post
 
 **User Request:**
+
 ```
 "Reply to the post at at://did:plc:abc123/app.bsky.feed.post/xyz789 saying 'Great point! I totally agree.'"
 ```
@@ -110,6 +139,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `reply_to_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Great point! I totally agree.",
@@ -119,6 +149,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/reply456",
@@ -131,6 +162,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Reply to a Reply (Nested Thread)
 
 **User Request:**
+
 ```
 "Reply to the comment in the thread saying 'Thanks for the clarification!'"
 ```
@@ -138,6 +170,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `reply_to_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Thanks for the clarification!",
@@ -146,11 +179,13 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 }
 ```
 
-**Note:** `root` is the first post in the thread, `parent` is the immediate post being replied to.
+**Note:** `root` is the first post in the thread, `parent` is the immediate post
+being replied to.
 
 ### View Full Thread
 
 **User Request:**
+
 ```
 "Show me the full conversation thread for this post"
 ```
@@ -158,6 +193,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `get_thread`
 
 **Parameters (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -166,6 +202,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -195,6 +232,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Like a Post
 
 **User Request:**
+
 ```
 "Like this post"
 ```
@@ -202,6 +240,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `like_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -210,6 +249,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.like/like456",
@@ -223,6 +263,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Unlike a Post
 
 **User Request:**
+
 ```
 "Unlike the post I just liked"
 ```
@@ -230,6 +271,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `unlike_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "likeUri": "at://did:plc:abc123/app.bsky.feed.like/like456"
@@ -237,6 +279,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -247,6 +290,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Repost Content
 
 **User Request:**
+
 ```
 "Repost this post"
 ```
@@ -254,6 +298,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `repost`
 
 **Parameters (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -264,11 +309,13 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **For Quote Post (repost with commentary):**
 
 **User Request:**
+
 ```
 "Repost this with the comment 'This is exactly what I was thinking! Great insights.'"
 ```
 
 **Parameters (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -280,6 +327,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Remove a Repost
 
 **User Request:**
+
 ```
 "Remove my repost"
 ```
@@ -287,6 +335,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `unrepost`
 
 **Parameters (JSON):**
+
 ```json
 {
   "repostUri": "at://did:plc:abc123/app.bsky.feed.repost/repost456"
@@ -298,6 +347,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Follow a User
 
 **User Request:**
+
 ```
 "Follow @alice.bsky.social"
 ```
@@ -305,6 +355,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `follow_user`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social"
@@ -312,6 +363,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.graph.follow/follow789",
@@ -325,6 +377,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Unfollow a User
 
 **User Request:**
+
 ```
 "Unfollow alice"
 ```
@@ -332,6 +385,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `unfollow_user`
 
 **Parameters (JSON):**
+
 ```json
 {
   "followUri": "at://did:plc:abc123/app.bsky.graph.follow/follow789"
@@ -339,6 +393,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -349,6 +404,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ### Get User Profile
 
 **User Request:**
+
 ```
 "Show me alice.bsky.social's profile"
 ```
@@ -356,6 +412,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 **Tool Call:** `get_user_profile`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social"
@@ -363,6 +420,7 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -382,7 +440,8 @@ These examples show how an LLM interacts with the AT Protocol MCP Server tools u
 }
 ```
 
-**Note:** The `viewer` field shows your relationship with this user (only when authenticated).
+**Note:** The `viewer` field shows your relationship with this user (only when
+authenticated).
 
 ## Building a Social Bot
 
@@ -397,6 +456,7 @@ These examples show workflow sequences for automated social interactions.
 **Tool Call:** `get_notifications`
 
 **Parameters (JSON):**
+
 ```json
 {
   "limit": 20
@@ -406,6 +466,7 @@ These examples show workflow sequences for automated social interactions.
 **Step 2: Filter for Unread Mentions**
 
 The LLM analyzes the response to identify notifications where:
+
 - `reason` is `"mention"`
 - `isRead` is `false`
 
@@ -414,6 +475,7 @@ The LLM analyzes the response to identify notifications where:
 **Tool Call:** `reply_to_post` (for each mention)
 
 **Parameters (JSON):**
+
 ```json
 {
   "text": "Thanks for mentioning me! 🤖",
@@ -422,7 +484,8 @@ The LLM analyzes the response to identify notifications where:
 }
 ```
 
-**Implementation Note:** This workflow would be triggered periodically (e.g., every minute) by an external scheduler, not by the LLM itself.
+**Implementation Note:** This workflow would be triggered periodically (e.g.,
+every minute) by an external scheduler, not by the LLM itself.
 
 ### Engagement Bot Workflow
 
@@ -433,6 +496,7 @@ The LLM analyzes the response to identify notifications where:
 **Tool Call:** `search_posts`
 
 **Parameters (JSON):**
+
 ```json
 {
   "q": "atproto",
@@ -443,11 +507,13 @@ The LLM analyzes the response to identify notifications where:
 
 **Step 2: Like Each Post**
 
-For each post in the results that hasn't been liked yet (check `viewer.like` field):
+For each post in the results that hasn't been liked yet (check `viewer.like`
+field):
 
 **Tool Call:** `like_post`
 
 **Parameters (JSON):**
+
 ```json
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -462,6 +528,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 ### Search for Posts
 
 **User Request:**
+
 ```
 "Search for top posts about machine learning in English"
 ```
@@ -469,6 +536,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Tool Call:** `search_posts`
 
 **Parameters (JSON):**
+
 ```json
 {
   "q": "machine learning",
@@ -481,11 +549,13 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Search by Author:**
 
 **User Request:**
+
 ```
 "Find alice's posts about TypeScript"
 ```
 
 **Parameters (JSON):**
+
 ```json
 {
   "q": "typescript",
@@ -496,22 +566,25 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Search with Date Range:**
 
 **User Request:**
+
 ```
-"Search for posts about atproto from January 2024"
+"Search for posts about atproto from January 2026"
 ```
 
 **Parameters (JSON):**
+
 ```json
 {
   "q": "atproto",
-  "since": "2024-01-01T00:00:00Z",
-  "until": "2024-01-31T23:59:59Z"
+  "since": "2026-01-01T00:00:00Z",
+  "until": "2026-01-31T23:59:59Z"
 }
 ```
 
 ### Get Timeline
 
 **User Request:**
+
 ```
 "Show me my timeline"
 ```
@@ -519,6 +592,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Tool Call:** `get_timeline`
 
 **Parameters (JSON):**
+
 ```json
 {
   "limit": 50
@@ -526,6 +600,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -552,6 +627,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Paginate to Next Page:**
 
 **Parameters (JSON):**
+
 ```json
 {
   "limit": 50,
@@ -562,6 +638,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 ### Explore Custom Feeds
 
 **User Request:**
+
 ```
 "Show me posts from the tech feed"
 ```
@@ -569,6 +646,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Tool Call:** `get_custom_feed`
 
 **Parameters (JSON):**
+
 ```json
 {
   "feed": "at://did:plc:abc123/app.bsky.feed.generator/tech-feed",
@@ -581,6 +659,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 ### Get Followers
 
 **User Request:**
+
 ```
 "Show me alice.bsky.social's followers"
 ```
@@ -588,6 +667,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Tool Call:** `get_followers`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social",
@@ -596,6 +676,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -616,11 +697,13 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 }
 ```
 
-**Analysis:** The LLM can analyze the response to count verified profiles (those with `displayName` and `avatar`).
+**Analysis:** The LLM can analyze the response to count verified profiles (those
+with `displayName` and `avatar`).
 
 ### Get Following
 
 **User Request:**
+
 ```
 "Who does alice.bsky.social follow?"
 ```
@@ -628,6 +711,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Tool Call:** `get_follows`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social",
@@ -636,6 +720,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 ```
 
 **Response (JSON):**
+
 ```json
 {
   "success": true,
@@ -656,6 +741,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 ### Find Mutual Follows Workflow
 
 **User Request:**
+
 ```
 "Find mutual follows for alice.bsky.social"
 ```
@@ -665,6 +751,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Tool Call:** `get_followers`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social",
@@ -677,6 +764,7 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 **Tool Call:** `get_follows`
 
 **Parameters (JSON):**
+
 ```json
 {
   "actor": "alice.bsky.social",
@@ -686,7 +774,8 @@ For each post in the results that hasn't been liked yet (check `viewer.like` fie
 
 **Step 3: Analysis**
 
-The LLM compares the two lists to find users who appear in both `followers` and `follows` arrays (matching by `did`).
+The LLM compares the two lists to find users who appear in both `followers` and
+`follows` arrays (matching by `did`).
 
 ## Best Practices
 
@@ -694,42 +783,27 @@ The LLM compares the two lists to find users who appear in both `followers` and 
 
 **Concept:** Space out multiple operations to avoid rate limits
 
-When performing multiple operations in sequence, wait between each call:
-
-**Example: Creating Multiple Posts**
-
-```
-1. Create first post
-2. Wait 1-2 seconds
-3. Create second post
-4. Wait 1-2 seconds
-5. Create third post
-```
+This server rate limits each tool to roughly **100 requests per minute per
+tool**. When performing many operations in sequence, add a short delay between
+calls so you stay under the limit:
 
 **Tool Calls:**
 
 ```json
 // First post
-{
-  "text": "Post 1"
-}
+{ "text": "Post 1" }
 
-// Wait 1-2 seconds, then second post
-{
-  "text": "Post 2"
-}
+// short delay, then second post
+{ "text": "Post 2" }
 
-// Wait 1-2 seconds, then third post
-{
-  "text": "Post 3"
-}
+// short delay, then third post
+{ "text": "Post 3" }
 ```
 
-**Rate Limit Guidelines:**
-- **Posts:** Wait 1-2 seconds between posts
-- **Likes:** Wait 0.5-1 seconds between likes
-- **Follows:** Wait 1-2 seconds between follows
-- **Searches:** Can be done more frequently, but monitor for rate limit errors
+A small, consistent pause (on the order of a second) between write operations
+such as posts, likes, and follows is generally enough. The platform (Bluesky)
+may also apply its own server-side limits, so watch for rate-limit errors and
+back off when you see them.
 
 ### Error Handling
 
@@ -737,7 +811,8 @@ When performing multiple operations in sequence, wait between each call:
 
 When a tool returns a rate limit error:
 
-**Error Response (JSON):**
+**Error Response (illustrative JSON):**
+
 ```json
 {
   "error": "Rate limit exceeded. Please try again later.",
@@ -747,18 +822,25 @@ When a tool returns a rate limit error:
 ```
 
 **Recommended Action:**
+
 1. Inform the user about the rate limit
-2. Wait for the `retryAfter` duration (in seconds)
+2. Wait before retrying — if a `retryAfter` value (in seconds) is present, honor
+   it; otherwise back off for a short interval
 3. Retry the operation
 
+**Note:** `retryAfter` is only populated when the upstream service returns a
+`retry-after` header, so it may be absent.
+
 **Example LLM Response:**
+
 ```
-"I've hit the rate limit. I'll wait 60 seconds and try again."
+"I've hit the rate limit. I'll wait a bit and try again."
 ```
 
 **Handling Authentication Errors:**
 
 **Error Response (JSON):**
+
 ```json
 {
   "error": "Authentication required",
@@ -766,13 +848,11 @@ When a tool returns a rate limit error:
 }
 ```
 
-**Recommended Action:**
-Inform the user that authentication is required for this operation.
+**Recommended Action:** Inform the user that authentication is required for this
+operation.
 
 ## See Also
 
 - [Content Management Examples](./content-management.md)
-- [Real-time Data Examples](./real-time-data.md)
 - [Custom Integration Examples](./custom-integration.md)
 - [API Reference](../api/)
-

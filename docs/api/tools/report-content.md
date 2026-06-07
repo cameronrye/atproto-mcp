@@ -1,6 +1,6 @@
 # report_content
 
-Report content (post, image, etc.) for policy violations.
+Report content (a post) that violates community guidelines or terms of service.
 
 ## Authentication
 
@@ -9,38 +9,40 @@ Report content (post, image, etc.) for policy violations.
 ## Parameters
 
 ### `subject` (required)
+
 - **Type:** `object`
-- **Description:** Content to report
+- **Description:** Strong reference to the content to report
 - **Properties:**
-  - `uri`: AT Protocol URI of the content
-  - `cid`: Content identifier
+  - `uri` (string, required): AT Protocol URI of the content (`at://...`)
+  - `cid` (string, required): Content identifier (CID) of the content
 
 ### `reasonType` (required)
+
 - **Type:** `string`
-- **Description:** Reason for report
-- **Values:**
-  - `spam` - Spam or unwanted content
-  - `violation` - Terms of service violation
-  - `misleading` - Misleading or false information
-  - `sexual` - Sexual content
-  - `rude` - Rude or harassing content
-  - `other` - Other reason
+- **Values:** `spam` | `violation` | `misleading` | `sexual` | `rude` | `other`
+- **Description:** Category of the report. Mapped to the corresponding
+  `com.atproto.moderation.defs#reason*` value.
 
 ### `reason` (optional)
+
 - **Type:** `string`
+- **Constraints:** Up to 2000 characters
 - **Description:** Additional details about the report
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
   message: string;
-  reportId: string;
-  reportedContent: {
-    uri: string;
-    cid: string;
-  }
+  reportId: string;          // server-assigned report id, as a string
+  reportDetails: {
+    subject: string;         // the reported content's AT-URI
+    reasonType: string;
+    reason?: string;
+  };
 }
 ```
 
@@ -59,29 +61,18 @@ Report content (post, image, etc.) for policy violations.
 }
 ```
 
-**Response:**
+**Response (illustrative):**
+
 ```json
 {
   "success": true,
-  "message": "Content reported successfully",
-  "reportId": "report_abc123",
-  "reportedContent": {
-    "uri": "at://did:plc:abc123/app.bsky.feed.post/spam123",
-    "cid": "bafyreiabc123..."
+  "message": "Content has been reported successfully. Moderators will review your report.",
+  "reportId": "12345",
+  "reportDetails": {
+    "subject": "at://did:plc:abc123/app.bsky.feed.post/spam123",
+    "reasonType": "spam",
+    "reason": "Repeated promotional content"
   }
-}
-```
-
-### Report Harassment
-
-```json
-{
-  "subject": {
-    "uri": "at://did:plc:abc123/app.bsky.feed.post/post456",
-    "cid": "bafyreiabc123..."
-  },
-  "reasonType": "rude",
-  "reason": "Targeted harassment and personal attacks"
 }
 ```
 
@@ -98,115 +89,27 @@ Report content (post, image, etc.) for policy violations.
 }
 ```
 
-## Report Types
+## Reason Types
 
-### `spam`
-- Unwanted promotional content
-- Repetitive posts
-- Bot-generated content
-- Scams or phishing
-
-### `violation`
-- Terms of service violations
-- Illegal content
-- Copyright infringement
-- Impersonation
-
-### `misleading`
-- False information
-- Manipulated media
-- Deceptive practices
-- Misinformation
-
-### `sexual`
-- Inappropriate sexual content
-- Unsolicited sexual content
-- Sexual exploitation
-
-### `rude`
-- Harassment
-- Bullying
-- Hate speech
-- Personal attacks
-
-### `other`
-- Issues not covered by other categories
-- Provide detailed reason in description
+- **`spam`** - unwanted promotional content, repetitive posts, scams or
+  phishing.
+- **`violation`** - terms-of-service violations, illegal content, impersonation.
+- **`misleading`** - false information, manipulated media, deceptive practices.
+- **`sexual`** - inappropriate or unsolicited sexual content.
+- **`rude`** - harassment, bullying, hate speech, personal attacks.
+- **`other`** - anything not covered above; describe it in `reason`.
 
 ## Error Handling
 
-### Common Errors
+Validation runs before any network call:
 
-#### Invalid Subject
-```json
-{
-  "error": "Subject URI and CID are required",
-  "code": "VALIDATION_ERROR"
-}
-```
+- A `subject.uri` that does not start with `at://` raises a `VALIDATION_ERROR`.
+- A malformed `subject.cid` raises a `VALIDATION_ERROR`.
+- A `reasonType` outside the allowed values, or a `reason` over 2000 characters,
+  raises a `VALIDATION_ERROR`.
 
-#### Invalid Reason Type
-```json
-{
-  "error": "Invalid reason type",
-  "code": "VALIDATION_ERROR"
-}
-```
-
-#### Content Not Found
-```json
-{
-  "error": "Content not found",
-  "code": "NOT_FOUND"
-}
-```
-
-## Best Practices
-
-### When to Report
-- Clear policy violations
-- Harmful content
-- Illegal activity
-- Safety concerns
-
-### Reporting Guidelines
-- Be specific in reason description
-- Provide context when helpful
-- Don't abuse reporting system
-- Report genuine violations only
-
-### User Experience
-- Make reporting easily accessible
-- Explain reporting process
-- Confirm report submission
-- Provide report status updates
-
-### Follow-up Actions
-- Block user if needed
-- Mute to avoid seeing content
-- Document patterns of abuse
-- Contact platform support for urgent issues
-
-## What Happens After Reporting
-
-### Review Process
-1. Report submitted to moderation team
-2. Content reviewed against policies
-3. Action taken if violation confirmed
-4. Reporter may receive outcome notification
-
-### Possible Outcomes
-- Content removed
-- User warned
-- User suspended
-- No action (no violation found)
-
-## Privacy
-
-- Reports are confidential
-- Reporter identity protected
-- Report details not shared with reported user
-- Moderation decisions may be appealed
+Other failures (content not found, network errors) surface as the underlying AT
+Protocol error.
 
 ## Related Tools
 
@@ -216,7 +119,5 @@ Report content (post, image, etc.) for policy violations.
 
 ## See Also
 
-- [Moderation Guide](../../guide/tools-resources.md#moderation)
-- [Community Guidelines](../../guide/tools-resources.md#guidelines)
-- [Safety Best Practices](../../guide/tools-resources.md#safety)
-
+- [Moderation Tools](../../guide/tools-resources.md#moderation)
+- [AT Protocol Moderation](https://docs.bsky.app/docs/advanced-guides/moderation)

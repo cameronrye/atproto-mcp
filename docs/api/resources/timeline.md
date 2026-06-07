@@ -12,7 +12,8 @@ atproto://timeline
 
 **Required:** Yes
 
-This resource requires authentication to access the user's personalized timeline.
+This resource requires authentication to access the user's personalized
+timeline.
 
 ## Resource Information
 
@@ -57,7 +58,7 @@ This resource requires authentication to access the user's personalized timeline
 ```json
 {
   "uri": "atproto://timeline",
-  "timestamp": "2024-01-15T10:30:00.000Z",
+  "timestamp": "2026-01-15T10:30:00.000Z",
   "posts": [
     {
       "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
@@ -69,7 +70,7 @@ This resource requires authentication to access the user's personalized timeline
         "avatar": "https://cdn.bsky.app/img/avatar/..."
       },
       "text": "Just deployed a new feature!",
-      "createdAt": "2024-01-15T10:25:00.000Z",
+      "createdAt": "2026-01-15T10:25:00.000Z",
       "replyCount": 5,
       "repostCount": 12,
       "likeCount": 48,
@@ -85,7 +86,7 @@ This resource requires authentication to access the user's personalized timeline
         "displayName": "Bob Johnson"
       },
       "text": "Great article on AT Protocol architecture",
-      "createdAt": "2024-01-15T10:20:00.000Z",
+      "createdAt": "2026-01-15T10:20:00.000Z",
       "replyCount": 2,
       "repostCount": 8,
       "likeCount": 25,
@@ -122,12 +123,16 @@ console.log(`Timestamp: ${timelineData.timestamp}`);
 
 ### Polling for Updates
 
+Each read returns a fresh snapshot, so re-read the resource when you need newer
+posts. The interval below is a suggestion for a client application — the server
+does not poll on your behalf or push updates.
+
 ```javascript
-// Poll timeline every 30 seconds
+// Re-read the timeline periodically (client-side choice, not server behavior)
 setInterval(async () => {
   const resource = await mcpClient.readResource('atproto://timeline');
   const timeline = JSON.parse(resource.text);
-  
+
   // Process new posts
   for (const post of timeline.posts) {
     if (isNewPost(post)) {
@@ -139,75 +144,28 @@ setInterval(async () => {
 
 ## Use Cases
 
-### Feed Display
-- Display user's personalized timeline
-- Show posts from followed users
-- Render embedded content
-- Display engagement metrics
-
-### Content Monitoring
-- Monitor timeline for keywords
-- Track mentions and replies
-- Detect trending topics
-- Analyze engagement patterns
-
-### Automation
-- Auto-like relevant posts
-- Auto-reply to mentions
-- Repost interesting content
-- Track conversation threads
-
-### Analytics
-- Measure timeline engagement
-- Track posting patterns
-- Analyze content types
-- Monitor follower activity
+- Display the user's personalized timeline and engagement metrics
+- Monitor the timeline for keywords, mentions, or replies
+- Drive automation such as auto-liking or replying to relevant posts
+- Analyze posting patterns and content types
 
 ## Best Practices
 
-### Caching
-- Cache timeline data for 30-60 seconds
-- Invalidate cache on user actions
-- Store cursor for pagination
-- Implement stale-while-revalidate
+These are suggestions for client applications; none are enforced by this server.
 
-### Performance
-- Limit fetch frequency (max once per 10 seconds)
-- Process posts asynchronously
-- Implement virtual scrolling for UI
-- Prefetch next page
-
-### User Experience
-- Show loading states
-- Implement pull-to-refresh
-- Display relative timestamps
-- Handle deleted posts gracefully
-
-### Data Handling
-- Parse JSON safely
-- Validate data structure
-- Handle missing fields
-- Log parsing errors
+- Treat each read as a point-in-time snapshot and re-read when you need newer
+  data
+- Store the `cursor` if you need to page back through older posts
+- Parse the JSON defensively and handle missing optional fields
+- Handle deleted posts gracefully, since they may appear briefly
 
 ## Limitations
 
-### Data Freshness
-- Data is a snapshot at fetch time
-- Not real-time (use streaming for real-time)
-- May include deleted posts briefly
-- Engagement counts may be slightly stale
-
-### Pagination
-- Limited to 50 posts per fetch
-- Use cursor for additional posts
-- Cursor may expire after time
-- No backward pagination
-
-### Content
-- Only includes posts from followed users
-- Algorithm-filtered content
-- May include recommended posts
-- Respects user's content preferences
+- Data is a snapshot at fetch time, not a real-time stream; re-read for updates
+- Each read returns up to 50 posts (hardcoded server-side); use the `cursor` to
+  fetch more
+- Cursors are forward-only and may expire over time
+- Content is the algorithm-filtered home feed and may include recommended posts
 
 ## Related Resources
 
@@ -217,10 +175,8 @@ setInterval(async () => {
 ## Related Tools
 
 - **[get_timeline](../tools/get-timeline.md)** - Get timeline with more control
-- **[start_streaming](../tools/start-streaming.md)** - Real-time timeline updates
 
 ## See Also
 
 - [MCP Protocol Guide](../../guide/mcp-protocol.md)
 - [Resource Access Patterns](../../guide/tools-resources.md#resources)
-

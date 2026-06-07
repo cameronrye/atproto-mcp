@@ -1,544 +1,272 @@
 # Custom Integration Examples
 
-Practical examples for building custom integrations, bots, and applications with AT Protocol.
+Practical patterns for building custom integrations on top of the AT Protocol
+MCP Server.
 
-## Building a Social Media Bot
+## How these examples work
 
-### Complete Bot Framework
+This server speaks the **Model Context Protocol over stdio**. It does **not**
+expose a TypeScript API you import, and it does **not** bind an HTTP port. Your
+application (or its MCP client library) launches the server as a child process
+and talks to it with JSON-RPC `tools/call` requests:
 
-```typescript
-import { EventEmitter } from 'events';
-
-class AtProtoBot extends EventEmitter {
-  private running = false;
-  private intervals: NodeJS.Timeout[] = [];
-  
-  constructor(
-    private config: {
-      name: string;
-      pollInterval?: number;
-      keywords?: string[];
-    }
-  ) {
-    super();
-  }
-  
-  async start() {
-    this.running = true;
-    console.log(`${this.config.name} started`);
-    
-    // Start streaming
-    await startStreaming({
-      subscriptionId: this.config.name,
-      collections: ['app.bsky.feed.post']
-    });
-    
-    // Poll for events
-    const interval = setInterval(
-      () => this.poll(),
-      this.config.pollInterval || 10000
-    );
-    this.intervals.push(interval);
-  }
-  
-  async stop() {
-    this.running = false;
-    this.intervals.forEach(i => clearInterval(i));
-    this.intervals = [];
-    
-    await stopStreaming({
-      subscriptionId: this.config.name
-    });
-    
-    console.log(`${this.config.name} stopped`);
-  }
-  
-  private async poll() {
-    if (!this.running) return;
-    
-    try {
-      const events = await getRecentEvents({
-        limit: 50,
-        collection: 'app.bsky.feed.post'
-      });
-      
-      for (const event of events.events) {
-        if (event.operation === 'create' && event.record) {
-          this.emit('post', event);
-          
-          // Check for keywords
-          if (this.config.keywords) {
-            const text = event.record.text.toLowerCase();
-            for (const keyword of this.config.keywords) {
-              if (text.includes(keyword.toLowerCase())) {
-                this.emit('keyword', keyword, event);
-              }
-            }
-          }
-        }
-      }
-    } catch (error) {
-      this.emit('error', error);
-    }
-  }
-}
-
-// Usage
-const bot = new AtProtoBot({
-  name: 'my-bot',
-  pollInterval: 10000,
-  keywords: ['atproto', 'bluesky']
-});
-
-bot.on('post', (event) => {
-  console.log('New post:', event.record.text);
-});
-
-bot.on('keyword', async (keyword, event) => {
-  console.log(`Keyword "${keyword}" found!`);
-  // Auto-like posts with keywords
-  const postUri = `at://${event.repo}/${event.collection}/${event.rkey}`;
-  await likePost({ uri: postUri, cid: event.cid });
-});
-
-bot.on('error', (error) => {
-  console.error('Bot error:', error);
-});
-
-await bot.start();
-```
-
-## Analytics Dashboard
-
-### Real-time Analytics Engine
-
-```typescript
-interface AnalyticsData {
-  totalPosts: number;
-  totalLikes: number;
-  totalReposts: number;
-  topAuthors: Map<string, number>;
-  topHashtags: Map<string, number>;
-  postsPerMinute: number;
-}
-
-class AnalyticsEngine {
-  private data: AnalyticsData = {
-    totalPosts: 0,
-    totalLikes: 0,
-    totalReposts: 0,
-    topAuthors: new Map(),
-    topHashtags: new Map(),
-    postsPerMinute: 0
-  };
-  
-  private recentPosts: Array<{ timestamp: Date }> = [];
-  
-  async update() {
-    const events = await getRecentEvents({ limit: 100 });
-    
-    for (const event of events.events) {
-      if (event.operation !== 'create') continue;
-      
-      switch (event.collection) {
-        case 'app.bsky.feed.post':
-          this.data.totalPosts++;
-          this.recentPosts.push({ timestamp: new Date(event.time) });
-          
-          // Track author
-          const count = this.data.topAuthors.get(event.repo) || 0;
-          this.data.topAuthors.set(event.repo, count + 1);
-          
-          // Extract hashtags
-          if (event.record?.text) {
-            const hashtags = event.record.text.match(/#\w+/g) || [];
-            for (const tag of hashtags) {
-              const tagCount = this.data.topHashtags.get(tag) || 0;
-              this.data.topHashtags.set(tag, tagCount + 1);
-            }
-          }
-          break;
-          
-        case 'app.bsky.feed.like':
-          this.data.totalLikes++;
-          break;
-          
-        case 'app.bsky.feed.repost':
-          this.data.totalReposts++;
-          break;
-      }
-    }
-    
-    // Calculate posts per minute
-    const oneMinuteAgo = new Date(Date.now() - 60000);
-    this.recentPosts = this.recentPosts.filter(p => p.timestamp > oneMinuteAgo);
-    this.data.postsPerMinute = this.recentPosts.length;
-  }
-  
-  getData(): AnalyticsData {
-    return this.data;
-  }
-  
-  getTopAuthors(limit: number = 10) {
-    return Array.from(this.data.topAuthors.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit);
-  }
-  
-  getTopHashtags(limit: number = 10) {
-    return Array.from(this.data.topHashtags.entries())
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, limit);
-  }
-}
-
-// Usage
-const analytics = new AnalyticsEngine();
-
-setInterval(async () => {
-  await analytics.update();
-  
-  const data = analytics.getData();
-  console.log('\n=== Analytics Dashboard ===');
-  console.log(`Total Posts: ${data.totalPosts}`);
-  console.log(`Total Likes: ${data.totalLikes}`);
-  console.log(`Total Reposts: ${data.totalReposts}`);
-  console.log(`Posts/min: ${data.postsPerMinute}`);
-  
-  console.log('\nTop Hashtags:');
-  analytics.getTopHashtags(5).forEach(([tag, count]) => {
-    console.log(`  ${tag}: ${count}`);
-  });
-}, 30000);
-```
-
-## Content Moderation System
-
-### Automated Moderation
-
-```typescript
-interface ModerationRule {
-  name: string;
-  check: (post: any) => boolean;
-  action: (post: any, repo: string) => Promise<void>;
-}
-
-class ModerationSystem {
-  private rules: ModerationRule[] = [];
-  private flaggedPosts: Set<string> = new Set();
-  
-  addRule(rule: ModerationRule) {
-    this.rules.push(rule);
-  }
-  
-  async moderate() {
-    const events = await getRecentEvents({
-      limit: 50,
-      collection: 'app.bsky.feed.post'
-    });
-    
-    for (const event of events.events) {
-      if (event.operation !== 'create' || !event.record) continue;
-      
-      const postUri = `at://${event.repo}/${event.collection}/${event.rkey}`;
-      
-      if (this.flaggedPosts.has(postUri)) continue;
-      
-      for (const rule of this.rules) {
-        if (rule.check(event.record)) {
-          console.log(`Rule "${rule.name}" triggered for post: ${postUri}`);
-          await rule.action(event.record, event.repo);
-          this.flaggedPosts.add(postUri);
-          break;
-        }
-      }
-    }
-  }
-}
-
-// Usage
-const moderator = new ModerationSystem();
-
-// Rule: Detect spam
-moderator.addRule({
-  name: 'spam-detection',
-  check: (post) => {
-    const spamKeywords = ['buy now', 'click here', 'limited offer'];
-    const text = post.text.toLowerCase();
-    return spamKeywords.some(kw => text.includes(kw));
+```jsonc
+// Request your MCP client sends over stdio
+{
+  "method": "tools/call",
+  "params": {
+    "name": "create_post",
+    "arguments": { "text": "Hello world!" },
   },
-  action: async (post, repo) => {
-    console.log('Spam detected, muting user');
-    await muteUser({ actor: repo });
-  }
-});
-
-// Rule: Detect excessive caps
-moderator.addRule({
-  name: 'excessive-caps',
-  check: (post) => {
-    const text = post.text;
-    const capsRatio = (text.match(/[A-Z]/g) || []).length / text.length;
-    return capsRatio > 0.7 && text.length > 20;
-  },
-  action: async (post, repo) => {
-    console.log('Excessive caps detected');
-    // Could report or flag for review
-  }
-});
-
-setInterval(() => moderator.moderate(), 10000);
+}
 ```
 
-## Multi-Account Manager
+Every tool result comes back as **stringified JSON inside a text content block**
+— there is no guaranteed structured schema, so parse the `text` field yourself
+when you need the data programmatically:
 
-### Account Manager
+```jsonc
+// Response the server returns
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\n  \"uri\": \"at://did:plc:.../app.bsky.feed.post/...\",\n  \"cid\": \"...\"\n}",
+    },
+  ],
+}
+```
+
+In the examples below, `callTool(name, args)` is a stand-in for whatever your
+MCP client library exposes for sending a `tools/call` request. A minimal helper
+that parses the text payload looks like this:
 
 ```typescript
-interface Account {
-  identifier: string;
-  password: string;
-  session?: any;
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+
+const transport = new StdioClientTransport({
+  command: 'atproto-mcp',
+  // Pass credentials via the environment of the spawned process.
+  env: {
+    ...process.env,
+    ATPROTO_IDENTIFIER: process.env.ATPROTO_IDENTIFIER!,
+    ATPROTO_PASSWORD: process.env.ATPROTO_PASSWORD!,
+  },
+});
+
+const client = new Client({ name: 'my-integration', version: '1.0.0' });
+await client.connect(transport);
+
+/** Call a tool and parse its stringified-JSON text result. */
+async function callTool<T = unknown>(
+  name: string,
+  args: Record<string, unknown> = {}
+): Promise<T> {
+  const result = await client.callTool({ name, arguments: args });
+  const block = result.content?.find(
+    (c: { type: string }) => c.type === 'text'
+  );
+  if (!block || block.type !== 'text') {
+    throw new Error(`Tool ${name} returned no text content`);
+  }
+  return JSON.parse(block.text) as T;
 }
-
-class MultiAccountManager {
-  private accounts: Map<string, Account> = new Map();
-  private currentAccount?: string;
-  
-  addAccount(identifier: string, password: string) {
-    this.accounts.set(identifier, { identifier, password });
-  }
-  
-  async switchAccount(identifier: string) {
-    const account = this.accounts.get(identifier);
-    if (!account) throw new Error('Account not found');
-    
-    // Authenticate with this account
-    // (Implementation depends on your auth setup)
-    this.currentAccount = identifier;
-    console.log(`Switched to account: ${identifier}`);
-  }
-  
-  async postToAll(text: string) {
-    const results = [];
-    
-    for (const [identifier, account] of this.accounts) {
-      await this.switchAccount(identifier);
-      
-      try {
-        const result = await createPost({ text });
-        results.push({ identifier, success: true, uri: result.uri });
-      } catch (error) {
-        results.push({ identifier, success: false, error });
-      }
-      
-      await sleep(2000); // Rate limiting
-    }
-    
-    return results;
-  }
-  
-  getCurrentAccount(): string | undefined {
-    return this.currentAccount;
-  }
-}
-
-// Usage
-const manager = new MultiAccountManager();
-manager.addAccount('account1.bsky.social', 'password1');
-manager.addAccount('account2.bsky.social', 'password2');
-
-// Post to all accounts
-const results = await manager.postToAll('Hello from all accounts!');
-console.log(results);
 ```
+
+::: tip Authentication
+
+Most tools require authentication. Set `ATPROTO_IDENTIFIER` and
+`ATPROTO_PASSWORD` (an app password from Bluesky **Settings → App Passwords**)
+in the environment of the spawned server process. Without credentials only
+public tools — notably `search_posts` and `get_user_profile` — are available.
+
+:::
+
+::: tip Rate limiting
+
+The server rate-limits each tool to **100 requests per minute per tool**.
+Long-running loops (RSS polling, backups) should pace their calls so they stay
+well under that limit and respect Bluesky's own platform limits.
+
+:::
 
 ## RSS Feed Integration
 
 ### RSS to AT Protocol Bridge
 
+Polls an RSS feed and turns new items into posts by calling the `create_post`
+tool. The external-link embed is passed through to `create_post`'s `arguments`.
+
 ```typescript
 import Parser from 'rss-parser';
 
-class RssBridge {
-  private parser = new Parser();
-  private seenItems = new Set<string>();
-  
-  constructor(private feedUrl: string) {}
-  
-  async poll() {
-    const feed = await this.parser.parseURL(this.feedUrl);
-    
-    for (const item of feed.items) {
-      if (this.seenItems.has(item.guid || item.link!)) continue;
-      
-      await this.postItem(item);
-      this.seenItems.add(item.guid || item.link!);
-      
-      await sleep(5000); // Rate limiting
-    }
-  }
-  
-  private async postItem(item: any) {
-    const text = this.formatPost(item);
-    
+const parser = new Parser();
+const seenItems = new Set<string>();
+
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+function formatPost(item: Parser.Item): string {
+  const title = item.title || 'New Article';
+  const maxLength = 250;
+  return title.length > maxLength
+    ? `${title.slice(0, maxLength - 3)}...`
+    : title;
+}
+
+function stripHtml(html: string): string {
+  return html.replace(/<[^>]*>/g, '').slice(0, 300);
+}
+
+async function pollFeed(feedUrl: string) {
+  const feed = await parser.parseURL(feedUrl);
+
+  for (const item of feed.items) {
+    const id = item.guid || item.link;
+    if (!id || seenItems.has(id)) continue;
+
     try {
-      const result = await createPost({
-        text,
-        embed: item.link ? {
-          external: {
-            uri: item.link,
-            title: item.title || 'Article',
-            description: this.stripHtml(item.contentSnippet || item.description || '')
-          }
-        } : undefined
+      const result = await callTool<{ uri: string }>('create_post', {
+        text: formatPost(item),
+        embed: item.link
+          ? {
+              external: {
+                uri: item.link,
+                title: item.title || 'Article',
+                description: stripHtml(
+                  item.contentSnippet || item.content || ''
+                ),
+              },
+            }
+          : undefined,
       });
-      
-      console.log(`Posted RSS item: ${item.title}`);
+      console.log(`Posted RSS item: ${item.title} -> ${result.uri}`);
     } catch (error) {
       console.error('Failed to post RSS item:', error);
     }
-  }
-  
-  private formatPost(item: any): string {
-    const title = item.title || 'New Article';
-    const maxLength = 250;
-    
-    if (title.length > maxLength) {
-      return title.substring(0, maxLength - 3) + '...';
-    }
-    
-    return title;
-  }
-  
-  private stripHtml(html: string): string {
-    return html.replace(/<[^>]*>/g, '').substring(0, 300);
+
+    seenItems.add(id);
+    await delay(5000); // Pace calls to stay under the per-tool rate limit.
   }
 }
 
-// Usage
-const bridge = new RssBridge('https://example.com/feed.xml');
-
-// Poll every 15 minutes
-setInterval(() => bridge.poll(), 15 * 60 * 1000);
+// Poll every 15 minutes.
+setInterval(() => pollFeed('https://example.com/feed.xml'), 15 * 60 * 1000);
 ```
 
 ## Webhook Integration
 
 ### Webhook Server
 
+Your own HTTP server receives webhooks and forwards them to the MCP server via
+`create_post`. Note that the HTTP listener belongs to **your** application — the
+AT Protocol MCP Server itself binds no port and is reached only over stdio.
+
 ```typescript
 import express from 'express';
 
-class WebhookServer {
-  private app = express();
-  
-  constructor(private port: number = 3000) {
-    this.app.use(express.json());
-    this.setupRoutes();
-  }
-  
-  private setupRoutes() {
-    // Receive webhook and post to AT Protocol
-    this.app.post('/webhook/post', async (req, res) => {
-      try {
-        const { text, embed } = req.body;
-        
-        const result = await createPost({ text, embed });
-        
-        res.json({
-          success: true,
-          uri: result.uri
-        });
-      } catch (error) {
-        res.status(500).json({
-          success: false,
-          error: error.message
-        });
-      }
-    });
-    
-    // Health check
-    this.app.get('/health', (req, res) => {
-      res.json({ status: 'ok' });
-    });
-  }
-  
-  start() {
-    this.app.listen(this.port, () => {
-      console.log(`Webhook server listening on port ${this.port}`);
-    });
-  }
-}
+const app = express();
+app.use(express.json());
 
-// Usage
-const server = new WebhookServer(3000);
-server.start();
+app.post('/webhook/post', async (req, res) => {
+  try {
+    const { text, embed } = req.body;
+    const result = await callTool<{ uri: string }>('create_post', {
+      text,
+      embed,
+    });
+    res.json({ success: true, uri: result.uri });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
+
+app.listen(3000, () => {
+  console.log('Webhook server listening on port 3000');
+});
 ```
 
 ## Backup and Archive System
 
 ### Account Backup
 
+Pages through a user's posts with `search_posts` and saves a profile snapshot
+with `get_user_profile`. Both tools work without authentication, which makes
+this a good public-data example.
+
+::: warning
+
+`search_posts` requires a non-empty `q`. An empty query does **not** return all
+of an author's posts — combine a query term with the `author` filter, and page
+with `cursor`.
+
+:::
+
 ```typescript
 import { writeFileSync } from 'fs';
 
-class AccountBackup {
-  async backupPosts(authorHandle: string) {
-    const allPosts = [];
-    let cursor: string | undefined;
-    
-    do {
-      const results = await searchPosts({
-        q: '',
-        author: authorHandle,
-        limit: 100,
-        cursor
-      });
-      
-      allPosts.push(...results.posts);
-      cursor = results.cursor;
-      
-      console.log(`Backed up ${allPosts.length} posts...`);
-    } while (cursor);
-    
-    // Save to file
-    const backup = {
+interface SearchResult {
+  posts: unknown[];
+  cursor?: string;
+}
+
+async function backupPosts(query: string, authorHandle: string) {
+  const allPosts: unknown[] = [];
+  let cursor: string | undefined;
+
+  do {
+    const results = await callTool<SearchResult>('search_posts', {
+      q: query,
       author: authorHandle,
-      timestamp: new Date().toISOString(),
-      postCount: allPosts.length,
-      posts: allPosts
-    };
-    
-    writeFileSync(
-      `backup-${authorHandle}-${Date.now()}.json`,
-      JSON.stringify(backup, null, 2)
-    );
-    
-    console.log(`Backup complete: ${allPosts.length} posts`);
-  }
-  
-  async backupProfile(authorHandle: string) {
-    const profile = await getUserProfile({ actor: authorHandle });
-    
-    writeFileSync(
-      `profile-${authorHandle}-${Date.now()}.json`,
-      JSON.stringify(profile, null, 2)
-    );
-    
-    console.log('Profile backup complete');
-  }
+      limit: 100,
+      cursor,
+    });
+
+    allPosts.push(...results.posts);
+    cursor = results.cursor;
+    console.log(`Backed up ${allPosts.length} posts...`);
+  } while (cursor);
+
+  writeFileSync(
+    `backup-${authorHandle}-${Date.now()}.json`,
+    JSON.stringify(
+      {
+        author: authorHandle,
+        query,
+        timestamp: new Date().toISOString(),
+        postCount: allPosts.length,
+        posts: allPosts,
+      },
+      null,
+      2
+    )
+  );
+  console.log(`Backup complete: ${allPosts.length} posts`);
+}
+
+async function backupProfile(authorHandle: string) {
+  const profile = await callTool('get_user_profile', { actor: authorHandle });
+  writeFileSync(
+    `profile-${authorHandle}-${Date.now()}.json`,
+    JSON.stringify(profile, null, 2)
+  );
+  console.log('Profile backup complete');
 }
 
 // Usage
-const backup = new AccountBackup();
-await backup.backupPosts('alice.bsky.social');
-await backup.backupProfile('alice.bsky.social');
+await backupPosts('atproto', 'alice.bsky.social');
+await backupProfile('alice.bsky.social');
 ```
 
 ## Cross-Platform Posting
 
 ### Multi-Platform Publisher
+
+Fans a single message out to several destinations. The AT Protocol destination
+is just a `create_post` call; add your own functions for other platforms.
 
 ```typescript
 interface Platform {
@@ -546,114 +274,69 @@ interface Platform {
   post: (text: string) => Promise<void>;
 }
 
-class MultiPlatformPublisher {
-  private platforms: Platform[] = [];
-  
-  addPlatform(platform: Platform) {
-    this.platforms.push(platform);
-  }
-  
-  async publish(text: string) {
-    const results = await Promise.allSettled(
-      this.platforms.map(p => p.post(text))
-    );
-    
-    results.forEach((result, i) => {
-      const platform = this.platforms[i];
-      if (result.status === 'fulfilled') {
-        console.log(`✓ Posted to ${platform.name}`);
-      } else {
-        console.error(`✗ Failed to post to ${platform.name}:`, result.reason);
-      }
-    });
-  }
+async function publish(platforms: Platform[], text: string) {
+  const results = await Promise.allSettled(platforms.map(p => p.post(text)));
+
+  results.forEach((result, i) => {
+    const platform = platforms[i];
+    if (result.status === 'fulfilled') {
+      console.log(`Posted to ${platform.name}`);
+    } else {
+      console.error(`Failed to post to ${platform.name}:`, result.reason);
+    }
+  });
 }
 
 // Usage
-const publisher = new MultiPlatformPublisher();
+const platforms: Platform[] = [
+  {
+    name: 'AT Protocol',
+    post: async text => {
+      await callTool('create_post', { text });
+    },
+  },
+  // Add other platforms, e.g. Mastodon, by implementing their own `post`.
+];
 
-// Add AT Protocol
-publisher.addPlatform({
-  name: 'AT Protocol',
-  post: async (text) => {
-    await createPost({ text });
-  }
-});
-
-// Add other platforms...
-// publisher.addPlatform({ name: 'Twitter', post: ... });
-// publisher.addPlatform({ name: 'Mastodon', post: ... });
-
-await publisher.publish('Hello from all platforms!');
+await publish(platforms, 'Hello from all platforms!');
 ```
 
-## Best Practices
+## Graceful Shutdown
 
-### Configuration Management
-
-```typescript
-interface BotConfig {
-  name: string;
-  pollInterval: number;
-  keywords: string[];
-  rateLimits: {
-    postsPerHour: number;
-    likesPerHour: number;
-  };
-}
-
-function loadConfig(): BotConfig {
-  return {
-    name: process.env.BOT_NAME || 'my-bot',
-    pollInterval: parseInt(process.env.POLL_INTERVAL || '10000'),
-    keywords: (process.env.KEYWORDS || '').split(','),
-    rateLimits: {
-      postsPerHour: parseInt(process.env.POSTS_PER_HOUR || '10'),
-      likesPerHour: parseInt(process.env.LIKES_PER_HOUR || '100')
-    }
-  };
-}
-```
-
-### Graceful Shutdown
+When your integration runs as a long-lived process, close the MCP client cleanly
+on exit so the spawned server process is torn down with it.
 
 ```typescript
-class GracefulBot {
-  private running = false;
-  
-  async start() {
-    this.running = true;
-    
-    // Handle shutdown signals
-    process.on('SIGTERM', () => this.shutdown());
-    process.on('SIGINT', () => this.shutdown());
-    
-    await this.run();
-  }
-  
-  private async shutdown() {
-    console.log('Shutting down gracefully...');
-    this.running = false;
-    
-    // Cleanup
-    await stopStreaming({ subscriptionId: 'my-bot' });
-    
+async function shutdown() {
+  console.log('Shutting down gracefully...');
+  try {
+    await client.close(); // Closes the stdio transport and the child process.
+  } finally {
     process.exit(0);
   }
-  
-  private async run() {
-    while (this.running) {
-      // Bot logic
-      await sleep(10000);
-    }
-  }
 }
+
+process.on('SIGTERM', shutdown);
+process.on('SIGINT', shutdown);
 ```
+
+## Streaming-based integrations
+
+Real-time patterns such as live analytics, firehose-driven moderation, and
+event-driven bots are **not supported** by this server today. The streaming
+tools (`start_streaming`, `get_recent_events`, `monitor_keywords`, and the rest)
+are registered but non-functional — firehose decoding is gated off, so they open
+no socket and never return events. See
+[Experimental & Roadmap](../guide/experimental.md) for the current status.
+
+If you need a polling-based approximation, `discover_trending` samples your own
+home timeline (roughly the latest 100 posts, not the network firehose) and can
+be called on an interval the same way as the tools above.
 
 ## See Also
 
+- [Basic Usage Examples](./basic-usage.md)
 - [Social Operations Examples](./social-operations.md)
 - [Content Management Examples](./content-management.md)
-- [Real-time Data Examples](./real-time-data.md)
-- [API Reference](../api/)
-
+- [Experimental & Roadmap](../guide/experimental.md)
+- [API Reference](../api/index.md)

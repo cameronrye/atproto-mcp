@@ -4,62 +4,83 @@ Search for posts on AT Protocol with advanced filtering options.
 
 ## Authentication
 
-**Optional:** Public tool (works without authentication)
+**Required:** Yes (Private tool)
+
+The AT Protocol search endpoint changed in 2025 to require authentication;
+unauthenticated calls return `403 Forbidden`. Provide credentials (e.g.
+`ATPROTO_IDENTIFIER` + `ATPROTO_PASSWORD`) for this tool to work.
 
 ## Parameters
 
 ### `q` (required)
+
 - **Type:** `string`
-- **Constraints:** 
+- **Constraints:**
   - Minimum length: 1 character
   - Maximum length: 300 characters
-- **Description:** Search query text
+- **Description:** Search query text. A non-empty query is required: there is no
+  match-all wildcard (a literal `*` is searched as text and matches nothing),
+  and an empty query does **not** return all of an author's posts. To list a
+  user's posts without a search term, use a timeline/author-feed tool instead.
 
 ### `limit` (optional)
+
 - **Type:** `number`
 - **Default:** `25`
 - **Constraints:** 1-100
 - **Description:** Maximum number of results to return
 
 ### `cursor` (optional)
+
 - **Type:** `string`
 - **Description:** Pagination cursor from previous response
 
 ### `sort` (optional)
+
 - **Type:** `"top" | "latest"`
 - **Default:** `"latest"`
 - **Description:** Sort order for results
 
 ### `since` (optional)
+
 - **Type:** `string`
 - **Description:** ISO 8601 timestamp - only return posts after this time
 
 ### `until` (optional)
+
 - **Type:** `string`
 - **Description:** ISO 8601 timestamp - only return posts before this time
 
 ### `mentions` (optional)
+
 - **Type:** `string`
 - **Description:** Filter posts that mention this user (handle or DID)
 
 ### `author` (optional)
+
 - **Type:** `string`
 - **Description:** Filter posts by author (handle or DID)
 
 ### `lang` (optional)
+
 - **Type:** `string`
-- **Constraints:** 2-character ISO 639-1 code
+- **Constraints:** A valid BCP-47 language tag (e.g. `en`, `en-US`, `pt-BR`)
 - **Description:** Filter posts by language
 
 ### `domain` (optional)
+
 - **Type:** `string`
 - **Description:** Filter posts containing links from this domain
 
 ### `url` (optional)
+
 - **Type:** `string`
 - **Description:** Filter posts containing this specific URL
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
@@ -135,8 +156,8 @@ Search for posts on AT Protocol with advanced filtering options.
 ```json
 {
   "q": "bluesky",
-  "since": "2024-01-01T00:00:00Z",
-  "until": "2024-01-31T23:59:59Z"
+  "since": "2026-01-01T00:00:00Z",
+  "until": "2026-01-31T23:59:59Z"
 }
 ```
 
@@ -173,6 +194,7 @@ Search for posts on AT Protocol with advanced filtering options.
 ### Common Errors
 
 #### Empty Query
+
 ```json
 {
   "error": "Search query is required",
@@ -181,14 +203,16 @@ Search for posts on AT Protocol with advanced filtering options.
 ```
 
 #### Invalid Language Code
+
 ```json
 {
-  "error": "Language code must be 2 characters",
+  "error": "Language code must be a valid BCP-47 tag (e.g. en, en-US, pt-BR)",
   "code": "VALIDATION_ERROR"
 }
 ```
 
 #### Invalid Date Format
+
 ```json
 {
   "error": "Invalid ISO 8601 timestamp",
@@ -196,66 +220,33 @@ Search for posts on AT Protocol with advanced filtering options.
 }
 ```
 
-## Best Practices
+## Notes
 
-### Query Construction
-- Use specific keywords for better results
-- Combine multiple filters for precise searches
-- Use quotes for exact phrase matching
-- Include hashtags in queries when relevant
+### Query and Filters
 
-### Sorting
-- **`latest`**: Best for real-time monitoring and recent content
-- **`top`**: Best for finding popular or high-quality content
-
-### Pagination
-- Always check `hasMore` before requesting next page
-- Store and use the `cursor` from previous response
-- Implement reasonable page sizes (25-50 results)
-
-### Performance
-- Use specific filters to reduce result set
-- Cache search results when appropriate
-- Implement debouncing for user-initiated searches
-- Monitor rate limits for frequent searches
+- A non-empty `q` is required; there is no match-all wildcard.
+- Combine filters (`author`, `mentions`, `lang`, `domain`, `url`, date range) to
+  narrow results.
+- `sort: "latest"` favors recent content; `sort: "top"` favors popular content.
 
 ### Language Filtering
-- Use ISO 639-1 two-letter codes
-- Combine with text search for multilingual content
-- Consider user's language preferences
+
+- `lang` accepts a BCP-47 tag (e.g. `en`, `en-US`, `pt-BR`), not a
+  two-letter-only code.
 
 ### Date Ranges
-- Use ISO 8601 format: `YYYY-MM-DDTHH:mm:ssZ`
-- Narrow date ranges for better performance
-- Consider timezone implications
 
-## Use Cases
+- `since` / `until` use ISO 8601 timestamps (`YYYY-MM-DDTHH:mm:ssZ`).
 
-### Content Discovery
-- Find posts about specific topics
-- Discover trending discussions
-- Monitor hashtags and keywords
+### Pagination
 
-### User Research
-- Analyze user sentiment
-- Track brand mentions
-- Study conversation patterns
-
-### Content Moderation
-- Monitor for specific terms
-- Track reported content
-- Identify spam patterns
-
-### Analytics
-- Track topic popularity over time
-- Measure engagement metrics
-- Analyze content trends
+- Pass the `cursor` from the previous response, and check `hasMore` before
+  requesting another page. `limit` accepts 1-100 (default 25).
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol rate limits:
-- **Default limit:** 300 searches per hour
-- **Burst limit:** 10 searches per minute
+This server applies a per-tool limit of 100 requests per minute. Calls are also
+subject to Bluesky's platform-level rate limits.
 
 ## Related Tools
 
@@ -266,5 +257,4 @@ This tool is subject to AT Protocol rate limits:
 ## See Also
 
 - [Social Operations Examples](../../examples/social-operations.md)
-- [Search Best Practices](../../guide/tools-resources.md#search)
-
+- [Tools & Resources Guide](../../guide/tools-resources.md)

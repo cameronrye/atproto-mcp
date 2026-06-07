@@ -1,22 +1,39 @@
 # discover_trending
 
-Discover trending topics and posts in your network. Analyzes recent activity to identify popular hashtags, topics, and posts.
+Surface frequently-used hashtags and notable posts from a sample of **your own
+home timeline**. This is not a network-wide trending feed: it analyzes up to the
+most recent ~100 posts in your timeline (`getTimeline`), then ranks hashtags,
+keyword topics, and posts found within that sample.
 
 ## Authentication
 
-**Required** - This tool requires authentication to analyze your network's trending content.
+**Required** - This tool reads your home timeline, so it requires
+authentication.
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `limit` | `number` | No | `50` | Number of posts to analyze. Must be between 10 and 100. |
-| `timeWindow` | `string` | No | `24h` | Time window for trend analysis. Options: `1h`, `6h`, `12h`, `24h`, `7d`. |
-| `includeHashtags` | `boolean` | No | `true` | Whether to include trending hashtags in results. |
-| `includeTopics` | `boolean` | No | `true` | Whether to include trending topics in results. |
-| `includePosts` | `boolean` | No | `true` | Whether to include trending posts in results. |
+| Parameter         | Type      | Required | Default | Description                                                                                                          |
+| ----------------- | --------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------------- |
+| `limit`           | `number`  | No       | `50`    | Number of timeline posts to fetch and analyze. Must be between 10 and 100.                                           |
+| `timeWindow`      | `string`  | No       | `24h`   | Posts older than this window (by `createdAt`) are excluded from the sample. Options: `1h`, `6h`, `12h`, `24h`, `7d`. |
+| `includeHashtags` | `boolean` | No       | `true`  | Whether to include ranked hashtags in results.                                                                       |
+| `includeTopics`   | `boolean` | No       | `true`  | Whether to include keyword topics in results.                                                                        |
+| `includePosts`    | `boolean` | No       | `true`  | Whether to include ranked posts in results.                                                                          |
+
+::: tip Scope
+
+`timeWindow` filters the sample that was already fetched; it does not page
+further back through your timeline. If the requested window contains few recent
+posts, results will be sparse. `growth` is a recency ratio _within the sample_
+(share of a hashtag's posts created in the last ~6 hours), not real growth
+measured over time.
+
+:::
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
@@ -24,41 +41,45 @@ Discover trending topics and posts in your network. Analyzes recent activity to 
   timeWindow: string;
   trendingHashtags: Array<{
     tag: string;
-    count: number;
-    recentPosts: number;
-    growth: number;
+    count: number; // occurrences within the sample
+    recentPosts: number; // occurrences in posts <= 6h old
+    growth: number; // recentPosts / count
   }>;
   trendingTopics: Array<{
-    topic: string;
-    count: number;
-    relevance: number;
-    keywords: string[];
+    topic: string; // extracted keyword
+    keywords: string[]; // sample snippets that mention it
+    postCount: number;
+    engagementScore: number; // summed likes + reposts + replies
   }>;
   trendingPosts: Array<{
     uri: string;
-    text: string;
+    cid: string;
     author: {
       did: string;
       handle: string;
       displayName?: string;
     };
+    text: string;
+    createdAt: string;
     likeCount: number;
     repostCount: number;
     replyCount: number;
-    trendScore: number;
-    createdAt: string;
+    trendingScore: number; // engagement * (1 + recency boost)
   }>;
   summary: {
     totalPostsAnalyzed: number;
     uniqueAuthors: number;
-    timeRange: { start: string; end: string };
-  };
+    timeRange: {
+      start: string;
+      end: string;
+    }
+  }
 }
 ```
 
 ## Examples
 
-### Discover Trending Content (Last 24 Hours)
+### Analyze Your Timeline (Last 24 Hours)
 
 ```json
 {
@@ -67,7 +88,7 @@ Discover trending topics and posts in your network. Analyzes recent activity to 
 }
 ```
 
-### Find Trending Hashtags Only
+### Hashtags Only
 
 ```json
 {
@@ -79,7 +100,7 @@ Discover trending topics and posts in your network. Analyzes recent activity to 
 }
 ```
 
-### Quick Trending Check (Last Hour)
+### Quick Check (Last Hour)
 
 ```json
 {
@@ -88,7 +109,7 @@ Discover trending topics and posts in your network. Analyzes recent activity to 
 }
 ```
 
-### Weekly Trend Analysis
+### Wider Window
 
 ```json
 {
@@ -106,52 +127,34 @@ Common errors:
 
 - **`AuthenticationRequired`**: Must be authenticated to use this tool
 - **`InvalidRequest`**: Invalid parameters
-- **`InsufficientData`**: Not enough posts in the time window to identify trends
 - **`RateLimitExceeded`**: Too many requests in a short period
 
-## Best Practices
+## Understanding the Metrics
 
-1. **Choose Appropriate Time Window**: Use shorter windows (1h, 6h) for real-time trends, longer (24h, 7d) for broader patterns
-2. **Regular Monitoring**: Check trends daily to stay current with your network
-3. **Act Quickly**: Engage with trending topics while they're hot
-4. **Analyze Growth**: Pay attention to hashtags with high growth rates
-5. **Verify Relevance**: Ensure trending topics align with your interests
-6. **Engage Strategically**: Comment on trending posts to increase visibility
-7. **Track Changes**: Monitor how trends evolve over different time windows
-
-## Understanding Trend Metrics
-
-- **Count**: Number of times the hashtag/topic appeared
-- **Recent Posts**: Number of posts in the most recent portion of the time window
-- **Growth**: Rate of increase in mentions (higher = faster growing trend)
-- **Trend Score**: Composite score based on engagement, recency, and velocity
-- **Relevance**: How relevant the topic is to your network
-
-## Time Windows
-
-- **`1h`**: Real-time trends, very recent activity
-- **`6h`**: Short-term trends, current conversations
-- **`12h`**: Half-day trends, sustained topics
-- **`24h`**: Daily trends, popular topics of the day
-- **`7d`**: Weekly trends, broader patterns and themes
+- **Count**: Number of times the hashtag appeared in the sampled posts
+- **Recent Posts**: Occurrences in posts created in the last ~6 hours
+- **Growth**: `recentPosts / count` — the share of a hashtag's posts that are
+  recent. This is a ratio within the sample, not growth measured over time.
+- **Engagement Score**: Summed likes, reposts, and replies across posts
+  mentioning a keyword topic
+- **Trending Score**: Post engagement multiplied by a recency boost (newer posts
+  score higher)
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol API rate limits:
-
-- 3,000 requests per hour for authenticated users
-- May require multiple API calls depending on the limit parameter
+Calls are rate limited per tool: 100 requests per minute per tool. The tool
+fetches your timeline in a single `getTimeline` call.
 
 ## Related Tools
 
 - **[search_posts](./search-posts.md)** - Search for posts on specific topics
-- **[monitor_keywords](#monitor-keywords)** - Monitor keywords in real-time
-- **[find_influential_users](#find-influential-users)** - Find influential users in trending topics
-- **[recommend_content](#recommend-content)** - Get personalized content recommendations
+- **[recommend_content](./recommend-content.md)** - Get personalized
+  recommendations from your timeline
+- **[find_influential_users](./find-influential-users.md)** - Find influential
+  users in a topic area
 - **[get_timeline](./get-timeline.md)** - View your timeline
 
 ## See Also
 
 - [Content Discovery Guide](../../guide/tools-resources.md#content-discovery)
 - [Analytics Tools Guide](../../guide/tools-resources.md#analytics--insights)
-

@@ -1,265 +1,128 @@
-# Architecture Diagrams
+# Architecture & Diagrams
 
-Visual representations of the AT Protocol MCP Server architecture.
+Visual representations of the AT Protocol MCP Server architecture and the
+interaction sequences behind common operations.
+
+::: tip Transport
+
+The server communicates with MCP clients over **stdio only**
+(`StdioServerTransport`). It does not bind a network port or expose an HTTP
+endpoint. Outbound calls to the AT Protocol use HTTPS.
+
+:::
 
 ## System Architecture
+
+The server sits between an MCP client and the AT Protocol. Tools and resources
+call the AT Protocol over HTTPS (the PDS for record writes, the App View for
+read/aggregation queries).
 
 ```mermaid
 graph TB
     subgraph "MCP Client"
         Client[MCP Client Application]
     end
-    
-    subgraph "MCP Server"
+
+    subgraph "MCP Server (stdio)"
         Server[MCP Server Core]
         Tools[Tool Handlers]
         Resources[Resource Providers]
+        Security[Security Manager<br/>rate limiting]
         Auth[Authentication Manager]
     end
-    
+
     subgraph "AT Protocol"
         PDS[Personal Data Server]
-        Firehose[Firehose Stream]
         AppView[App View API]
     end
-    
-    Client -->|MCP Protocol| Server
+
+    Client -->|MCP Protocol over stdio| Server
+    Server --> Security
     Server --> Tools
     Server --> Resources
     Server --> Auth
-    
-    Tools -->|API Calls| PDS
-    Tools -->|API Calls| AppView
-    Resources -->|API Calls| PDS
-    Resources -->|API Calls| AppView
-    Auth -->|Authentication| PDS
-    
-    Server -->|Subscribe| Firehose
-    Firehose -->|Events| Server
-    
+
+    Tools -->|HTTPS| PDS
+    Tools -->|HTTPS| AppView
+    Resources -->|HTTPS| PDS
+    Resources -->|HTTPS| AppView
+    Auth -->|App-password session| PDS
+
     style Client fill:#e1f5ff
     style Server fill:#fff3e0
     style PDS fill:#f3e5f5
-    style Firehose fill:#e8f5e9
+    style AppView fill:#e8f5e9
 ```
 
-## Component Architecture
+::: warning Streaming is not wired into this diagram
 
-```mermaid
-graph LR
-    subgraph "Core Components"
-        MCP[MCP Protocol Handler]
-        Router[Request Router]
-        Validator[Input Validator]
-    end
-    
-    subgraph "Tool Layer"
-        Social[Social Tools]
-        Content[Content Tools]
-        OAuth[OAuth Tools]
-        Streaming[Streaming Tools]
-    end
-    
-    subgraph "Resource Layer"
-        Timeline[Timeline Resource]
-        Profile[Profile Resource]
-        Notifications[Notifications Resource]
-    end
-    
-    subgraph "Infrastructure"
-        Auth[Auth Manager]
-        Cache[Cache Layer]
-        Logger[Logger]
-        ErrorHandler[Error Handler]
-    end
-    
-    MCP --> Router
-    Router --> Validator
-    Validator --> Social
-    Validator --> Content
-    Validator --> OAuth
-    Validator --> Streaming
-    
-    Router --> Timeline
-    Router --> Profile
-    Router --> Notifications
-    
-    Social --> Auth
-    Content --> Auth
-    OAuth --> Auth
-    
-    Social --> Cache
-    Content --> Cache
-    
-    Social --> ErrorHandler
-    Content --> ErrorHandler
-    OAuth --> ErrorHandler
-    Streaming --> ErrorHandler
-    
-    style MCP fill:#e3f2fd
-    style Auth fill:#fff3e0
-    style Cache fill:#f3e5f5
-```
+Firehose/streaming tools are registered but **not functional** — firehose
+decoding is gated off, so the server opens no WebSocket and surfaces no live
+events. See [Experimental & Roadmap](../guide/experimental.md).
 
-## Data Flow Architecture
+:::
+
+## Request Data Flow
+
+Every tool invocation is rate limited per tool (100 requests per minute per
+tool) before it runs. Most tools require an authenticated session; a few public
+tools (such as `search_posts` and `get_user_profile`) run unauthenticated.
 
 ```mermaid
 flowchart TD
-    Start[Client Request] --> Validate{Valid Request?}
-    Validate -->|No| Error[Return Error]
+    Start[Client Request] --> Lookup{Tool Exists?}
+    Lookup -->|No| Error[Return Error]
+    Lookup -->|Yes| RateLimit{Within Rate Limit?}
+
+    RateLimit -->|No| RateError[Rate Limit Error]
+    RateLimit -->|Yes| Available{Tool Available?}
+
+    Available -->|No| UnavailError[Not Available Error]
+    Available -->|Yes| Validate{Valid Arguments?}
+
+    Validate -->|No| ValidationError[Validation Error]
     Validate -->|Yes| Auth{Requires Auth?}
-    
-    Auth -->|No| Execute[Execute Tool/Resource]
+
+    Auth -->|No| Execute[Execute Tool]
     Auth -->|Yes| CheckAuth{Authenticated?}
-    
+
     CheckAuth -->|No| AuthError[Authentication Error]
     CheckAuth -->|Yes| Execute
-    
-    Execute --> Cache{Cacheable?}
-    Cache -->|Yes| CheckCache{In Cache?}
-    Cache -->|No| API[Call AT Protocol API]
-    
-    CheckCache -->|Yes| Return[Return Cached Data]
-    CheckCache -->|No| API
-    
+
+    Execute --> API[Call AT Protocol API]
     API --> Success{Success?}
-    Success -->|Yes| StoreCache[Store in Cache]
+    Success -->|Yes| Return[Return JSON Result]
     Success -->|No| HandleError[Handle Error]
-    
-    StoreCache --> Return
+
     HandleError --> Error
-    
     Return --> End[Return to Client]
     Error --> End
+    RateError --> End
+    UnavailError --> End
+    ValidationError --> End
     AuthError --> End
-    
+
     style Start fill:#e8f5e9
     style End fill:#e8f5e9
     style Error fill:#ffebee
+    style RateError fill:#ffebee
+    style UnavailError fill:#ffebee
+    style ValidationError fill:#ffebee
     style AuthError fill:#ffebee
 ```
 
-## Authentication Architecture
+::: tip Results are JSON text
 
-```mermaid
-graph TB
-    subgraph "Authentication Methods"
-        AppPass[App Password]
-        OAuth[OAuth 2.0]
-        Unauth[Unauthenticated]
-    end
-    
-    subgraph "Auth Manager"
-        Manager[Authentication Manager]
-        SessionStore[Session Store]
-        TokenRefresh[Token Refresh]
-    end
-    
-    subgraph "AT Protocol"
-        PDS[Personal Data Server]
-        OAuthServer[OAuth Server]
-    end
-    
-    AppPass -->|Credentials| Manager
-    OAuth -->|OAuth Flow| Manager
-    Unauth -->|No Auth| Manager
-    
-    Manager -->|Create Session| PDS
-    Manager -->|OAuth Flow| OAuthServer
-    Manager --> SessionStore
-    Manager --> TokenRefresh
-    
-    SessionStore -->|Store Tokens| Manager
-    TokenRefresh -->|Refresh| PDS
-    
-    style AppPass fill:#e3f2fd
-    style OAuth fill:#f3e5f5
-    style Unauth fill:#fff3e0
-    style Manager fill:#e8f5e9
-```
+Tool results are returned as stringified JSON text content, not a guaranteed
+structured schema.
 
-## Streaming Architecture
-
-```mermaid
-graph TB
-    subgraph "Firehose Client"
-        Client[Firehose Client]
-        Buffer[Event Buffer]
-        Subscriptions[Subscription Manager]
-    end
-    
-    subgraph "AT Protocol"
-        Firehose[Firehose Stream]
-    end
-    
-    subgraph "Event Processing"
-        Filter[Event Filter]
-        Handler[Event Handler]
-        Store[Event Store]
-    end
-    
-    subgraph "Consumers"
-        Tools[MCP Tools]
-        Analytics[Analytics]
-        Bots[Bots]
-    end
-    
-    Firehose -->|WebSocket| Client
-    Client --> Buffer
-    Client --> Subscriptions
-    
-    Buffer --> Filter
-    Filter --> Handler
-    Handler --> Store
-    
-    Store --> Tools
-    Store --> Analytics
-    Store --> Bots
-    
-    style Firehose fill:#e8f5e9
-    style Client fill:#e3f2fd
-    style Buffer fill:#fff3e0
-```
-
-## Deployment Architecture
-
-```mermaid
-graph TB
-    subgraph "Client Applications"
-        Desktop[Desktop App]
-        Web[Web App]
-        CLI[CLI Tool]
-    end
-    
-    subgraph "MCP Server Deployment"
-        Server[MCP Server]
-        Config[Configuration]
-        Logs[Logs]
-    end
-    
-    subgraph "External Services"
-        Bluesky[Bluesky PDS]
-        CustomPDS[Custom PDS]
-        Firehose[Firehose]
-    end
-    
-    Desktop -->|MCP Protocol| Server
-    Web -->|MCP Protocol| Server
-    CLI -->|MCP Protocol| Server
-    
-    Config --> Server
-    Server --> Logs
-    
-    Server -->|HTTPS| Bluesky
-    Server -->|HTTPS| CustomPDS
-    Server -->|WebSocket| Firehose
-    
-    style Server fill:#e3f2fd
-    style Bluesky fill:#e8f5e9
-    style CustomPDS fill:#e8f5e9
-```
+:::
 
 ## Tool Organization
+
+A representative slice of the 60 tools, grouped by area. (Streaming and OAuth
+completion tools exist but are experimental/non-functional — see
+[Experimental & Roadmap](../guide/experimental.md).)
 
 ```mermaid
 graph LR
@@ -269,116 +132,321 @@ graph LR
         Like[like_post]
         Repost[repost]
     end
-    
+
     subgraph "User Tools"
         Follow[follow_user]
         Profile[get_user_profile]
         Update[update_profile]
     end
-    
+
     subgraph "Data Tools"
         Search[search_posts]
         Timeline[get_timeline]
         Notifications[get_notifications]
     end
-    
-    subgraph "OAuth Tools"
-        Start[start_oauth_flow]
-        Callback[handle_oauth_callback]
-        Refresh[refresh_oauth_tokens]
+
+    subgraph "Moderation Tools"
+        Mute[mute_user]
+        Block[block_user]
+        Report[report_content]
     end
-    
-    subgraph "Streaming Tools"
-        StartStream[start_streaming]
-        GetEvents[get_recent_events]
-        Status[get_streaming_status]
-    end
-    
+
     style Post fill:#e3f2fd
     style Follow fill:#f3e5f5
     style Search fill:#fff3e0
-    style Start fill:#e8f5e9
-    style StartStream fill:#ffebee
+    style Mute fill:#e8f5e9
 ```
 
-## Resource Architecture
+## Resources
+
+The server registers **4 resources**. Three are functional and fetch live data
+from the AT Protocol (they require authentication). The fourth is a registered
+placeholder.
 
 ```mermaid
 graph TB
     subgraph "MCP Resources"
-        Timeline[Timeline Resource<br/>atproto://timeline]
-        Profile[Profile Resource<br/>atproto://profile]
-        Notifs[Notifications Resource<br/>atproto://notifications]
+        Timeline[Timeline<br/>atproto://timeline]
+        Profile[Profile<br/>atproto://profile]
+        Notifs[Notifications<br/>atproto://notifications]
+        Convo[Conversation Context<br/>atproto://conversation-context<br/>placeholder]
     end
-    
-    subgraph "Data Sources"
-        TimelineAPI[Timeline API]
-        ProfileAPI[Profile API]
-        NotifsAPI[Notifications API]
+
+    subgraph "AT Protocol"
+        API[PDS / App View API]
     end
-    
-    subgraph "Caching"
-        Cache[Resource Cache]
-    end
-    
-    Timeline -->|Fetch| TimelineAPI
-    Profile -->|Fetch| ProfileAPI
-    Notifs -->|Fetch| NotifsAPI
-    
-    Timeline --> Cache
-    Profile --> Cache
-    Notifs --> Cache
-    
-    Cache -->|TTL: 30s| Timeline
-    Cache -->|TTL: 5m| Profile
-    Cache -->|TTL: 30s| Notifs
-    
+
+    Timeline -->|Fetch| API
+    Profile -->|Fetch| API
+    Notifs -->|Fetch| API
+
     style Timeline fill:#e3f2fd
     style Profile fill:#f3e5f5
     style Notifs fill:#fff3e0
+    style Convo fill:#eeeeee
 ```
 
-## Error Handling Architecture
+::: warning Placeholder resource
+
+`atproto://conversation-context` is registered and readable, but the server
+never auto-populates it — reads return empty/near-empty content. See
+[Experimental & Roadmap](../guide/experimental.md).
+
+:::
+
+## Post Creation Flow
 
 ```mermaid
-graph TB
-    Operation[Tool/Resource Operation] --> Try{Try Execute}
-    
-    Try -->|Success| Return[Return Result]
-    Try -->|Error| Classify{Classify Error}
-    
-    Classify -->|Auth Error| RefreshToken{Can Refresh?}
-    Classify -->|Rate Limit| WaitRetry[Wait & Retry]
-    Classify -->|Network Error| NetworkRetry{Retry?}
-    Classify -->|Validation Error| ValidationError[Return Validation Error]
-    Classify -->|Other| GenericError[Return Error]
-    
-    RefreshToken -->|Yes| Refresh[Refresh Token]
-    RefreshToken -->|No| AuthError[Return Auth Error]
-    
-    Refresh --> Retry[Retry Operation]
-    WaitRetry --> Retry
-    NetworkRetry -->|Yes| Retry
-    NetworkRetry -->|No| NetworkError[Return Network Error]
-    
-    Retry --> Try
-    
+flowchart TD
+    Start[Create Post] --> HasMedia{Has Media?}
+
+    HasMedia -->|Yes| UploadMedia[Upload Images/Videos]
+    HasMedia -->|No| PreparePost[Prepare Post Data]
+
+    UploadMedia --> GetBlobs[Get Blob References]
+    GetBlobs --> PreparePost
+
+    PreparePost --> CreatePost[Call create_post]
+    CreatePost --> Success{Success?}
+
+    Success -->|Yes| ReturnURI[Return Post URI & CID]
+    Success -->|No| Error[Return Error]
+
+    ReturnURI --> End[End]
+    Error --> End
+
+    style Start fill:#e8f5e9
+    style End fill:#e8f5e9
+    style Error fill:#ffebee
+```
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant Auth as Auth Manager
+    participant PDS as AT Protocol PDS
+
+    Client->>Server: create_post(text, embed)
+    Server->>Auth: Verify Authentication
+    Auth-->>Server: Session Valid
+
+    alt Has Images
+        Server->>PDS: Upload Image Blobs
+        PDS-->>Server: Blob References
+    end
+
+    Server->>PDS: Create Post Record
+    PDS-->>Server: Post URI & CID
+    Server-->>Client: Success Response
+```
+
+## Search and Pagination
+
+`search_posts` returns a page of results plus an optional cursor; passing the
+cursor back fetches the next page until no cursor is returned.
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant API as App View
+
+    Client->>Server: search_posts(q, limit: 50)
+    Server->>API: Search Request
+    API-->>Server: Results + Cursor
+    Server-->>Client: Page 1 Results
+
+    Client->>Server: search_posts(q, cursor, limit: 50)
+    Server->>API: Search Request with Cursor
+    API-->>Server: Results + Cursor
+    Server-->>Client: Page 2 Results
+
+    Client->>Server: search_posts(q, cursor, limit: 50)
+    Server->>API: Search Request with Cursor
+    API-->>Server: Results (no cursor)
+    Server-->>Client: Final Page Results
+```
+
+## Image Upload and Embed
+
+Upload returns a blob reference; pass it into `create_post` to embed the image.
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant PDS as AT Protocol PDS
+
+    Note over Client,PDS: Create Post with Image
+
+    Client->>Server: upload_image(imageBlob, alt)
+    Server->>PDS: Upload Blob
+    PDS-->>Server: Blob Reference
+    Server-->>Client: Upload Success
+
+    Client->>Server: create_post(text, embed: {images})
+    Server->>PDS: Create Post with Blob Ref
+    PDS-->>Server: Post URI & CID
+    Server-->>Client: Post Created
+```
+
+## Follow / Unfollow
+
+`follow_user` returns the follow record's URI; pass it to `unfollow_user` to
+remove the follow.
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant PDS as AT Protocol PDS
+
+    Client->>Server: follow_user(actor)
+    Server->>PDS: Resolve Actor to DID
+    PDS-->>Server: DID
+
+    Server->>PDS: Create Follow Record
+    PDS-->>Server: Follow URI
+    Server-->>Client: Follow Success (store URI)
+
+    Note over Client: Later...
+
+    Client->>Server: unfollow_user(followUri)
+    Server->>PDS: Delete Follow Record
+    PDS-->>Server: Deleted
+    Server-->>Client: Unfollow Success
+```
+
+## Profile Update
+
+```mermaid
+flowchart TD
+    Start[Update Profile] --> HasImages{Has Avatar/Banner?}
+
+    HasImages -->|Yes| UploadImages[Upload Images]
+    HasImages -->|No| PrepareUpdate[Prepare Update Data]
+
+    UploadImages --> GetImageBlobs[Get Image Blobs]
+    GetImageBlobs --> PrepareUpdate
+
+    PrepareUpdate --> CallUpdate[Call update_profile]
+    CallUpdate --> Success{Success?}
+
+    Success -->|Yes| Return[Return Updated Profile]
+    Success -->|No| Error[Handle Error]
+
     Return --> End[End]
-    ValidationError --> End
-    GenericError --> End
-    AuthError --> End
-    NetworkError --> End
-    
-    style Return fill:#e8f5e9
-    style ValidationError fill:#ffebee
-    style GenericError fill:#ffebee
-    style AuthError fill:#ffebee
-    style NetworkError fill:#ffebee
+    Error --> End
+
+    style Start fill:#e8f5e9
+    style End fill:#e8f5e9
+    style Error fill:#ffebee
+```
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant PDS as AT Protocol PDS
+
+    Client->>Server: upload_image(avatarBlob)
+    Server->>PDS: Upload Avatar Blob
+    PDS-->>Server: Avatar Blob Ref
+    Server-->>Client: Upload Success
+
+    Client->>Server: upload_image(bannerBlob)
+    Server->>PDS: Upload Banner Blob
+    PDS-->>Server: Banner Blob Ref
+    Server-->>Client: Upload Success
+
+    Client->>Server: update_profile(displayName, description, avatar, banner)
+    Server->>PDS: Update Profile Record
+    PDS-->>Server: Profile Updated
+    Server-->>Client: Update Success
+```
+
+## Moderation
+
+Reports are submitted via `com.atproto.moderation.createReport`. Blocking and
+muting write the corresponding records.
+
+```mermaid
+flowchart TD
+    Start[Detect Violation] --> Classify{Action?}
+
+    Classify -->|Spam / noise| MuteUser[mute_user]
+    Classify -->|Harassment| BlockUser[block_user]
+    Classify -->|Policy Violation| ReportContent[report_content]
+
+    MuteUser --> End[End]
+    BlockUser --> End
+    ReportContent --> End
+
+    style Start fill:#fff3e0
+    style End fill:#e8f5e9
+```
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant PDS as AT Protocol PDS
+
+    Client->>Server: report_content(subject, reasonType, reason)
+    Server->>PDS: createReport (com.atproto.moderation)
+    PDS-->>Server: Report Acknowledged
+    Server-->>Client: Report Submitted
+
+    Note over Client: Optionally block the user
+
+    Client->>Server: block_user(actor)
+    Server->>PDS: Create Block Record
+    PDS-->>Server: Block URI
+    Server-->>Client: User Blocked
+```
+
+## Resource Access
+
+Resources fetch directly from the AT Protocol on each read; there is no caching
+layer.
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant API as PDS / App View
+
+    Client->>Server: Read Resource (atproto://timeline)
+    Server->>API: Fetch Timeline
+    API-->>Server: Timeline Data
+    Server-->>Client: Return Data
+```
+
+## Error Handling
+
+A rate-limited request from the AT Protocol surfaces to the client as a
+rate-limit error; the client decides whether and when to retry.
+
+```mermaid
+sequenceDiagram
+    participant Client as MCP Client
+    participant Server as MCP Server
+    participant PDS as AT Protocol PDS
+
+    Client->>Server: create_post(text)
+    Server->>PDS: Create Post
+    PDS-->>Server: 429 Rate Limit Error
+    Server-->>Client: Rate Limit Error
+
+    Client->>Client: Wait, then retry
+    Client->>Server: create_post(text) [Retry]
+    Server->>PDS: Create Post
+    PDS-->>Server: Success
+    Server-->>Client: Post Created
 ```
 
 ## See Also
 
-- [Flow Charts](./flows.md)
-- [Sequence Diagrams](./sequences.md)
+- [Experimental & Roadmap](../guide/experimental.md)
 - [API Reference](../api/)
-

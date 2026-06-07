@@ -1,6 +1,8 @@
 # create_thread
 
-Create a multi-post thread on AT Protocol. Posts are automatically chained together with proper reply structure. Useful for longer-form content that exceeds the 300-character limit.
+Create a multi-post thread on AT Protocol. Posts are automatically chained
+together with proper reply structure. Useful for longer-form content that
+exceeds the 300-character limit.
 
 ## Authentication
 
@@ -8,12 +10,15 @@ Create a multi-post thread on AT Protocol. Posts are automatically chained toget
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `posts` | `Array<{text: string, langs?: string[]}>` | Yes | - | Array of posts to create in the thread. Each post can have text and optional language tags. |
-| `langs` | `string[]` | No | - | Default language tags for all posts (e.g., `["en"]`). Can be overridden per post. |
+| Parameter | Type                                      | Required | Default | Description                                                                                                                          |
+| --------- | ----------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `posts`   | `Array<{text: string, langs?: string[]}>` | Yes      | -       | Posts to create in the thread. **2 to 25** posts; each `text` is 1-300 characters. Each post can have optional BCP-47 language tags. |
+| `langs`   | `string[]`                                | No       | -       | Default BCP-47 language tags for all posts (e.g., `["en"]`, `["pt-BR"]`). Can be overridden per post.                                |
 
 ## Response
+
+Tool results are returned as stringified JSON text. The shape below is
+illustrative.
 
 ```typescript
 {
@@ -23,16 +28,20 @@ Create a multi-post thread on AT Protocol. Posts are automatically chained toget
     uri: string;
     cid: string;
     text: string;
-    position: number;
-    isRoot: boolean;
+    position: number; // 1-based order in the thread
+    isRoot: boolean; // true only for the first post
   }>;
   rootPost: {
     uri: string;
     cid: string;
-  };
+  }
   totalPosts: number;
 }
 ```
+
+Posts are created sequentially. Each non-root post replies to the previous one
+and references the root post, so `thread[0]` has `position: 1` and
+`isRoot: true`, and every later entry has `isRoot: false`.
 
 ## Examples
 
@@ -42,7 +51,9 @@ Create a multi-post thread on AT Protocol. Posts are automatically chained toget
 {
   "posts": [
     { "text": "This is the first post in my thread. It introduces the topic." },
-    { "text": "This is the second post, continuing the thought from the first." },
+    {
+      "text": "This is the second post, continuing the thought from the first."
+    },
     { "text": "And this is the conclusion of my thread." }
   ],
   "langs": ["en"]
@@ -67,11 +78,21 @@ Create a multi-post thread on AT Protocol. Posts are automatically chained toget
 {
   "posts": [
     { "text": "Thread: Why decentralized social networks matter 🧵" },
-    { "text": "1/ Traditional social networks are controlled by single companies. This creates several problems..." },
-    { "text": "2/ First, your data is owned by the platform, not by you. They can change the rules at any time..." },
-    { "text": "3/ Second, algorithms decide what you see, often optimizing for engagement over quality..." },
-    { "text": "4/ Decentralized networks like AT Protocol solve these issues by giving users control..." },
-    { "text": "5/ With AT Protocol, you own your data, choose your algorithm, and can move between apps freely." }
+    {
+      "text": "1/ Traditional social networks are controlled by single companies. This creates several problems..."
+    },
+    {
+      "text": "2/ First, your data is owned by the platform, not by you. They can change the rules at any time..."
+    },
+    {
+      "text": "3/ Second, algorithms decide what you see, often optimizing for engagement over quality..."
+    },
+    {
+      "text": "4/ Decentralized networks like AT Protocol solve these issues by giving users control..."
+    },
+    {
+      "text": "5/ With AT Protocol, you own your data, choose your algorithm, and can move between apps freely."
+    }
   ],
   "langs": ["en"]
 }
@@ -79,25 +100,17 @@ Create a multi-post thread on AT Protocol. Posts are automatically chained toget
 
 ## Error Handling
 
-Common errors:
+Common errors (most are surfaced as schema validation failures before any post
+is created):
 
-- **`AuthenticationRequired`**: Must be authenticated to use this tool
-- **`InvalidRequest`**: Invalid posts array (empty or invalid format)
-- **`TextTooLong`**: One or more posts exceed 300 characters
-- **`TextRequired`**: One or more posts have empty text
-- **`RateLimitExceeded`**: Too many post requests in a short period
-- **`ThreadCreationFailed`**: Failed to create one or more posts in the thread
+- **Authentication required**: Must be authenticated to create posts
+- **Too few / too many posts**: The thread must contain 2-25 posts
+- **Empty text**: A post has empty text (minimum 1 character)
+- **Text too long**: A post exceeds 300 characters
+- **Invalid language tag**: A `langs` entry is not a valid BCP-47 tag
 
-## Best Practices
-
-1. **Plan Your Thread**: Outline the full thread before creating it
-2. **Keep Posts Focused**: Each post should contain one complete thought
-3. **Use Numbering**: Number posts (1/, 2/, 3/) to show thread structure
-4. **Start Strong**: Make the first post engaging to hook readers
-5. **End with CTA**: Consider ending with a call-to-action or summary
-6. **Check Character Limits**: Ensure each post is under 300 characters
-7. **Use Thread Indicators**: Start with "Thread:" or use 🧵 emoji
-8. **Set Languages**: Specify language tags for better discoverability
+Because posts are created one at a time, a failure partway through can leave the
+earlier posts already published.
 
 ## Thread Structure
 
@@ -106,30 +119,21 @@ Common errors:
 - **Root Reference**: All posts maintain a reference to the root post
 - **Automatic Linking**: The tool handles all reply structure automatically
 
-## Character Limits
+## Limits
 
-- Each post must be 300 characters or less
-- No limit on number of posts in a thread
-- Recommended: 3-10 posts for optimal engagement
+- Each post must be 1-300 characters
+- A thread must contain between 2 and 25 posts
 
 ## Language Tags
 
-Common language codes:
-- `en` - English
-- `es` - Spanish
-- `fr` - French
-- `de` - German
-- `ja` - Japanese
-- `pt` - Portuguese
-- `zh` - Chinese
+Language tags use BCP-47 (e.g. `en`, `en-US`, `pt-BR`, `ja`, `zh-Hant`). Provide
+a thread-wide default via `langs`, or override per post.
 
 ## Rate Limiting
 
-This tool is subject to AT Protocol API rate limits:
-
-- 3,000 requests per hour for authenticated users
-- Each post in the thread counts as a separate operation
-- Large threads may hit rate limits
+Subject to the server's per-tool limit of 100 requests per minute. Each post in
+the thread is created with a separate `agent.post` call, so a long thread
+consumes several requests against that limit.
 
 ## Related Tools
 
@@ -143,4 +147,3 @@ This tool is subject to AT Protocol API rate limits:
 - [Composite Operations Guide](../../guide/tools-resources.md#composite-operations)
 - [Content Management Guide](../../guide/tools-resources.md#content-management)
 - [AT Protocol Post Limits](https://docs.bsky.app/docs/advanced-guides/posts)
-

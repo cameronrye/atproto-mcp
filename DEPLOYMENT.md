@@ -1,323 +1,296 @@
-# AT Protocol MCP Server - Production Deployment Guide
+# AT Protocol MCP Server - Deployment Guide
 
-This guide covers deploying the AT Protocol MCP Server in production environments.
+This guide covers deploying the AT Protocol MCP Server so that LLM clients (such
+as Claude Desktop and other MCP-compatible apps) can use it.
 
 ## Overview
 
-This deployment guide is for **deploying the MCP server infrastructure** that LLM clients connect to. The MCP server acts as middleware between LLM clients (like Claude Desktop) and the AT Protocol ecosystem.
+The MCP server acts as middleware between LLM clients and the AT Protocol
+ecosystem. It speaks the **Model Context Protocol over stdio** — the server is
+launched as a child process by the MCP client and communicates over standard
+input/output. **It does not listen on a TCP port and does not expose an HTTP
+endpoint.**
 
-**Deployment scenarios:**
-- **Personal use**: Run locally for your own LLM client
-- **Team deployment**: Shared server for multiple users' LLM clients
-- **Enterprise**: Scalable infrastructure for organization-wide LLM access to AT Protocol
-- **Custom integrations**: Deploy for your own MCP-compatible applications
+This means there are only two supported deployment shapes today:
 
-**Note**: End users don't interact with this server directly. They interact with their LLM client, which connects to this MCP server via the MCP protocol.
+1. **Local stdio process** — the MCP client (e.g. Claude Desktop) spawns
+   `atproto-mcp` directly. This is the primary, recommended setup.
+2. **Docker container running the stdio server** — useful for pinning a specific
+   build/runtime or isolating dependencies. The container still communicates
+   over stdio; it does not serve HTTP.
+
+> [!NOTE] End users do not connect to this server directly. They interact with
+> their LLM client, which spawns and talks to this MCP server over stdio.
 
 ## Prerequisites
 
-- Docker and Docker Compose
-- Node.js 20+ (for local development)
-- AT Protocol account with app password
-- (Optional) OAuth client credentials when available
+- Node.js 20+ (the published runtime target; CI tests Node 20, 21, and 22)
+- An MCP-compatible client (e.g. Claude Desktop)
+- (Optional) An AT Protocol account with an **app password** for authenticated
+  tools — without it, only public tools such as `search_posts` and
+  `get_user_profile` work
+- (Optional) Docker, if you prefer running the server in a container
 
-## Quick Start
+## Quick Start (stdio)
 
-1. **Clone and Setup**
-   ```bash
-   git clone <repository-url>
-   cd atproto-mcp
-   cp .env.example .env
-   ```
+### Run from a local checkout
 
-2. **Configure Environment**
-   Edit `.env` file with your credentials:
-   ```bash
-   ATPROTO_IDENTIFIER=your.handle.bsky.social
-   ATPROTO_PASSWORD=your-app-password
-   ```
+```bash
+git clone <repository-url>
+cd atproto-mcp
+pnpm install
+pnpm build
+```
 
-3. **Deploy with Docker Compose**
-   ```bash
-   docker-compose up -d
-   ```
+Then run the server. With no credentials it starts in unauthenticated mode
+(public tools only):
 
-4. **Verify Deployment**
-   ```bash
-   curl http://localhost:3000/health
-   ```
+```bash
+node dist/cli.js
+```
+
+To enable authenticated tools, provide an app password (see
+[Authentication](#authentication)):
+
+```bash
+ATPROTO_IDENTIFIER=your.handle.bsky.social \
+ATPROTO_PASSWORD=your-app-password \
+node dist/cli.js
+```
+
+A `.env` file in the working directory is loaded automatically (real environment
+variables take precedence). Copy `.env.example` to `.env` and fill in values:
+
+```bash
+cp .env.example .env
+```
+
+### Wire it into an MCP client (Claude Desktop)
+
+Add the server to your client's MCP configuration. For Claude Desktop, edit
+`claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "atproto": {
+      "command": "node",
+      "args": ["/absolute/path/to/atproto-mcp/dist/cli.js"],
+      "env": {
+        "ATPROTO_IDENTIFIER": "your.handle.bsky.social",
+        "ATPROTO_PASSWORD": "your-app-password"
+      }
+    }
+  }
+}
+```
+
+The client launches the process and communicates over stdio. Restart the client
+after changing its configuration.
+
+## Authentication
+
+App passwords are the supported, fully-working authentication method.
+
+1. In Bluesky, go to **Settings → App Passwords** and create a new app password.
+2. Set `ATPROTO_IDENTIFIER` (your handle) and `ATPROTO_PASSWORD` (the app
+   password — **not** your main account password).
+
+Without credentials, the server still runs, but only public, read-only tools are
+available. Most tools require authentication.
+
+> [!NOTE] OAuth is **experimental and incomplete** — the token-exchange step is
+> not implemented, so an OAuth login cannot complete. Use app passwords.
 
 ## Configuration
 
 ### Environment Variables
 
-| Variable | Description | Required | Default |
-|----------|-------------|----------|---------|
-| `ATPROTO_IDENTIFIER` | Your AT Protocol handle | Yes | - |
-| `ATPROTO_PASSWORD` | Your app password | Yes | - |
-| `ATPROTO_SERVICE` | AT Protocol service URL | No | `https://bsky.social` |
-| `NODE_ENV` | Environment mode | No | `production` |
-| `LOG_LEVEL` | Logging level | No | `info` |
-| `SERVER_PORT` | Server port | No | `3000` |
+These are the only environment variables the server reads. Anything not listed
+here (for example a server port/host, Redis, or monitoring settings) is **not**
+consulted.
 
-### Production Configuration
+| Variable                | Description                                                           | Required |
+| ----------------------- | --------------------------------------------------------------------- | -------- |
+| `ATPROTO_IDENTIFIER`    | Your AT Protocol handle or DID (enables authenticated tools)          | No\*     |
+| `ATPROTO_PASSWORD`      | Your app password                                                     | No\*     |
+| `ATPROTO_SERVICE`       | AT Protocol service (PDS/AppView) URL (default `https://bsky.social`) | No       |
+| `ATPROTO_AUTH_METHOD`   | `app-password` (default) or `oauth` (experimental)                    | No       |
+| `ATPROTO_CLIENT_ID`     | OAuth client ID (experimental auth path only)                         | No       |
+| `ATPROTO_CLIENT_SECRET` | OAuth client secret (experimental auth path only)                     | No       |
+| `MCP_SERVER_NAME`       | Server name advertised to MCP clients (default `atproto-mcp`)         | No       |
+| `MCP_SERVER_PORT`       | Accepted but **reserved/ignored**: stdio transport binds no port      | No       |
+| `MCP_SERVER_HOST`       | Accepted but **reserved/ignored**: stdio transport binds no host      | No       |
+| `LOG_LEVEL`             | `debug` \| `info` \| `warn` \| `error` (default `info`)               | No       |
 
-The server uses `config/production.json` for production settings. Key areas:
+\* App-password auth requires `ATPROTO_IDENTIFIER` **and** `ATPROTO_PASSWORD`
+together. Both are optional overall — omit them to run in unauthenticated mode.
 
-- **Performance**: Connection pooling, caching, WebSocket management
-- **Security**: Input sanitization, rate limiting, error handling
-- **Monitoring**: Health checks, metrics, logging
-- **Features**: Streaming, OAuth, moderation, media uploads
+`NODE_ENV` is read by the runtime in the usual way: in `development`, error
+messages returned to clients are more detailed; in `production`, they are
+sanitized.
 
-## Docker Deployment
+### CLI Flags
 
-### Single Container
+```text
+-s, --service <url>     AT Protocol service URL
+-a, --auth <method>     app-password | oauth
+-l, --log-level <lvl>   debug | info | warn | error
+-p, --port <port>       reserved/ignored (stdio transport binds no port)
+-h, --host <host>       reserved/ignored (stdio transport binds no host)
+-v, --version           print version
+    --help              print usage
+```
+
+## Docker Deployment (stdio)
+
+The container runs the same stdio server. **Do not publish a port** — the server
+does not serve HTTP, so there is nothing listening to map.
+
+### Build
+
 ```bash
 docker build -t atproto-mcp .
-docker run -d \
-  --name atproto-mcp \
-  -p 3000:3000 \
-  -e ATPROTO_IDENTIFIER=your.handle \
-  -e ATPROTO_PASSWORD=your-password \
+```
+
+### Run
+
+```bash
+docker run -i --rm \
+  -e ATPROTO_IDENTIFIER=your.handle.bsky.social \
+  -e ATPROTO_PASSWORD=your-app-password \
   atproto-mcp
 ```
 
-### Docker Compose (Recommended)
+The `-i` flag keeps stdin open so the MCP client can drive the server over
+stdio. There is intentionally no `-p 3000:3000` mapping.
+
+> [!NOTE] The Dockerfile contains an `EXPOSE 3000` line. It is **vestigial and
+> misleading** — the server binds no port and exposes no HTTP endpoint. It can
+> be ignored.
+
+### Using the container from an MCP client
+
+Point your client at `docker` instead of `node`:
+
+```json
+{
+  "mcpServers": {
+    "atproto": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-e",
+        "ATPROTO_IDENTIFIER",
+        "-e",
+        "ATPROTO_PASSWORD",
+        "atproto-mcp"
+      ],
+      "env": {
+        "ATPROTO_IDENTIFIER": "your.handle.bsky.social",
+        "ATPROTO_PASSWORD": "your-app-password"
+      }
+    }
+  }
+}
+```
+
+## Health Check
+
+The repository ships a process-local smoke check at `dist/health-check.js`,
+wired into the Docker image's `HEALTHCHECK`:
+
 ```bash
-# Start all services
-docker-compose up -d
-
-# View logs
-docker-compose logs -f atproto-mcp
-
-# Stop services
-docker-compose down
+node dist/health-check.js
 ```
 
-### Services Included
+Important: because the server speaks MCP over stdio and binds no port, a
+separate health-check process **cannot connect to the running server to probe
+it**. This script instead:
 
-- **atproto-mcp**: Main MCP server
-- **redis**: Session storage and caching (optional)
-- **prometheus**: Metrics collection (optional)
-- **grafana**: Monitoring dashboard (optional)
+- loads the package,
+- constructs the server (which builds and **validates the configuration**,
+  throwing on bad config), and
+- checks the **current process's own heap usage** (failing if heap is nearly
+  exhausted).
 
-## Kubernetes Deployment
+It deliberately does **not** report uptime, cache size, or connection counts of
+the running server — a fresh process cannot observe those. It exits `0` on
+success and `1` on failure, which is what the Docker `HEALTHCHECK` consumes.
 
-### Basic Deployment
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: atproto-mcp
-spec:
-  replicas: 2
-  selector:
-    matchLabels:
-      app: atproto-mcp
-  template:
-    metadata:
-      labels:
-        app: atproto-mcp
-    spec:
-      containers:
-      - name: atproto-mcp
-        image: atproto-mcp:latest
-        ports:
-        - containerPort: 3000
-        env:
-        - name: ATPROTO_IDENTIFIER
-          valueFrom:
-            secretKeyRef:
-              name: atproto-secrets
-              key: identifier
-        - name: ATPROTO_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: atproto-secrets
-              key: password
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "250m"
-          limits:
-            memory: "512Mi"
-            cpu: "500m"
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 3000
-          initialDelaySeconds: 5
-          periodSeconds: 5
-```
-
-### Service and Ingress
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: atproto-mcp-service
-spec:
-  selector:
-    app: atproto-mcp
-  ports:
-  - port: 80
-    targetPort: 3000
-  type: ClusterIP
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: atproto-mcp-ingress
-spec:
-  rules:
-  - host: atproto-mcp.yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: atproto-mcp-service
-            port:
-              number: 80
-```
-
-## Monitoring and Observability
-
-### Health Checks
-- **Endpoint**: `GET /health`
-- **Docker**: Built-in health check
-- **Kubernetes**: Liveness and readiness probes
-
-### Metrics
-- **Prometheus**: Metrics exposed on `/metrics`
-- **Grafana**: Pre-configured dashboards
-- **Custom Metrics**: Performance, security, business metrics
-
-### Logging
-- **Format**: JSON in production
-- **Levels**: error, warn, info, debug
-- **Rotation**: Automatic log rotation
-- **Aggregation**: Compatible with ELK, Fluentd, etc.
+There is **no** `GET /health` HTTP endpoint. Commands like
+`curl http://localhost:3000/health` do not apply to this server.
 
 ## Security Considerations
 
-### Network Security
-- Use HTTPS in production
-- Configure proper CORS origins
-- Set up firewall rules
-- Use reverse proxy (nginx, Traefik)
+See
+[SECURITY.md](https://github.com/cameronrye/atproto-mcp/blob/main/SECURITY.md)
+for the full policy. Deployment essentials:
 
-### Secrets Management
-- Use environment variables for secrets
-- Consider HashiCorp Vault or similar
-- Rotate credentials regularly
-- Never commit secrets to version control
-
-### Container Security
-- Run as non-root user
-- Use minimal base images
-- Scan for vulnerabilities
-- Keep dependencies updated
-
-## Performance Tuning
-
-### Resource Allocation
-- **Memory**: 256MB minimum, 512MB recommended
-- **CPU**: 0.25 cores minimum, 0.5 cores recommended
-- **Storage**: 1GB for logs and cache
-
-### Scaling
-- **Horizontal**: Multiple container instances
-- **Vertical**: Increase container resources
-- **Load Balancing**: Use nginx or cloud load balancer
-
-### Optimization
-- Enable connection pooling
-- Configure appropriate cache sizes
-- Tune rate limits based on usage
-- Monitor and adjust based on metrics
+- **Use app passwords**, never your main account password, and never commit
+  credentials. Pass them via environment variables or your client's `env` block.
+- The container already runs as a **non-root user**.
+- Each tool invocation is **rate limited** (100 requests per minute per tool) to
+  guard against runaway loops.
+- Error details returned to clients are **sanitized** in production
+  (`NODE_ENV=production`).
+- Keep dependencies current with `pnpm audit` and `pnpm update`.
 
 ## Troubleshooting
 
-### Common Issues
+### Authentication failures
 
-1. **Authentication Failures**
-   - Verify AT Protocol credentials
-   - Check app password validity
-   - Ensure service URL is correct
+- Verify the handle/DID in `ATPROTO_IDENTIFIER`.
+- Confirm `ATPROTO_PASSWORD` is a Bluesky **app password**, not your account
+  password.
+- Confirm `ATPROTO_SERVICE` points at the right PDS/AppView (default
+  `https://bsky.social`).
 
-2. **High Memory Usage**
-   - Check cache configuration
-   - Monitor connection pool size
-   - Review log retention settings
+### A tool reports it is not available
 
-3. **Connection Issues**
-   - Verify network connectivity
-   - Check firewall rules
-   - Review proxy configuration
+Most tools require authentication. Confirm credentials are set. Some tools are
+experimental stubs (streaming, OAuth completion) and are intentionally
+non-functional — see
+[Experimental & Roadmap](https://cameronrye.github.io/atproto-mcp/guide/experimental).
 
-### Debug Mode
+### Enable debug logging
+
 ```bash
-# Enable debug logging
-docker-compose exec atproto-mcp \
-  env LOG_LEVEL=debug node dist/cli.js
+LOG_LEVEL=debug node dist/cli.js
+# or
+node dist/cli.js --log-level debug
 ```
 
-### Log Analysis
-```bash
-# View recent logs
-docker-compose logs --tail=100 atproto-mcp
+In Docker, set `-e LOG_LEVEL=debug` on the `docker run` command. Logs are
+written to stderr, so they do not interfere with the stdio MCP protocol on
+stdout.
 
-# Follow logs in real-time
-docker-compose logs -f atproto-mcp
+## Roadmap / Planned (not yet available)
 
-# Search logs
-docker-compose logs atproto-mcp | grep ERROR
-```
+> [!WARNING] Everything in this section is a **future idea** and is **not
+> implemented**. Today the server is stdio-only with no network listener.
 
-## Backup and Recovery
+A future version could add an **HTTP/SSE transport** so the server can be hosted
+as a long-running network service rather than spawned per-client. That would
+make the following possible (none of which exist yet):
 
-### Data Backup
-- Configuration files
-- Log files (if needed)
-- Cache data (optional)
-- Credentials and secrets
+- A real HTTP **health endpoint** (e.g. `GET /health`) that genuinely probes the
+  running server, replacing the current process-local smoke check.
+- Remote/multi-client access over the network, with TLS termination via a
+  reverse proxy and proper CORS configuration.
+- Horizontal scaling behind a load balancer.
 
-### Recovery Procedures
-1. Restore configuration files
-2. Recreate secrets/environment variables
-3. Deploy containers
-4. Verify functionality
-
-## Maintenance
-
-### Updates
-1. Pull latest image
-2. Update configuration if needed
-3. Rolling deployment
-4. Verify functionality
-
-### Monitoring
-- Set up alerts for critical metrics
-- Regular health check monitoring
-- Performance trend analysis
-- Security audit logs
+Until that transport ships, ignore any reference (in older docs, the Dockerfile
+`EXPOSE`, or reserved `--port`/`--host` flags) implying an HTTP server, bound
+port, or `/health` HTTP endpoint.
 
 ## Support
 
 For issues and questions:
-- Check logs for error messages
-- Review configuration settings
-- Consult AT Protocol documentation
-- Open GitHub issues for bugs
 
-## License
-
-This deployment guide is part of the AT Protocol MCP Server project.
+- Run with `LOG_LEVEL=debug` and review the logs (stderr).
+- Review your environment variables and client configuration.
+- Consult the AT Protocol documentation.
+- Open a GitHub issue for bugs.

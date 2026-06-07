@@ -1,24 +1,29 @@
 # analyze_moderation_status
 
-Analyze moderation status of a post or user. Returns content labels, moderation decisions, and personal moderation state (blocks, mutes). Subject can be a DID (for users) or AT-URI (for posts).
+Analyze moderation status of a post or user. Returns content labels, moderation
+decisions, and personal moderation state (blocks, mutes). Subject can be a DID
+(for users) or AT-URI (for posts).
 
 ## Authentication
 
-**Enhanced** - This tool works without authentication but provides additional personal moderation state when authenticated.
+**Required:** Yes (Private tool). Personal moderation state (your blocks and
+mutes of the subject) is only meaningful when authenticated.
 
 ## Parameters
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `subject` | `string` | Yes | - | DID (for users) or AT-URI (for posts) to analyze. |
-| `includeLabels` | `boolean` | No | `true` | Whether to include content labels in the response. |
+| Parameter       | Type      | Required | Default | Description                                                                                                                                                                                                              |
+| --------------- | --------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `subject`       | `string`  | Yes      | -       | The thing to analyze. For a **user**, pass a handle (`alice.bsky.social`) or DID (`did:plc:...`). For a **post**, pass its AT-URI (`at://...`). The subject type is inferred from whether the value starts with `at://`. |
+| `includeLabels` | `boolean` | No       | `true`  | Whether to include content labels in the response.                                                                                                                                                                       |
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
-  subject: string;
+  subject: string;        // echoes the subject you passed in
   subjectType: 'user' | 'post';
   moderation: {
     labels?: Array<{
@@ -27,12 +32,12 @@ Analyze moderation status of a post or user. Returns content labels, moderation 
       val: string;
       cts: string;
     }>;
-    blocked?: boolean;
-    muted?: boolean;
-    blockedBy?: boolean;
-    blocking?: boolean;
-    mutedByList?: boolean;
-    blockedByList?: boolean;
+    blocked?: boolean;        // you block this user (derived from `blocking`)
+    muted?: boolean;          // you mute this user
+    blockedBy?: boolean;      // this user blocks you
+    blocking?: string;        // AT-URI of your block record, if any
+    mutedByList?: boolean;    // muted via a list (users only)
+    blockingByList?: boolean; // blocked via one of your lists (users only)
   };
   analysis: {
     hasContentWarnings: boolean;
@@ -43,6 +48,10 @@ Analyze moderation status of a post or user. Returns content labels, moderation 
   };
 }
 ```
+
+For a **post** subject, only `blocked`, `muted`, and `blockedBy` (reflecting the
+post author's relationship to you) are populated; the list-based fields apply to
+user subjects only.
 
 ## Examples
 
@@ -75,37 +84,21 @@ Analyze moderation status of a post or user. Returns content labels, moderation 
 
 ## Error Handling
 
-Common errors:
-
-- **`InvalidRequest`**: Invalid subject or parameters
-- **`SubjectNotFound`**: User or post does not exist
-- **`RateLimitExceeded`**: Too many requests in a short period
-
-## Best Practices
-
-1. **Check Before Engaging**: Analyze moderation status before interacting with content
-2. **Include Labels**: Set `includeLabels: true` for complete moderation picture
-3. **Respect Safety Levels**: Honor safety level indicators in your application
-4. **Monitor Changes**: Re-check moderation status periodically for active content
-5. **Handle Blocked Content**: Gracefully handle blocked or restricted content
-6. **User Privacy**: Don't expose detailed moderation state publicly
-7. **Combine with Context**: Use alongside other tools for complete content analysis
+A missing or unresolvable subject (handle/DID/post not found, or a post that is
+itself blocked) surfaces as the underlying AT Protocol error. Per-tool rate
+limiting also applies (see below).
 
 ## Subject Types
 
-### User (DID or Handle)
-- Analyzes user account moderation status
-- Returns profile-level labels and blocks/mutes
-- Example: `did:plc:abc123` or `alice.bsky.social`
-
-### Post (AT-URI)
-- Analyzes individual post moderation status
-- Returns post-level labels and author moderation state
-- Example: `at://did:plc:abc123/app.bsky.feed.post/xyz1`
+- **User** - pass a handle (`alice.bsky.social`) or DID (`did:plc:abc123`).
+  Returns profile-level labels and your blocks/mutes of that user.
+- **Post** - pass an AT-URI (`at://did:plc:abc123/app.bsky.feed.post/xyz1`).
+  Returns post-level labels and the author's moderation state relative to you.
 
 ## Content Labels
 
 Common label values:
+
 - **`porn`**: Adult sexual content
 - **`sexual`**: Sexually suggestive content
 - **`nudity`**: Nudity (artistic or otherwise)
@@ -122,35 +115,26 @@ Common label values:
 
 ## Moderation State
 
-### Personal Moderation (requires authentication)
+### Personal Moderation
+
 - **`blocked`**: You have blocked this user
 - **`muted`**: You have muted this user
 - **`blockedBy`**: This user has blocked you
-- **`blocking`**: You are blocking this user
-- **`mutedByList`**: Muted via a moderation list
-- **`blockedByList`**: Blocked via a moderation list
+- **`blocking`**: AT-URI of your block record for this user, if any
+- **`mutedByList`**: Muted via a list
+- **`blockingByList`**: Blocked via one of your lists
 
 ### Public Moderation
+
 - **`labels`**: Content labels applied by moderators or automated systems
 - **`hasContentWarnings`**: Whether content has any warnings
 - **`isNSFW`**: Whether content is marked as NSFW
 - **`isSpam`**: Whether content is marked as spam
 
-## Use Cases
-
-- **Content Filtering**: Filter content based on moderation status
-- **Safety Checks**: Verify content safety before displaying
-- **User Verification**: Check if users are blocked or muted
-- **Compliance**: Ensure content meets community guidelines
-- **Moderation Tools**: Build moderation interfaces
-- **Reporting**: Identify content that may need reporting
-
 ## Rate Limiting
 
-This tool is subject to AT Protocol API rate limits:
-
-- 3,000 requests per hour for authenticated users
-- 300 requests per hour for unauthenticated users
+Calls are rate limited per tool to 100 requests per minute (see the
+[error handling guide](../../guide/error-handling.md)).
 
 ## Related Tools
 
@@ -159,10 +143,9 @@ This tool is subject to AT Protocol API rate limits:
 - **[report_content](./report-content.md)** - Report inappropriate content
 - **[report_user](./report-user.md)** - Report a user
 - **[get_user_profile](./get-user-profile.md)** - Get user profile
-- **[get_post_context](#get-post-context)** - Get post context
+- **[get_post_context](./get-post-context.md)** - Get post context
 
 ## See Also
 
-- [Enhanced Moderation Guide](../../guide/tools-resources.md#enhanced-moderation)
+- [Moderation Tools](../../guide/tools-resources.md#moderation)
 - [AT Protocol Moderation](https://docs.bsky.app/docs/advanced-guides/moderation)
-

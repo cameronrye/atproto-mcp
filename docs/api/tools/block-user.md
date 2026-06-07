@@ -1,6 +1,6 @@
 # block_user
 
-Block a user to prevent all interactions.
+Block a user to prevent them from seeing your content and interacting with you.
 
 ## Authentication
 
@@ -9,20 +9,25 @@ Block a user to prevent all interactions.
 ## Parameters
 
 ### `actor` (required)
+
 - **Type:** `string`
-- **Description:** User identifier (DID or handle) to block
+- **Description:** User identifier (DID or handle) to block. Handles are
+  resolved to a DID before the block record is created, because a block record's
+  subject must be a DID.
 
 ## Response
+
+Tool results are returned as stringified JSON text. The illustrative shape is:
 
 ```typescript
 {
   success: boolean;
   message: string;
-  blockUri: string;
   blockedUser: {
-    did: string;
-    handle?: string;
-  }
+    actor: string;   // echoes the actor you passed in
+    did?: string;
+    uri?: string;    // AT-URI of the created block record
+  };
 }
 ```
 
@@ -36,94 +41,46 @@ Block a user to prevent all interactions.
 }
 ```
 
-**Response:**
+**Response (illustrative):**
+
 ```json
 {
   "success": true,
-  "message": "User blocked successfully",
-  "blockUri": "at://did:plc:myuser/app.bsky.graph.block/block123",
+  "message": "User harasser.bsky.social has been blocked. They cannot see your content or interact with you.",
   "blockedUser": {
-    "did": "did:plc:abc123xyz789",
-    "handle": "harasser.bsky.social"
+    "actor": "harasser.bsky.social",
+    "uri": "at://did:plc:myuser/app.bsky.graph.block/block123"
   }
 }
 ```
 
 ## What Blocking Does
 
-### Complete Separation
-- Blocked user cannot see your posts
-- You cannot see blocked user's posts
-- Blocked user cannot reply to your posts
-- Blocked user cannot follow you
-- Existing follow relationships are removed
-- All interactions are prevented
-
-### Visibility
-- Blocked user may notice they're blocked
-- Attempts to view your profile show "blocked" message
-- Attempts to interact fail with block error
+- The blocked user cannot see your posts, and you cannot see theirs.
+- The blocked user cannot reply to your posts or follow you.
+- Existing follow relationships between you are removed.
 
 ## Error Handling
 
-### Common Errors
+An `actor` that is neither a DID (`did:...`) nor a handle (`user.domain`) raises
+a `VALIDATION_ERROR` before any network call:
 
-#### Invalid Actor
 ```json
 {
-  "error": "Actor (DID or handle) is required",
+  "error": "Actor must be a valid DID (did:...) or handle (user.domain.com)",
   "code": "VALIDATION_ERROR"
 }
 ```
 
-#### User Not Found
-```json
-{
-  "error": "User not found",
-  "code": "NOT_FOUND"
-}
-```
+A handle that cannot be resolved, or other API failures, surface as the
+underlying AT Protocol error. This tool does not deduplicate or special-case
+self-blocks; those conditions are handled by the AT Protocol service and
+returned as its error.
 
-#### Already Blocked
-```json
-{
-  "success": true,
-  "message": "User was already blocked",
-  "blockUri": "at://did:plc:myuser/app.bsky.graph.block/block123"
-}
-```
+## Block vs Mute
 
-#### Cannot Block Self
-```json
-{
-  "error": "Cannot block yourself",
-  "code": "INVALID_OPERATION"
-}
-```
-
-## Best Practices
-
-### When to Block
-- Harassment or abuse
-- Spam or bot accounts
-- Severe policy violations
-- Safety concerns
-
-### Block vs Mute
-- **Block**: Complete separation, user aware, severe
-- **Mute**: Soft filter, user unaware, temporary
-
-### User Experience
-- Confirm block action with user
-- Explain blocking consequences
-- Provide easy unblock option
-- Show blocked users list
-
-### Safety
-- Block immediately for safety concerns
-- Report serious violations
-- Document harassment patterns
-- Consider platform-level reporting
+- **Block:** complete separation; the user can tell they are blocked.
+- **Mute:** soft filter that only affects your own feeds; the user is unaware.
 
 ## Related Tools
 
@@ -133,6 +90,4 @@ Block a user to prevent all interactions.
 
 ## See Also
 
-- [Moderation Guide](../../guide/tools-resources.md#moderation)
-- [Safety Best Practices](../../guide/tools-resources.md#safety)
-
+- [Moderation Tools](../../guide/tools-resources.md#moderation)
