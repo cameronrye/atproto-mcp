@@ -51,8 +51,16 @@ export class FirehoseClient extends EventEmitter {
   private isShuttingDown = false;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private reconnectTimer: NodeJS.Timeout | null = null;
+  private stabilityTimer: NodeJS.Timeout | null = null;
   private lastSeq: number | null = null;
+  private lastPongAt = 0;
   private warnedParserNotImplemented = false;
+
+  private static readonly HEARTBEAT_MS = 30000;
+  // A connection must stay open this long before its success "counts" (resets
+  // backoff). Prevents an accept-then-drop relay from zeroing the attempt
+  // counter every cycle and reconnecting ~once/second forever.
+  private static readonly STABILITY_MS = 30000;
 
   constructor(config: IAtpConfig) {
     super();
@@ -72,6 +80,11 @@ export class FirehoseClient extends EventEmitter {
     this.isShuttingDown = false;
 
     try {
+      // Tear down any lingering socket (e.g. a half-open one from a prior
+      // reconnect) before opening a new one, so we never leak the old socket or
+      // leave its listeners attached to this client.
+      this.teardownSocket();
+
       const firehoseUrl = this.getFirehoseUrl();
       this.logger.info('Connecting to AT Protocol firehose', { url: firehoseUrl });
 
@@ -80,10 +93,21 @@ export class FirehoseClient extends EventEmitter {
       this.ws.on('open', () => {
         this.logger.info('Firehose connection established');
         this.isConnecting = false;
-        this.reconnectAttempts = 0;
-        this.reconnectDelay = 1000;
+        this.lastPongAt = Date.now();
         this.startHeartbeat();
         this.emit('connected');
+
+        // Only reset backoff after the connection has proven stable (stayed open
+        // for STABILITY_MS) — not on the open event itself.
+        this.stabilityTimer = setTimeout(() => {
+          this.reconnectAttempts = 0;
+          this.reconnectDelay = 1000;
+        }, FirehoseClient.STABILITY_MS);
+        this.stabilityTimer.unref();
+      });
+
+      this.ws.on('pong', () => {
+        this.lastPongAt = Date.now();
       });
 
       this.ws.on('message', (data: Buffer) => {
@@ -131,12 +155,11 @@ export class FirehoseClient extends EventEmitter {
    */
   async disconnect(): Promise<void> {
     this.isShuttingDown = true;
+    // cleanup() tears down the socket (removes listeners + terminates) and all
+    // timers. This is a full teardown, so also drop subscriptions — otherwise a
+    // later reconnect would replay stale handlers.
     this.cleanup();
-
-    if (this.ws) {
-      this.ws.close();
-      this.ws = null;
-    }
+    this.subscriptions.clear();
 
     this.logger.info('Firehose client disconnected');
     this.emit('disconnected', { code: 1000, reason: 'Client disconnect' });
@@ -169,6 +192,13 @@ export class FirehoseClient extends EventEmitter {
   }
 
   /**
+   * Number of active subscriptions (for status reporting).
+   */
+  getSubscriptionCount(): number {
+    return this.subscriptions.size;
+  }
+
+  /**
    * Get the last processed sequence number
    */
   getLastSeq(): number | null {
@@ -184,8 +214,17 @@ export class FirehoseClient extends EventEmitter {
    */
   private getFirehoseUrl(): string {
     const relay = process.env['ATPROTO_RELAY'] ?? 'wss://bsky.network';
+    // Preserve an explicit ws:// scheme (local relays / tests); https/wss/bare
+    // hosts all map to secure wss://.
+    const scheme = /^ws:\/\//.test(relay) ? 'ws' : 'wss';
     const baseUrl = relay.replace(/^(wss?|https?):\/\//, '');
-    return `wss://${baseUrl}/xrpc/com.atproto.sync.subscribeRepos`;
+    let url = `${scheme}://${baseUrl}/xrpc/com.atproto.sync.subscribeRepos`;
+    // Resume from the last processed sequence on reconnect so events emitted
+    // during the disconnect window are not dropped.
+    if (this.lastSeq != null) {
+      url += `?cursor=${this.lastSeq}`;
+    }
+    return url;
   }
 
   /**
@@ -278,7 +317,10 @@ export class FirehoseClient extends EventEmitter {
     }
 
     this.reconnectAttempts++;
-    const delay = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
+    const base = Math.min(this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1), 30000);
+    // Full jitter over [base/2, base] so many clients dropped at once by a relay
+    // restart don't reconnect in lockstep (thundering herd).
+    const delay = Math.round(base / 2 + Math.random() * (base / 2));
 
     this.logger.info('Scheduling firehose reconnection', {
       attempt: this.reconnectAttempts,
@@ -302,15 +344,27 @@ export class FirehoseClient extends EventEmitter {
    */
   private startHeartbeat(): void {
     this.heartbeatInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        this.ws.ping();
+      if (this.ws?.readyState !== WebSocket.OPEN) {
+        return;
       }
-    }, 30000); // Ping every 30 seconds
+
+      // Liveness check: a half-open TCP connection (peer vanished with no
+      // FIN/RST) stays readyState===OPEN forever, so pings vanish and 'close'
+      // never fires. If no pong has arrived within ~2 heartbeat intervals,
+      // terminate the dead socket to trigger the normal reconnect path.
+      if (Date.now() - this.lastPongAt > FirehoseClient.HEARTBEAT_MS * 2) {
+        this.logger.warn('No firehose pong within liveness window; terminating dead connection');
+        this.ws.terminate();
+        return;
+      }
+
+      this.ws.ping();
+    }, FirehoseClient.HEARTBEAT_MS);
     this.heartbeatInterval.unref();
   }
 
   /**
-   * Cleanup resources
+   * Cleanup resources: stop all timers and tear down the socket.
    */
   private cleanup(): void {
     this.isConnecting = false;
@@ -323,6 +377,34 @@ export class FirehoseClient extends EventEmitter {
     if (this.reconnectTimer) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
+    }
+
+    if (this.stabilityTimer) {
+      clearTimeout(this.stabilityTimer);
+      this.stabilityTimer = null;
+    }
+
+    this.teardownSocket();
+  }
+
+  /**
+   * Remove all listeners from the current socket and force-close it.
+   *
+   * Called before opening a new socket and during cleanup so a half-open or
+   * errored socket is never left attached to this client (which would leak the
+   * underlying FD and could double-process events). Because the first of the
+   * error/close pair to fire removes the listeners here, the second never
+   * re-runs cleanup/reconnect — closing the error-then-close double-schedule race.
+   */
+  private teardownSocket(): void {
+    if (this.ws) {
+      this.ws.removeAllListeners();
+      try {
+        this.ws.terminate();
+      } catch {
+        // Socket may already be closed; ignore.
+      }
+      this.ws = null;
     }
   }
 }
