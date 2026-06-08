@@ -52,28 +52,26 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
     // dispatch bug, only the LAST tool (extract_media_from_post) is reachable and
     // this call is rejected by a literal-name schema mismatch instead of routing
     // to get_user_profile. A correct router reaches the tool, whose own validation
-    // then complains about the missing required `actor` argument.
-    await expect(client.callTool({ name: 'get_user_profile', arguments: {} })).rejects.toThrow(
-      /actor/i
-    );
+    // then complains about the missing required `actor` argument. Per the MCP
+    // contract, that execution/validation error comes back as an isError result,
+    // not a JSON-RPC rejection.
+    const res = await client.callTool({ name: 'get_user_profile', arguments: {} });
+    expect(res.isError).toBe(true);
+    expect(JSON.stringify(res.content)).toMatch(/actor/i);
   });
 
   it('routes tools/call to multiple distinct tools (never the literal-mismatch parse error)', async () => {
     await connect();
     // Each of these errors deterministically without a network call: get_user_profile
     // fails validation (missing actor); the write tools are unavailable in
-    // unauthenticated mode. The point is that every one is REACHED — pre-fix, every
-    // non-last tool was instead rejected with a Zod literal mismatch against the only
-    // surviving handler (`expected "extract_media_from_post"`).
+    // unauthenticated mode. Both surface as isError tool results. The point is that
+    // every one is REACHED — pre-fix, every non-last tool was instead rejected with a
+    // Zod literal mismatch against the only surviving handler ("extract_media_from_post").
     for (const name of ['get_user_profile', 'create_post', 'like_post', 'block_user']) {
-      let message = '';
-      try {
-        await client.callTool({ name, arguments: {} });
-      } catch (error) {
-        message = error instanceof Error ? error.message : String(error);
-      }
-      expect(message, `${name} should have produced an error`).not.toBe('');
-      expect(message, `${name} was rejected by the wrong (last-tool) handler`).not.toMatch(
+      const res = await client.callTool({ name, arguments: {} });
+      const text = JSON.stringify(res.content);
+      expect(res.isError, `${name} should have produced a tool-error result`).toBe(true);
+      expect(text, `${name} was rejected by the wrong (last-tool) handler`).not.toMatch(
         /invalid_literal|expected.*extract_media_from_post/i
       );
     }

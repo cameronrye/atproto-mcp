@@ -3,8 +3,17 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
+
+/**
+ * Map a short report-reason key (e.g. 'spam') to its AT Protocol moderation
+ * reason NSID (e.g. com.atproto.moderation.defs#reasonSpam). Shared by the
+ * content and user report tools.
+ */
+function toReasonNsid(reasonType: string): string {
+  return `com.atproto.moderation.defs#reason${reasonType.charAt(0).toUpperCase()}${reasonType.slice(1)}`;
+}
 
 const MuteUserSchema = z.object({
   actor: z.string().min(1, 'Actor (DID or handle) is required'),
@@ -325,7 +334,7 @@ export class ReportContentTool extends BaseTool {
         async () => {
           const agent = this.atpClient.getAgent();
           return await agent.com.atproto.moderation.createReport({
-            reasonType: `com.atproto.moderation.defs#reason${params.reasonType.charAt(0).toUpperCase() + params.reasonType.slice(1)}`,
+            reasonType: toReasonNsid(params.reasonType),
             reason: params.reason,
             subject: {
               $type: 'com.atproto.repo.strongRef',
@@ -399,7 +408,7 @@ export class ReportUserTool extends BaseTool {
         async () => {
           const agent = this.atpClient.getAgent();
           return await agent.com.atproto.moderation.createReport({
-            reasonType: `com.atproto.moderation.defs#reason${params.reasonType.charAt(0).toUpperCase() + params.reasonType.slice(1)}`,
+            reasonType: toReasonNsid(params.reasonType),
             reason: params.reason,
             subject: {
               $type: 'com.atproto.admin.defs#repoRef',
@@ -466,7 +475,9 @@ export class AnalyzeModerationStatusTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'AnalyzeModerationStatus');
+    // Public content labels are readable without auth; personal moderation state
+    // (blocks/mutes) is added when authenticated. Hence ENHANCED, not PRIVATE.
+    super(atpClient, 'AnalyzeModerationStatus', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: { subject: string; includeLabels?: boolean }): Promise<{

@@ -126,21 +126,13 @@ export class FindSimilarUsersTool extends BaseTool {
 
       const baseFollows = followsResponse.data.follows as any[];
 
-      // Get base user's recent posts for content analysis
-      const postsResponse = await this.executeAtpOperation(
-        async () => agent.getAuthorFeed({ actor: params.actor, limit: 30 }),
-        'getAuthorFeed',
-        { actor: params.actor, limit: 30 }
-      );
-
-      const basePosts = postsResponse.data.feed.map((item: any) => item.post);
-      const baseTopics = this.extractTopics(basePosts);
+      // NOTE: this tool ranks by follow-graph overlap only — it does NOT analyze
+      // content topics. The previous getAuthorFeed fetch + topic extraction was a
+      // wasted network round-trip whose result was never used, so it is omitted.
 
       this.logger.info('Base user data collected', {
         followersCount: baseFollowers.size,
         followsCount: baseFollows.length,
-        postsCount: basePosts.length,
-        topicsCount: baseTopics.size,
       });
 
       // Analyze follows to find similar users
@@ -434,7 +426,13 @@ export class RecommendContentTool extends BaseTool {
         { limit: 100 }
       );
 
-      const timelinePosts = timelineResponse.data.feed.map((item: any) => item.post);
+      // The repost indicator lives on the feed item's `reason`
+      // (app.bsky.feed.defs#reasonRepost), not on the post record — preserve it so
+      // excludeReposts can actually filter reposts.
+      const timelinePosts = timelineResponse.data.feed.map((item: any) => ({
+        ...item.post,
+        __isRepost: item.reason?.$type === 'app.bsky.feed.defs#reasonRepost',
+      }));
 
       // Get user's recent likes to understand preferences
       const likedTopics = new Set<string>();
@@ -471,8 +469,8 @@ export class RecommendContentTool extends BaseTool {
         // Skip if already liked
         if (postData.viewer?.like) continue;
 
-        // Skip reposts if requested
-        if (params.excludeReposts && postData.record?.repost) continue;
+        // Skip reposts if requested (flag derived from the feed item's reason).
+        if (params.excludeReposts && postData.__isRepost) continue;
 
         // Check age
         const postAge = now.getTime() - new Date(postData.indexedAt).getTime();

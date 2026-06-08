@@ -309,17 +309,12 @@ export class AtpClient {
     try {
       this.logger.debug('Refreshing session');
 
-      // Note: refreshSession method may not exist in current @atproto/api version
-      // This is a placeholder for when the method becomes available
       if ('refreshSession' in this.agent && typeof this.agent.refreshSession === 'function') {
-        const response = await (this.agent as any).refreshSession();
-
-        if (!response.success) {
-          throw new AuthenticationError('Session refresh failed', response, {
-            sessionActive: this.session?.active,
-          });
-        }
-
+        // AtpAgent.refreshSession() returns Promise<void> and throws on failure;
+        // it does NOT resolve to a { success } envelope. Awaiting it is the whole
+        // contract — inspecting a `.success` field would throw a TypeError and
+        // force a needless full re-login on every token refresh.
+        await this.agent.refreshSession();
         this.logger.info('Session refreshed successfully');
       } else {
         // Fallback: re-authenticate if refresh is not available
@@ -488,10 +483,30 @@ export class AtpClient {
         );
       }
 
-      if (errorObj.status >= 400 && errorObj.status < 500) {
+      // Only a genuine bad-request (400/422) is a client *parameter* problem.
+      // Other 4xx (403 forbidden, 404 not found, 409 conflict, ...) must NOT be
+      // reported to the caller as "invalid parameters" — that misleads the LLM
+      // into "fixing" arguments that were correct. Preserve the status and a
+      // meaningful code instead.
+      if (errorObj.status === 400 || errorObj.status === 422) {
         return new ValidationError(
-          errorObj.message || 'Client error',
+          errorObj.message || 'Invalid request',
           undefined,
+          errorObj,
+          context
+        );
+      }
+
+      if (errorObj.status >= 400 && errorObj.status < 500) {
+        const codeByStatus: Record<number, string> = {
+          403: 'FORBIDDEN',
+          404: 'NOT_FOUND',
+          409: 'CONFLICT',
+        };
+        return new AtpError(
+          errorObj.message || `Request failed with status ${errorObj.status}`,
+          codeByStatus[errorObj.status] ?? 'CLIENT_ERROR',
+          errorObj.status,
           errorObj,
           context
         );

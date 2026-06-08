@@ -9,7 +9,12 @@ import { RichText } from '@atproto/api';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type { IMcpTool } from '../index.js';
 import { Logger } from '../../utils/logger.js';
-import { AtpError, AuthenticationError, ValidationError } from '../../types/index.js';
+import {
+  AtpError,
+  AuthenticationError,
+  type IAtpPost,
+  ValidationError,
+} from '../../types/index.js';
 
 /**
  * Tool authentication requirements
@@ -277,18 +282,36 @@ export abstract class BaseTool implements IMcpTool {
     if (!actor || typeof actor !== 'string') {
       throw new ValidationError('Actor must be a non-empty string');
     }
+    if (actor.length > 2048) {
+      throw new ValidationError('Actor is too long', 'actor', actor);
+    }
 
-    // Basic validation for DID or handle format
-    const isDid = actor.startsWith('did:');
-    const isHandle = actor.includes('.') && !actor.startsWith('http');
-
-    if (!isDid && !isHandle) {
+    // A DID (did:method:id) or a DNS-style handle. The previous "contains a dot"
+    // heuristic accepted traversal/scheme-like junk (e.g. "../../etc",
+    // "javascript:alert(1)//.x") as handles; validate the real structure instead.
+    const isDid = /^did:[a-z0-9]+:[a-zA-Z0-9._%-]+$/.test(actor);
+    if (!isDid && !this.isValidHandle(actor)) {
       throw new ValidationError(
         'Actor must be a valid DID (did:...) or handle (user.domain.com)',
         'actor',
         actor
       );
     }
+  }
+
+  /**
+   * Validate a DNS-style AT Protocol handle. Splits on '.' and checks each label
+   * independently so the check is linear (no catastrophic-backtracking risk) — a
+   * valid handle has at least two labels, each a DNS label (1-63 chars,
+   * alphanumeric with optional internal hyphens).
+   */
+  private isValidHandle(handle: string): boolean {
+    const labels = handle.split('.');
+    if (labels.length < 2) {
+      return false;
+    }
+    const label = /^[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/;
+    return labels.every(part => label.test(part));
   }
 
   /**
@@ -364,6 +387,12 @@ export abstract class BaseTool implements IMcpTool {
       return cid;
     } catch (error) {
       this.logger.error('Failed to resolve CID from URI', error, { uri });
+      // Preserve typed errors (AuthenticationError, RateLimitError, ValidationError,
+      // and other AtpErrors) so the server maps them to the correct MCP error code
+      // and the caller keeps the original cause. Only wrap genuinely unknown errors.
+      if (error instanceof AtpError || error instanceof ValidationError) {
+        throw error;
+      }
       throw new Error(
         `Could not resolve CID from URI ${uri}: ${
           error instanceof Error ? error.message : 'Unknown error'
@@ -422,6 +451,58 @@ export abstract class BaseTool implements IMcpTool {
         dateString
       );
     }
+  }
+
+  /**
+   * Map an app.bsky.feed.defs#postView (as returned by searchPosts/getTimeline/
+   * getAuthorFeed) into the server's normalized IAtpPost shape. Shared so the
+   * search and timeline tools do not each carry an identical copy.
+   */
+  protected transformPostView(postData: any): IAtpPost {
+    return {
+      uri: postData.uri,
+      cid: postData.cid,
+      author: {
+        did: postData.author.did,
+        handle: postData.author.handle,
+        displayName: postData.author.displayName,
+        description: postData.author.description,
+        avatar: postData.author.avatar,
+        followersCount: postData.author.followersCount,
+        followsCount: postData.author.followsCount,
+        postsCount: postData.author.postsCount,
+      },
+      record: {
+        text: postData.record.text || '',
+        createdAt: postData.record.createdAt,
+        reply: postData.record.reply
+          ? {
+              root: {
+                uri: postData.record.reply.root.uri,
+                cid: postData.record.reply.root.cid,
+              },
+              parent: {
+                uri: postData.record.reply.parent.uri,
+                cid: postData.record.reply.parent.cid,
+              },
+            }
+          : undefined,
+        embed: postData.record.embed,
+        langs: postData.record.langs,
+        labels: postData.record.labels,
+        tags: postData.record.tags,
+      },
+      replyCount: postData.replyCount,
+      repostCount: postData.repostCount,
+      likeCount: postData.likeCount,
+      indexedAt: postData.indexedAt,
+      viewer: postData.viewer
+        ? {
+            repost: postData.viewer.repost,
+            like: postData.viewer.like,
+          }
+        : undefined,
+    };
   }
 
   /**

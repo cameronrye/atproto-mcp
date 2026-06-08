@@ -785,50 +785,52 @@ export class FindInfluentialUsersTool extends BaseTool {
         };
       }
 
-      // Get profiles for all authors
-      const users: any[] = [];
-
-      for (const did of Array.from(authorDids).slice(0, params.maxResults! * 2)) {
+      // Hydrate author profiles in batches via getProfiles (up to 25 actors per
+      // call) instead of one sequential getProfile round-trip per author.
+      const targetDids = Array.from(authorDids).slice(0, params.maxResults! * 2);
+      const profiles: any[] = [];
+      for (let i = 0; i < targetDids.length; i += 25) {
+        const chunk = targetDids.slice(i, i + 25);
         try {
-          const profileResponse = await this.executeAtpOperation(
-            async () => agent.getProfile({ actor: did }),
-            'getProfile',
-            { actor: did }
+          const resp = await this.executeAtpOperation(
+            async () => agent.getProfiles({ actors: chunk }),
+            'getProfiles',
+            { count: chunk.length }
+          );
+          profiles.push(...((resp.data.profiles as any[]) ?? []));
+        } catch {
+          this.logger.warn('Failed to fetch a profile chunk', { count: chunk.length });
+        }
+      }
+
+      const users: any[] = [];
+      for (const profile of profiles) {
+        const followersCount = profile.followersCount || 0;
+
+        // Filter by minimum followers
+        if (followersCount >= params.minFollowers!) {
+          const influenceScore = this.calculateInfluenceScore(
+            followersCount,
+            profile.followsCount || 0,
+            profile.postsCount || 0
           );
 
-          const profile = profileResponse.data;
-          const followersCount = profile.followersCount || 0;
+          // Relevance = how many of the matched posts are from this author.
+          const relevanceScore = searchResponse.data.posts.filter(
+            p => p.author.did === profile.did
+          ).length;
 
-          // Filter by minimum followers
-          if (followersCount >= params.minFollowers!) {
-            // Calculate influence score
-            const influenceScore = this.calculateInfluenceScore(
-              followersCount,
-              profile.followsCount || 0,
-              profile.postsCount || 0
-            );
-
-            // Calculate relevance score based on how many posts match the query
-            const relevantPosts = searchResponse.data.posts.filter(
-              p => p.author.did === did
-            ).length;
-            const relevanceScore = relevantPosts;
-
-            users.push({
-              did: profile.did,
-              handle: profile.handle,
-              displayName: profile.displayName,
-              description: profile.description,
-              followersCount,
-              followsCount: profile.followsCount || 0,
-              postsCount: profile.postsCount || 0,
-              influenceScore,
-              relevanceScore,
-            });
-          }
-        } catch {
-          // Skip users that can't be fetched
-          this.logger.warn('Failed to fetch profile', { did });
+          users.push({
+            did: profile.did,
+            handle: profile.handle,
+            displayName: profile.displayName,
+            description: profile.description,
+            followersCount,
+            followsCount: profile.followsCount || 0,
+            postsCount: profile.postsCount || 0,
+            influenceScore,
+            relevanceScore,
+          });
         }
       }
 

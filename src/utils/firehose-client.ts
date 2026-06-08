@@ -271,8 +271,10 @@ export class FirehoseClient extends EventEmitter {
   private processEvent(event: IFirehoseEvent): void {
     this.emit('event', event);
 
-    // Notify matching subscriptions
-    for (const subscription of this.subscriptions.values()) {
+    // Iterate a snapshot: a subscription handler may subscribe/unsubscribe during
+    // dispatch, and mutating the Map mid-iteration would otherwise skip a still-
+    // valid subscriber.
+    for (const subscription of Array.from(this.subscriptions.values())) {
       try {
         // Check if subscription matches the event
         if (this.matchesSubscription(event, subscription)) {

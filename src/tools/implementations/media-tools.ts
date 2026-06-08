@@ -19,6 +19,29 @@ function mediaBaseDir(): string {
   return process.env['ATPROTO_MEDIA_DIR'] ?? process.cwd();
 }
 
+/** MIME types accepted for remotely-fetched link-preview thumbnails. */
+const ALLOWED_IMAGE_MIME = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
+]);
+
+/**
+ * Normalize and validate an image Content-Type for upload. The value comes from a
+ * remote server (the link-preview target), so it is untrusted: only known image
+ * types are accepted, and parameters (e.g. `; charset=...`) are stripped. Returns
+ * the normalized MIME, or null if it is missing or not an allowed image type.
+ */
+export function safeImageMime(contentType: string | null | undefined): string | null {
+  if (!contentType) {
+    return null;
+  }
+  const mime = contentType.split(';')[0]?.trim().toLowerCase() ?? '';
+  return ALLOWED_IMAGE_MIME.has(mime) ? mime : null;
+}
+
 const UploadImageSchema = z.object({
   filePath: z.string().min(1, 'File path is required'),
   altText: z.string().max(1000, 'Alt text cannot exceed 1000 characters').optional(),
@@ -594,34 +617,39 @@ export class GenerateLinkPreviewTool extends BaseTool {
             timeoutMs: 10_000,
           });
 
-          if (imageResponse.status >= 200 && imageResponse.status < 300) {
+          // Only upload the thumbnail when the remote response is actually a
+          // known image type — never store an arbitrary (e.g. text/html or
+          // octet-stream) payload as a blob just because the page advertised it
+          // as og:image. Also enforce the 1MB size cap.
+          const contentType = safeImageMime(imageResponse.contentType);
+          if (
+            imageResponse.status >= 200 &&
+            imageResponse.status < 300 &&
+            contentType &&
+            imageResponse.body.length <= 1024 * 1024
+          ) {
             const imageBuffer = imageResponse.body;
 
-            // Check image size (max 1MB)
-            if (imageBuffer.length <= 1024 * 1024) {
-              const contentType = imageResponse.contentType || 'image/jpeg';
+            const uploadResponse = await this.executeAtpOperation(
+              async () => {
+                const agent = this.atpClient.getAgent();
+                return await agent.uploadBlob(imageBuffer, {
+                  encoding: contentType,
+                });
+              },
+              'uploadThumbnail',
+              { imageUrl, size: imageBuffer.length }
+            );
 
-              const uploadResponse = await this.executeAtpOperation(
-                async () => {
-                  const agent = this.atpClient.getAgent();
-                  return await agent.uploadBlob(imageBuffer, {
-                    encoding: contentType,
-                  });
-                },
-                'uploadThumbnail',
-                { imageUrl, size: imageBuffer.length }
-              );
-
-              thumbBlob = {
-                blob: {
-                  type: 'blob',
-                  // Stringify the multiformats CID (see UploadImageTool).
-                  ref: uploadResponse.data?.blob?.ref?.toString() ?? '',
-                  mimeType: uploadResponse.data?.blob?.mimeType || contentType,
-                  size: uploadResponse.data?.blob?.size || imageBuffer.length,
-                },
-              };
-            }
+            thumbBlob = {
+              blob: {
+                type: 'blob',
+                // Stringify the multiformats CID (see UploadImageTool).
+                ref: uploadResponse.data?.blob?.ref?.toString() ?? '',
+                mimeType: uploadResponse.data?.blob?.mimeType || contentType,
+                size: uploadResponse.data?.blob?.size || imageBuffer.length,
+              },
+            };
           }
         } catch (imageError) {
           this.logger.warn('Failed to download thumbnail image', imageError as Error);

@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 
 const CreateListSchema = z.object({
@@ -313,7 +313,9 @@ export class GetListTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetList');
+    // Reading a list works against the public AppView; it just returns richer
+    // viewer state when authenticated.
+    super(atpClient, 'GetList', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: { listUri: string; limit?: number; cursor?: string }): Promise<{
@@ -379,7 +381,9 @@ export class GetListTool extends BaseTool {
             handle: response.data.list.creator.handle,
             displayName: response.data.list.creator.displayName,
           },
-          itemCount: response.data.items.length,
+          // The list view carries the true member count; items.length is only the
+          // current page, so prefer listItemCount and fall back when it is absent.
+          itemCount: response.data.list.listItemCount ?? response.data.items.length,
         },
         items: response.data.items.map((item: any) => ({
           uri: item.uri,
@@ -408,7 +412,8 @@ export class GetThreadTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetThread');
+    // Fetching a public thread does not require authentication.
+    super(atpClient, 'GetThread', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: { uri: string; depth?: number; parentHeight?: number }): Promise<{
@@ -509,7 +514,8 @@ export class GetCustomFeedTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetCustomFeed');
+    // Public custom feeds are readable without authentication.
+    super(atpClient, 'GetCustomFeed', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: { feedUri: string; limit?: number; cursor?: string }): Promise<{

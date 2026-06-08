@@ -70,7 +70,11 @@ export class AtpMcpServer {
 
       // Initialize security manager
       const securityConfig: ISecurityConfig = {
-        enableInputSanitization: true,
+        // The blanket HTML/script InputSanitizer is intentionally NOT applied to
+        // tool arguments (it would corrupt legitimate post content). Per-field
+        // zod validation and url-safety guards are the real defenses, so this flag
+        // honestly reports that the object sanitizer does not run on the hot path.
+        enableInputSanitization: false,
         enableRateLimit: true,
         enableErrorSanitization: true,
         maxInputLength: 10000,
@@ -173,6 +177,20 @@ export class AtpMcpServer {
           });
         }
 
+        // Build an MCP "tool error" result. Per the MCP spec, errors that occur
+        // while a (known) tool runs — including invalid arguments, unavailable
+        // tools, and rate limiting — are reported as a result with isError: true,
+        // NOT as JSON-RPC protocol errors. This lets the calling model SEE the
+        // error text and react (fix arguments, authenticate, back off) instead of
+        // receiving an opaque transport failure. Protocol errors are reserved for
+        // problems with the request itself (e.g. an unknown tool, handled above).
+        const toolError = (
+          message: string
+        ): { content: Array<{ type: 'text'; text: string }>; isError: true } => ({
+          content: [{ type: 'text', text: message }],
+          isError: true,
+        });
+
         // Rate-limit tool invocations to guard against runaway loops / abuse.
         // Note: tool arguments are intentionally NOT passed through the HTML/script
         // input sanitizer — that sanitizer strips characters (`<`, `>`, collapses
@@ -180,34 +198,26 @@ export class AtpMcpServer {
         // data. Per-field validation is handled by each tool's zod schema, and
         // outbound URLs/paths are guarded at their call sites (see url-safety).
         if (!this.securityManager.checkRateLimit(`tool:${toolName}`)) {
-          throw new McpError(
-            ErrorCode.InternalError,
-            `Rate limit exceeded for tool "${toolName}". Please slow down and retry shortly.`,
-            { tool: toolName }
+          return toolError(
+            `Rate limit exceeded for tool "${toolName}". Please slow down and retry shortly.`
           );
         }
 
+        // Surface tool availability (e.g. requires authentication) as a result the
+        // model can act on, not a protocol error.
+        if (
+          'isAvailable' in tool &&
+          typeof tool.isAvailable === 'function' &&
+          !tool.isAvailable()
+        ) {
+          const availabilityMessage =
+            'getAvailabilityMessage' in tool && typeof tool.getAvailabilityMessage === 'function'
+              ? tool.getAvailabilityMessage()
+              : 'Tool not available';
+          return toolError(`Tool not available: ${availabilityMessage}`);
+        }
+
         try {
-          // Check if tool is available before execution
-          if ('isAvailable' in tool && typeof tool.isAvailable === 'function') {
-            if (!tool.isAvailable()) {
-              const availabilityMessage =
-                'getAvailabilityMessage' in tool &&
-                typeof tool.getAvailabilityMessage === 'function'
-                  ? tool.getAvailabilityMessage()
-                  : 'Tool not available';
-
-              throw new McpError(
-                ErrorCode.InternalError,
-                `Tool not available: ${availabilityMessage}`,
-                {
-                  tool: toolName,
-                  availability: availabilityMessage,
-                }
-              );
-            }
-          }
-
           const result = await tool.handler(request.params.arguments || {});
 
           // DESIGN DECISION: Return results as formatted JSON text for LLM consumption
@@ -249,16 +259,9 @@ export class AtpMcpServer {
         } catch (error) {
           this.logger.error(`Tool ${toolName} execution failed`, error);
 
-          // Re-throw protocol errors (unknown/unavailable tool) as-is so the
-          // client receives the accurate JSON-RPC code.
-          if (error instanceof McpError) {
-            throw error;
-          }
-
-          // Invalid input is a client-correctable condition: map it to the
-          // spec's InvalidParams (-32602) rather than InternalError (-32603).
+          // Invalid arguments are safe to surface verbatim so the model can fix them.
           if (error instanceof ValidationError) {
-            throw new McpError(ErrorCode.InvalidParams, error.message, { tool: toolName });
+            return toolError(`Invalid parameters: ${error.message}`);
           }
 
           // Sanitize internal error details before returning to the client.
@@ -266,18 +269,32 @@ export class AtpMcpServer {
             .getErrorSanitizer()
             .sanitizeError(error instanceof Error ? error : new Error(String(error)));
 
-          throw new McpError(
-            ErrorCode.InternalError,
-            `Tool execution failed: ${sanitized.message}`,
-            {
-              tool: toolName,
-            }
-          );
+          return toolError(`Tool execution failed: ${sanitized.message}`);
         }
       }
     );
 
     this.logger.info(`Registered ${tools.length} MCP tools`);
+  }
+
+  /**
+   * Normalize an error thrown inside a resource/prompt handler into an McpError:
+   * pass an existing McpError through, otherwise log + sanitize and wrap it as an
+   * InternalError. Returned (not thrown) so the caller writes `throw this.…`.
+   */
+  private toHandlerMcpError(
+    error: unknown,
+    label: string,
+    context: Record<string, unknown>
+  ): McpError {
+    this.logger.error(label, error);
+    if (error instanceof McpError) {
+      return error;
+    }
+    const sanitized = this.securityManager
+      .getErrorSanitizer()
+      .sanitizeError(error instanceof Error ? error : new Error(String(error)));
+    return new McpError(ErrorCode.InternalError, `${label}: ${sanitized.message}`, context);
   }
 
   /**
@@ -337,20 +354,9 @@ export class AtpMcpServer {
             ],
           };
         } catch (error) {
-          this.logger.error(`Resource read failed`, error);
-          if (error instanceof McpError) {
-            throw error;
-          }
-          const sanitized = this.securityManager
-            .getErrorSanitizer()
-            .sanitizeError(error instanceof Error ? error : new Error(String(error)));
-          throw new McpError(
-            ErrorCode.InternalError,
-            `Resource read failed: ${sanitized.message}`,
-            {
-              uri: request.params.uri,
-            }
-          );
+          throw this.toHandlerMcpError(error, 'Resource read failed', {
+            uri: request.params.uri,
+          });
         }
       }
     );
@@ -407,18 +413,9 @@ export class AtpMcpServer {
           const messages = await prompt.get(request.params.arguments ?? {});
           return { messages };
         } catch (error) {
-          this.logger.error(`Prompt generation failed`, error);
-          if (error instanceof McpError) {
-            throw error;
-          }
-          const sanitized = this.securityManager
-            .getErrorSanitizer()
-            .sanitizeError(error instanceof Error ? error : new Error(String(error)));
-          throw new McpError(
-            ErrorCode.InternalError,
-            `Prompt generation failed: ${sanitized.message}`,
-            { name: request.params.name }
-          );
+          throw this.toHandlerMcpError(error, 'Prompt generation failed', {
+            name: request.params.name,
+          });
         }
       }
     );

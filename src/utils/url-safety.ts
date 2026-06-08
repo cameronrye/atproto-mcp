@@ -13,6 +13,7 @@ import https from 'node:https';
 import zlib from 'node:zlib';
 import { type LookupAddress, type LookupOptions, lookup as dnsLookup } from 'node:dns';
 import { isIP, isIPv4, isIPv6 } from 'node:net';
+import { realpathSync } from 'node:fs';
 import path from 'node:path';
 
 function ipv4ToInt(ip: string): number | null {
@@ -122,6 +123,17 @@ function isBlockedIPv6(ip: string): boolean {
   if (b[0] === 0x20 && b[1] === 0x02) {
     return isBlockedIPv4(`${b[2]}.${b[3]}.${b[4]}.${b[5]}`);
   }
+  // NAT64 64:ff9b::/96 — evaluate the embedded IPv4 (last 4 bytes) so a private
+  // IPv4 cannot be smuggled to the resolver as an IPv6 literal.
+  if (
+    b[0] === 0x00 &&
+    b[1] === 0x64 &&
+    b[2] === 0xff &&
+    b[3] === 0x9b &&
+    b.slice(4, 12).every(x => x === 0)
+  ) {
+    return isBlockedIPv4(`${b[12]}.${b[13]}.${b[14]}.${b[15]}`);
+  }
   return false;
 }
 
@@ -176,6 +188,26 @@ export function assertSafePath(filePath: string, baseDir: string): string {
       `Refusing to access "${filePath}": resolved path is outside the allowed directory (${resolvedBase})`
     );
   }
+
+  // Resolve symlinks so a link planted inside the base directory cannot point
+  // outside it (the lexical check above only catches `..` traversal). This is
+  // enforced for paths that actually exist; a not-yet-created path has no link to
+  // follow, so an ENOENT is treated as "nothing to resolve".
+  try {
+    const realBase = realpathSync(resolvedBase);
+    const realResolved = realpathSync(resolved);
+    const realRel = path.relative(realBase, realResolved);
+    if (realRel.startsWith('..') || path.isAbsolute(realRel)) {
+      throw new Error(
+        `Refusing to access "${filePath}": resolves outside the allowed directory via a symlink (${realBase})`
+      );
+    }
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') {
+      throw err;
+    }
+  }
+
   return resolved;
 }
 
