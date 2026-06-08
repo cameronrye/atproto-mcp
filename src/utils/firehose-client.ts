@@ -398,13 +398,19 @@ export class FirehoseClient extends EventEmitter {
    */
   private teardownSocket(): void {
     if (this.ws) {
-      this.ws.removeAllListeners();
+      const sock = this.ws;
+      this.ws = null;
+      sock.removeAllListeners();
+      // A socket terminated while still CONNECTING emits an async 'error'
+      // ("WebSocket was closed before the connection was established"). We just
+      // removed all listeners, so attach a no-op one to swallow it rather than
+      // let it surface as an unhandled error.
+      sock.on('error', () => {});
       try {
-        this.ws.terminate();
+        sock.terminate();
       } catch {
         // Socket may already be closed; ignore.
       }
-      this.ws = null;
     }
   }
 }
