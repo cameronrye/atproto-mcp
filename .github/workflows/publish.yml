@@ -36,7 +36,11 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.RELEASE_TOKEN || github.token }}
+          # Use the workflow's GITHUB_TOKEN for git operations. It is always
+          # valid and has contents:write (declared above), which is all this
+          # job needs to push the tag and create the release. (A stale
+          # RELEASE_TOKEN PAT previously broke checkout with an auth failure.)
+          token: ${{ github.token }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v2
@@ -145,7 +149,7 @@ jobs:
           prerelease: false
           files: |
             dist/**/*
-          token: ${{ secrets.RELEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summary
         run: |

@@ -113,7 +113,7 @@ export default withMermaid(
             price: '0',
             priceCurrency: 'USD',
           },
-          softwareVersion: '0.2.1',
+          softwareVersion: '0.3.0',
           programmingLanguage: 'TypeScript',
           codeRepository: 'https://github.com/cameronrye/atproto-mcp',
           license: 'https://opensource.org/licenses/MIT',
