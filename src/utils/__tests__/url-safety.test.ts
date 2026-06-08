@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertSafePath, isBlockedAddress, parseSafeHttpUrl } from '../url-safety.js';
+import { assertSafePath, isBlockedAddress, parseSafeHttpUrl, safeFetch } from '../url-safety.js';
 
 describe('isBlockedAddress', () => {
   it('blocks IPv4 loopback, private, link-local, and reserved ranges', () => {
@@ -90,5 +90,26 @@ describe('assertSafePath', () => {
       /outside|allowed/i
     );
     expect(() => assertSafePath('/etc/passwd', '/srv/media')).toThrow(/outside|allowed/i);
+  });
+});
+
+describe('safeFetch SSRF rejection', () => {
+  it('refuses to fetch loopback, private, link-local, and metadata targets', async () => {
+    for (const url of [
+      'http://127.0.0.1/',
+      'http://10.0.0.1/',
+      'http://169.254.169.254/latest/meta-data/', // cloud metadata endpoint
+      'http://[::1]/',
+      'http://0177.0.0.1/', // octal-obfuscated loopback
+      'http://2130706433/', // decimal-obfuscated loopback
+    ]) {
+      await expect(safeFetch(url), `should reject ${url}`).rejects.toThrow();
+    }
+  });
+
+  it('refuses non-http(s) schemes', async () => {
+    for (const url of ['file:///etc/passwd', 'ftp://example.com/x', 'gopher://example.com/']) {
+      await expect(safeFetch(url), `should reject ${url}`).rejects.toThrow();
+    }
   });
 });

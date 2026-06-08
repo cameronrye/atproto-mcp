@@ -1,6 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { Logger, LogLevel } from '../logger.js';
-import { RateLimiter, type ISecurityConfig, SecurityManager } from '../security.js';
+import {
+  ErrorSanitizer,
+  InputSanitizer,
+  RateLimiter,
+  type ISecurityConfig,
+  SecurityManager,
+} from '../security.js';
 
 const logger = new Logger('SecurityTest', LogLevel.ERROR);
 
@@ -97,5 +103,61 @@ describe('RateLimiter', () => {
     // Reset = oldest request + window, i.e. roughly one window from now.
     expect(reset).toBeGreaterThanOrEqual(before + 60000 - 1000);
     expect(reset).toBeLessThanOrEqual(Date.now() + 60000 + 1000);
+  });
+});
+
+describe('ErrorSanitizer', () => {
+  it('genericizes messages containing sensitive terms in production', () => {
+    const sanitizer = new ErrorSanitizer(logger, false);
+    const result = sanitizer.sanitizeError(new Error('invalid password for user'));
+    expect(result.message).toBe('An internal error occurred');
+  });
+
+  it('passes through and truncates non-sensitive messages in production', () => {
+    const sanitizer = new ErrorSanitizer(logger, false);
+    const long = 'x'.repeat(500);
+    const result = sanitizer.sanitizeError(new Error(long));
+    expect(result.message.length).toBe(200);
+  });
+
+  it('returns detailed messages in development mode', () => {
+    const sanitizer = new ErrorSanitizer(logger, true);
+    const result = sanitizer.sanitizeError(new Error('database connection at /var/secret failed'));
+    expect(result.message).toBe('database connection at /var/secret failed');
+  });
+});
+
+describe('InputSanitizer', () => {
+  const sanitizer = new InputSanitizer(10000, logger);
+
+  it('strips angle brackets and javascript: protocol', () => {
+    const out = sanitizer.sanitizeString('<script>javascript:alert(1)</script>');
+    expect(out).not.toContain('<');
+    expect(out).not.toContain('>');
+    expect(out).not.toMatch(/javascript:/i);
+  });
+
+  it('rejects input longer than the configured maximum', () => {
+    const small = new InputSanitizer(5, logger);
+    expect(() => small.sanitizeString('abcdef')).toThrow(/maximum/);
+  });
+
+  it('does not pollute the prototype when sanitizing a __proto__ key', () => {
+    // Realistic attack vector: an own __proto__ key from parsed JSON.
+    const malicious = JSON.parse('{"__proto__": {"polluted": true}, "safe": "ok"}');
+    const result = sanitizer.sanitizeObject(malicious);
+
+    // Object.prototype must be untouched, and the result must not inherit the
+    // attacker-controlled prototype.
+    expect(({} as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect(Object.getPrototypeOf(result)).toBe(Object.prototype);
+    expect((result as Record<string, unknown>)['polluted']).toBeUndefined();
+    expect((result as Record<string, unknown>)['safe']).toBe('ok');
+  });
+
+  it('validates AT Protocol DIDs and handles', () => {
+    expect(sanitizer.validateAtProtoIdentifier('did:plc:abc123')).toBe(true);
+    expect(sanitizer.validateAtProtoIdentifier('alice.bsky.social')).toBe(true);
+    expect(sanitizer.validateAtProtoIdentifier('not a handle')).toBe(false);
   });
 });

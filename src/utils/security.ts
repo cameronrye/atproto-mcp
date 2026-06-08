@@ -90,6 +90,15 @@ export class InputSanitizer {
       const sanitized: any = {};
       for (const [key, value] of Object.entries(obj)) {
         const sanitizedKey = this.sanitizeString(key);
+        // Drop prototype-polluting keys so an attacker-supplied `__proto__`/
+        // `constructor`/`prototype` can't reassign the result's prototype.
+        if (
+          sanitizedKey === '__proto__' ||
+          sanitizedKey === 'constructor' ||
+          sanitizedKey === 'prototype'
+        ) {
+          continue;
+        }
         sanitized[sanitizedKey] = this.sanitizeObject(value);
       }
       return sanitized;
