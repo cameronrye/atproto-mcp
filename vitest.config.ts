@@ -29,10 +29,10 @@ export default defineConfig({
       // actually fails the run. Values are a no-regression ratchet pinned just
       // under current real coverage; raise them as coverage improves.
       thresholds: {
-        branches: 34,
-        functions: 56,
-        lines: 47,
-        statements: 47,
+        branches: 44,
+        functions: 67,
+        lines: 59,
+        statements: 59,
       },
     },
     setupFiles: ['./src/test/setup.ts'],

@@ -279,22 +279,22 @@ export class BatchLikeTool extends BaseTool {
           // Validate the URI
           this.validateAtUri(uri);
 
-          // Get the CID for the post
-          const cid = await this.getCidFromUri(uri);
+          // One round-trip: the post view carries both the CID (for the like
+          // subject) and viewer.like (authoritative "already liked" signal).
+          const post = await this.getPostView(uri);
+          if (!post?.cid) {
+            throw new Error(`Post not found or missing CID: ${uri}`);
+          }
 
-          // Check if already liked
-          const existingLike = await this.checkExistingLike(uri, cid);
-          if (existingLike) {
-            this.logger.debug('Post is already liked', {
-              uri,
-              likeUri: existingLike.uri,
-            });
+          const existingLikeUri = post.viewer?.like;
+          if (existingLikeUri) {
+            this.logger.debug('Post is already liked', { uri, likeUri: existingLikeUri });
 
             results.push({
               uri,
               success: true,
-              likeUri: existingLike.uri as ATURI,
-              likeCid: existingLike.cid as CID,
+              likeUri: existingLikeUri as ATURI,
+              likeCid: '' as CID,
               alreadyLiked: true,
             });
 
@@ -308,7 +308,7 @@ export class BatchLikeTool extends BaseTool {
             $type: 'app.bsky.feed.like',
             subject: {
               uri,
-              cid,
+              cid: post.cid,
             },
             createdAt: new Date().toISOString(),
           };
@@ -387,35 +387,7 @@ export class BatchLikeTool extends BaseTool {
     }
   }
 
-  /**
-   * Check if the post is already liked
-   */
-  private async checkExistingLike(
-    postUri: string,
-    _postCid: string
-  ): Promise<{ uri: string; cid: string } | null> {
-    try {
-      // viewer.like is the authoritative "have I liked this post" signal, with
-      // no 100-record scan limit (the old listRecords scan missed likes on
-      // accounts with >100 likes, causing duplicate like records).
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.getPosts({ uris: [postUri] });
-        },
-        'getPostViewerState',
-        { postUri }
-      );
-
-      const likeUri = response.data.posts[0]?.viewer?.like;
-      return likeUri ? { uri: likeUri, cid: '' } : null;
-    } catch (error) {
-      this.logger.warn('Could not check for existing like', error);
-      return null;
-    }
-  }
-
-  // getCidFromUri is provided by BaseTool.
+  // Post lookup (CID + viewer state) is provided by BaseTool.getPostView.
 }
 
 /**
@@ -485,22 +457,22 @@ export class BatchRepostTool extends BaseTool {
           // Validate the URI
           this.validateAtUri(uri);
 
-          // Get the CID for the post
-          const cid = await this.getCidFromUri(uri);
+          // One round-trip: the post view carries both the CID (for the repost
+          // subject) and viewer.repost (authoritative "already reposted" signal).
+          const post = await this.getPostView(uri);
+          if (!post?.cid) {
+            throw new Error(`Post not found or missing CID: ${uri}`);
+          }
 
-          // Check if already reposted
-          const existingRepost = await this.checkExistingRepost(uri, cid);
-          if (existingRepost) {
-            this.logger.debug('Post is already reposted', {
-              uri,
-              repostUri: existingRepost.uri,
-            });
+          const existingRepostUri = post.viewer?.repost;
+          if (existingRepostUri) {
+            this.logger.debug('Post is already reposted', { uri, repostUri: existingRepostUri });
 
             results.push({
               uri,
               success: true,
-              repostUri: existingRepost.uri as ATURI,
-              repostCid: existingRepost.cid as CID,
+              repostUri: existingRepostUri as ATURI,
+              repostCid: '' as CID,
               alreadyReposted: true,
             });
 
@@ -514,7 +486,7 @@ export class BatchRepostTool extends BaseTool {
             $type: 'app.bsky.feed.repost',
             subject: {
               uri,
-              cid,
+              cid: post.cid,
             },
             createdAt: new Date().toISOString(),
           };
@@ -593,32 +565,5 @@ export class BatchRepostTool extends BaseTool {
     }
   }
 
-  /**
-   * Check if the post is already reposted
-   */
-  private async checkExistingRepost(
-    postUri: string,
-    _postCid: string
-  ): Promise<{ uri: string; cid: string } | null> {
-    try {
-      // viewer.repost is the authoritative "have I reposted this" signal, with
-      // no 100-record scan limit.
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.getPosts({ uris: [postUri] });
-        },
-        'getPostViewerState',
-        { postUri }
-      );
-
-      const repostUri = response.data.posts[0]?.viewer?.repost;
-      return repostUri ? { uri: repostUri, cid: '' } : null;
-    } catch (error) {
-      this.logger.warn('Could not check for existing repost', error);
-      return null;
-    }
-  }
-
-  // getCidFromUri is provided by BaseTool.
+  // Post lookup (CID + viewer state) is provided by BaseTool.getPostView.
 }

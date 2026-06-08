@@ -32,4 +32,20 @@ describe('Logger stdio safety', () => {
     expect(logSpy).not.toHaveBeenCalled();
     expect(errSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('strips control chars from a logged stack trace but preserves newlines', () => {
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const err = new Error('boom');
+    // An attacker-influenced error message is echoed in the stack's first line;
+    // a raw CR or other control char there would let it forge extra log lines.
+    err.stack = 'Error: boom\r\n\x07INJECTED fake line\n  at someFn (file.ts:1:1)';
+    new Logger('Test').error('failed', err);
+
+    const output = errSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(output).not.toContain('\r');
+    expect(output).not.toContain('\x07');
+    // The genuine stack newlines (frames) are kept for readability.
+    expect(output).toContain('\n  at someFn (file.ts:1:1)');
+  });
 });
