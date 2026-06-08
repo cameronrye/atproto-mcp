@@ -291,20 +291,5 @@ export class UpdateProfileTool extends BaseTool {
     }
   }
 
-  /**
-   * Upload a blob to AT Protocol
-   */
-  private async uploadBlob(blob: Blob): Promise<{ blob: any }> {
-    return await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        const response = await agent.uploadBlob(blob, {
-          encoding: blob.type,
-        });
-        return response.data;
-      },
-      'uploadBlob',
-      { blobSize: blob.size, blobType: blob.type }
-    );
-  }
+  // uploadBlob is provided by BaseTool.
 }

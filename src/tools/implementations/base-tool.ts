@@ -323,6 +323,21 @@ export abstract class BaseTool implements IMcpTool {
   }
 
   /**
+   * Upload a Blob to the user's PDS and return the blob ref payload.
+   */
+  protected async uploadBlob(blob: Blob): Promise<{ blob: any }> {
+    return await this.executeAtpOperation(
+      async () => {
+        const agent = this.atpClient.getAgent();
+        const response = await agent.uploadBlob(blob, { encoding: blob.type });
+        return response.data;
+      },
+      'uploadBlob',
+      { blobSize: blob.size, blobType: blob.type }
+    );
+  }
+
+  /**
    * Resolve the CID of the record referenced by an AT Protocol URI by fetching
    * the record. Throws a clear error if the URI is malformed or has no CID.
    */
