@@ -67,7 +67,10 @@ jobs:
 
       - name: Update package.json version
         run: |
-          npm version ${{ inputs.version }} --no-git-tag-version
+          # --allow-same-version: the documented release flow commits the version
+          # bump to main first, so package.json may already be at inputs.version;
+          # without this flag `npm version` aborts with "Version not changed".
+          npm version ${{ inputs.version }} --no-git-tag-version --allow-same-version
           echo "Updated package.json to version ${{ inputs.version }}"
 
       - name: Verify package contents
