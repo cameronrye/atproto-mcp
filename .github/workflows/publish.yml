@@ -50,9 +50,22 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # npm trusted publishing (OIDC) requires Node >= 22.14.0 and npm >= 11.5.1.
+          # NOTE: intentionally NO `registry-url`. setup-node only writes an .npmrc
+          # auth line + exports a dummy NODE_AUTH_TOKEN (XXXXX-XXXXX-...) when
+          # registry-url is set; that placeholder masks OIDC failures as opaque
+          # E404s. (The fix that drops the dummy, actions/setup-node#1558, is not in
+          # any release yet.) Without registry-url there is no token to interfere,
+          # and `npm publish` defaults to registry.npmjs.org where OIDC + automatic
+          # provenance run on a clean slate.
+          node-version: 22
           cache: 'pnpm'
-          registry-url: 'https://registry.npmjs.org'
+
+      - name: Upgrade npm for trusted publishing
+        # The Node 22 runner ships npm 10.x; OIDC trusted publishing needs >= 11.5.1.
+        # We publish the final tarball with `npm publish` (pnpm has no native OIDC
+        # support — its publish just shells out to npm), so npm itself must be recent.
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -86,17 +99,20 @@ jobs:
         if: inputs.dry_run
         run: |
           echo "🔍 DRY RUN: Would publish version ${{ inputs.version }} with tag ${{ inputs.tag }}"
-          pnpm publish --dry-run --tag ${{ inputs.tag }} --no-git-checks --provenance
+          npm publish --dry-run --tag ${{ inputs.tag }} --access public
           echo "✅ Dry run completed successfully"
 
       - name: Publish to npm
         if: '!inputs.dry_run'
+        # Authenticated via OIDC trusted publishing — no NODE_AUTH_TOKEN/NPM_TOKEN.
+        # Requires the `id-token: write` permission above AND a trusted publisher
+        # configured on npmjs.com for this repo + workflow file (publish.yml).
+        # Provenance is generated automatically under trusted publishing, so the
+        # --provenance flag is no longer needed.
         run: |
           echo "📦 Publishing version ${{ inputs.version }} with tag ${{ inputs.tag }}"
-          pnpm publish --tag ${{ inputs.tag }} --no-git-checks --provenance --access public
+          npm publish --tag ${{ inputs.tag }} --access public
           echo "✅ Published successfully"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create git tag
         if: '!inputs.dry_run && inputs.tag == ''latest'''
