@@ -105,12 +105,22 @@ export class AnalyzeNetworkTool extends BaseTool {
       let topFollowers: any[] = [];
       let topFollows: any[] = [];
       let mutualConnectionsCount = 0;
+      // Full DID set of the sampled followers (up to maxSampleSize), kept so
+      // mutual-connection counting intersects the *entire* sample rather than
+      // just the top-10 ranked slice.
+      let followerDidSet = new Set<string>();
 
       if (params.includeFollowers && followersCount > 0) {
         const followersResponse = await this.executeAtpOperation(
           async () => agent.getFollowers({ actor, limit: params.maxSampleSize }),
           'getFollowers',
           { actor, limit: params.maxSampleSize }
+        );
+
+        // Capture the full sampled follower DID set for mutual-connection
+        // counting before we rank/truncate to the top 10.
+        followerDidSet = new Set(
+          (followersResponse.data.followers as any[]).map(f => f.did).filter(Boolean)
         );
 
         // getFollowers returns ProfileView entries WITHOUT followersCount, so we
@@ -148,10 +158,14 @@ export class AnalyzeNetworkTool extends BaseTool {
             followersCount: f.followersCount ?? 0,
           }));
 
-        // Calculate mutual connections
-        if (params.includeFollowers && topFollowers.length > 0) {
-          const followerDids = new Set(topFollowers.map(f => f.did));
-          mutualConnectionsCount = topFollows.filter(f => followerDids.has(f.did)).length;
+        // Calculate mutual connections over the FULL sampled sets (not the
+        // top-10 ranked slices, which would cap the count at 10 and bias it to
+        // high-follower accounts). This is the overlap within the sampled
+        // followers/follows (each up to maxSampleSize), not the lifetime total.
+        if (params.includeFollowers && followerDidSet.size > 0) {
+          mutualConnectionsCount = (followsResponse.data.follows as any[]).filter(f =>
+            followerDidSet.has(f.did)
+          ).length;
         }
       }
 

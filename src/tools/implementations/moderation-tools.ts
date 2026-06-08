@@ -483,9 +483,12 @@ export class AnalyzeModerationStatusTool extends BaseTool {
       blocked?: boolean;
       muted?: boolean;
       blockedBy?: boolean;
-      blocking?: boolean;
-      mutedByList?: boolean;
-      blockedByList?: boolean;
+      // `blocking` is the AT-URI of your block record (a string), not a boolean.
+      blocking?: string;
+      // mutedByList/blockingByList are list-view objects from ViewerState, not
+      // booleans. AT Protocol's ViewerState has no `blockedByList` field.
+      mutedByList?: { uri: string; name?: string };
+      blockingByList?: { uri: string; name?: string };
     };
     analysis: {
       hasContentWarnings: boolean;
