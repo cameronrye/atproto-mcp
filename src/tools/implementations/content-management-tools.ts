@@ -5,7 +5,12 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { ATURI, IDeletePostParams, IUpdateProfileParams } from '../../types/index.js';
+import {
+  type ATURI,
+  type IDeletePostParams,
+  type IUpdateProfileParams,
+  ValidationError,
+} from '../../types/index.js';
 
 /**
  * Zod schema for delete post parameters
@@ -57,22 +62,21 @@ export class DeletePostTool extends BaseTool {
       // Verify the post exists and belongs to the current user
       await this.verifyPostOwnership(params.uri);
 
-      // Delete the post record
+      // Delete the post record. The repo is pinned to the authenticated user's own
+      // DID (verifyPostOwnership already confirmed the URI's authority matches) and
+      // the collection is pinned to app.bsky.feed.post so a non-post URI cannot
+      // delete an arbitrary record type.
+      const { rkey } = this.parseAtUri(params.uri);
       await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          const uriParts = params.uri.replace('at://', '').split('/');
-          const did = uriParts[0];
-          const collection = uriParts[1];
-          const rkey = uriParts[2];
-
-          if (!did || !collection || !rkey) {
-            throw new Error(`Invalid AT URI format: ${params.uri}`);
+          const repo = agent.session?.did;
+          if (!repo) {
+            throw new Error('User session not available');
           }
-
           return await agent.com.atproto.repo.deleteRecord({
-            repo: did,
-            collection,
+            repo,
+            collection: 'app.bsky.feed.post',
             rkey,
           });
         },
@@ -109,30 +113,28 @@ export class DeletePostTool extends BaseTool {
         throw new Error('User session not available');
       }
 
-      // Extract DID from URI
-      const uriParts = uri.replace('at://', '').split('/');
-      const postOwnerDid = uriParts[0];
+      // Parse and pin the collection: delete_post must only ever delete a post
+      // record, never some other record type named by an untrusted URI.
+      const { repo: postOwnerDid, collection, rkey } = this.parseAtUri(uri);
+      if (collection !== 'app.bsky.feed.post') {
+        throw new ValidationError(
+          `delete_post can only delete post records (collection "${collection}" is not app.bsky.feed.post)`,
+          'uri',
+          uri
+        );
+      }
 
       if (postOwnerDid !== currentUserDid) {
         throw new Error('Cannot delete post: post belongs to another user');
       }
 
-      // Verify the post exists
-      const collection = uriParts[1];
-      const rkey = uriParts[2];
-
       await this.executeAtpOperation(
-        async () => {
-          if (!collection || !rkey) {
-            throw new Error(`Invalid AT URI format: ${uri}`);
-          }
-
-          return await agent.com.atproto.repo.getRecord({
+        async () =>
+          await agent.com.atproto.repo.getRecord({
             repo: postOwnerDid,
             collection,
             rkey,
-          });
-        },
+          }),
         'verifyPost',
         { uri }
       );
@@ -177,8 +179,8 @@ export class UpdateProfileTool extends BaseTool {
         hasBanner: !!params.banner,
       });
 
-      // Get current profile to merge with updates
-      const currentProfile = await this.getCurrentProfile();
+      // Get current profile (and its CID) to merge with updates.
+      const { value: currentProfile, cid: currentCid } = await this.getCurrentProfile();
 
       // Build updated profile record. Start from the EXISTING record so fields
       // this tool does not manage (pinnedPost, createdAt, pronouns, labels, etc.)
@@ -232,6 +234,9 @@ export class UpdateProfileTool extends BaseTool {
             collection: 'app.bsky.actor.profile',
             rkey: 'self',
             record: updatedProfile,
+            // Compare-and-swap against the CID we read so a concurrent profile
+            // update is detected (InvalidSwap) instead of being silently clobbered.
+            ...(currentCid ? { swapRecord: currentCid } : {}),
           });
         },
         'updateProfile',
@@ -260,9 +265,10 @@ export class UpdateProfileTool extends BaseTool {
   }
 
   /**
-   * Get current profile record
+   * Get the current profile record and its CID (the CID enables a compare-and-swap
+   * on write). Returns an empty value with no CID when no profile exists yet.
    */
-  private async getCurrentProfile(): Promise<any> {
+  private async getCurrentProfile(): Promise<{ value: any; cid?: string }> {
     try {
       const response = await this.executeAtpOperation(
         async () => {
@@ -283,28 +289,17 @@ export class UpdateProfileTool extends BaseTool {
         {}
       );
 
-      return response.data.value || {};
+      return {
+        value: response.data.value || {},
+        ...(response.data.cid ? { cid: response.data.cid } : {}),
+      };
     } catch {
-      // If profile doesn't exist, return empty object
+      // If profile doesn't exist, return empty value (a first-time create has no
+      // prior CID to swap against).
       this.logger.debug('No existing profile found, creating new one');
-      return {};
+      return { value: {} };
     }
   }
 
-  /**
-   * Upload a blob to AT Protocol
-   */
-  private async uploadBlob(blob: Blob): Promise<{ blob: any }> {
-    return await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        const response = await agent.uploadBlob(blob, {
-          encoding: blob.type,
-        });
-        return response.data;
-      },
-      'uploadBlob',
-      { blobSize: blob.size, blobType: blob.type }
-    );
-  }
+  // uploadBlob is provided by BaseTool.
 }

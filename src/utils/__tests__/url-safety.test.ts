@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
-import { assertSafePath, isBlockedAddress, parseSafeHttpUrl } from '../url-safety.js';
+import { afterEach, describe, expect, it } from 'vitest';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { assertSafePath, isBlockedAddress, parseSafeHttpUrl, safeFetch } from '../url-safety.js';
 
 describe('isBlockedAddress', () => {
   it('blocks IPv4 loopback, private, link-local, and reserved ranges', () => {
@@ -36,6 +39,9 @@ describe('isBlockedAddress', () => {
       '::a00:1', // IPv4-compatible 10.0.0.1
       '2002:7f00:1::1', // 6to4 wrapping 127.0.0.1
       '2002:a00:1::1', // 6to4 wrapping 10.0.0.1
+      '64:ff9b::7f00:1', // NAT64 wrapping 127.0.0.1
+      '64:ff9b::a00:1', // NAT64 wrapping 10.0.0.1
+      '64:ff9b::169.254.169.254', // NAT64 wrapping cloud metadata
     ]) {
       expect(isBlockedAddress(ip), `${ip} should be blocked`).toBe(true);
     }
@@ -90,5 +96,55 @@ describe('assertSafePath', () => {
       /outside|allowed/i
     );
     expect(() => assertSafePath('/etc/passwd', '/srv/media')).toThrow(/outside|allowed/i);
+  });
+
+  describe('symlink escapes', () => {
+    let root: string;
+
+    afterEach(() => {
+      if (root) rmSync(root, { recursive: true, force: true });
+    });
+
+    it('rejects a symlink inside the base dir that points outside it', () => {
+      root = mkdtempSync(join(tmpdir(), 'urlsafe-'));
+      const base = join(root, 'media');
+      mkdirSync(base);
+      // A secret outside the allowed directory, and a symlink inside it pointing there.
+      const secret = join(root, 'secret.txt');
+      writeFileSync(secret, 'top secret');
+      symlinkSync(secret, join(base, 'escape.txt'));
+
+      expect(() => assertSafePath('escape.txt', base)).toThrow(/outside|allowed|symlink/i);
+    });
+
+    it('still allows a real file inside the base dir', () => {
+      root = mkdtempSync(join(tmpdir(), 'urlsafe-'));
+      const base = join(root, 'media');
+      mkdirSync(base);
+      writeFileSync(join(base, 'photo.jpg'), 'data');
+
+      expect(() => assertSafePath('photo.jpg', base)).not.toThrow();
+    });
+  });
+});
+
+describe('safeFetch SSRF rejection', () => {
+  it('refuses to fetch loopback, private, link-local, and metadata targets', async () => {
+    for (const url of [
+      'http://127.0.0.1/',
+      'http://10.0.0.1/',
+      'http://169.254.169.254/latest/meta-data/', // cloud metadata endpoint
+      'http://[::1]/',
+      'http://0177.0.0.1/', // octal-obfuscated loopback
+      'http://2130706433/', // decimal-obfuscated loopback
+    ]) {
+      await expect(safeFetch(url), `should reject ${url}`).rejects.toThrow();
+    }
+  });
+
+  it('refuses non-http(s) schemes', async () => {
+    for (const url of ['file:///etc/passwd', 'ftp://example.com/x', 'gopher://example.com/']) {
+      await expect(safeFetch(url), `should reject ${url}`).rejects.toThrow();
+    }
   });
 });

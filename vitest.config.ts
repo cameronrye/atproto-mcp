@@ -7,7 +7,8 @@ export default defineConfig({
     environment: 'node',
     coverage: {
       provider: 'v8',
-      reporter: ['text', 'json', 'html'],
+      // 'lcov' is required by the Codecov upload step in ci.yml (coverage/lcov.info).
+      reporter: ['text', 'json', 'html', 'lcov'],
       // Vitest 4.0: Explicitly include source files for coverage
       include: ['src/**/*.{js,ts}'],
       exclude: [
@@ -22,13 +23,16 @@ export default defineConfig({
         '**/*.test.*',
         '**/*.spec.*',
       ],
+      // Vitest 4.x: thresholds must be flat keys (or per-file globs). The old
+      // `thresholds.global` wrapper is treated as a filename glob that matches
+      // nothing, silently disabling enforcement — keep these flat so the gate
+      // actually fails the run. Values are a no-regression ratchet pinned just
+      // under current real coverage; raise them as coverage improves.
       thresholds: {
-        global: {
-          branches: 80,
-          functions: 80,
-          lines: 80,
-          statements: 80,
-        },
+        branches: 34,
+        functions: 56,
+        lines: 47,
+        statements: 47,
       },
     },
     setupFiles: ['./src/test/setup.ts'],

@@ -68,7 +68,7 @@ export class GetTimelineTool extends BaseTool {
 
       // Transform posts to our interface
       const posts: IAtpPost[] = response.data.feed.map((feedItem: any) =>
-        this.transformPost(feedItem.post)
+        this.transformPostView(feedItem.post)
       );
 
       const hasMore = !!response.data.cursor;
@@ -91,56 +91,6 @@ export class GetTimelineTool extends BaseTool {
       this.logger.error('Failed to retrieve timeline', error);
       this.formatError(error);
     }
-  }
-
-  /**
-   * Transform AT Protocol post data to our interface
-   */
-  private transformPost(postData: any): IAtpPost {
-    return {
-      uri: postData.uri,
-      cid: postData.cid,
-      author: {
-        did: postData.author.did,
-        handle: postData.author.handle,
-        displayName: postData.author.displayName,
-        description: postData.author.description,
-        avatar: postData.author.avatar,
-        followersCount: postData.author.followersCount,
-        followsCount: postData.author.followsCount,
-        postsCount: postData.author.postsCount,
-      },
-      record: {
-        text: postData.record.text || '',
-        createdAt: postData.record.createdAt,
-        reply: postData.record.reply
-          ? {
-              root: {
-                uri: postData.record.reply.root.uri,
-                cid: postData.record.reply.root.cid,
-              },
-              parent: {
-                uri: postData.record.reply.parent.uri,
-                cid: postData.record.reply.parent.cid,
-              },
-            }
-          : undefined,
-        embed: postData.record.embed,
-        langs: postData.record.langs,
-        labels: postData.record.labels,
-        tags: postData.record.tags,
-      },
-      replyCount: postData.replyCount,
-      repostCount: postData.repostCount,
-      likeCount: postData.likeCount,
-      indexedAt: postData.indexedAt,
-      viewer: postData.viewer
-        ? {
-            repost: postData.viewer.repost,
-            like: postData.viewer.like,
-          }
-        : undefined,
-    };
   }
 
   /**
@@ -188,7 +138,7 @@ export class GetTimelineTool extends BaseTool {
       );
 
       const posts: IAtpPost[] = response.data.feed.map((feedItem: any) =>
-        this.transformPost(feedItem.post)
+        this.transformPostView(feedItem.post)
       );
 
       return {
@@ -246,7 +196,7 @@ export class GetTimelineTool extends BaseTool {
       );
 
       const posts: IAtpPost[] = response.data.feed.map((feedItem: any) =>
-        this.transformPost(feedItem.post)
+        this.transformPostView(feedItem.post)
       );
 
       return {

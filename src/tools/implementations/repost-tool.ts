@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { ATURI, CID, IRepostParams } from '../../types/index.js';
+import { type ATURI, type CID, type IRepostParams, ValidationError } from '../../types/index.js';
 
 /**
  * Zod schema for repost parameters
@@ -138,9 +138,15 @@ export class RepostTool extends BaseTool {
    * Create a quote post (post with embedded repost)
    */
   private async createQuotePost(params: IRepostParams): Promise<unknown> {
+    // Detect richtext facets (mentions/links/hashtags) just like a normal post —
+    // agent.post() does NOT auto-detect them, so without this the quote text's
+    // links/@mentions/#hashtags would be stored as inert plain text.
+    const { text, facets } = await this.buildRichText(params.text ?? '');
+
     const quotePostRecord = {
       $type: 'app.bsky.feed.post' as const,
-      text: params.text ?? '',
+      text,
+      ...(facets ? { facets } : {}),
       embed: {
         $type: 'app.bsky.embed.record',
         record: {
@@ -198,27 +204,24 @@ export class UnrepostTool extends BaseTool {
         repostUri: params.repostUri,
       });
 
-      // Validate the repost URI
+      // Validate the repost URI and pin the collection: the URI is untrusted, so
+      // we must NOT delete whatever record type it happens to name.
       this.validateAtUri(params.repostUri);
+      const { collection } = this.parseAtUri(params.repostUri);
+      if (collection !== 'app.bsky.feed.repost') {
+        throw new ValidationError(
+          `repostUri must reference a repost record (collection "${collection}" is not app.bsky.feed.repost)`,
+          'repostUri',
+          params.repostUri
+        );
+      }
 
-      // Delete the repost record
+      // Delete the repost record via the SDK helper, which pins the collection to
+      // app.bsky.feed.repost and the repo to the authenticated user's own DID.
       await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          const uriParts = params.repostUri.replace('at://', '').split('/');
-          const did = uriParts[0];
-          const collection = uriParts[1];
-          const rkey = uriParts[2];
-
-          if (!did || !collection || !rkey) {
-            throw new Error(`Invalid AT URI format: ${params.repostUri}`);
-          }
-
-          return await agent.com.atproto.repo.deleteRecord({
-            repo: did,
-            collection,
-            rkey,
-          });
+          return await agent.deleteRepost(params.repostUri);
         },
         'deleteRepost',
         { repostUri: params.repostUri }

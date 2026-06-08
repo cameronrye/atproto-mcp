@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 
 const CreateListSchema = z.object({
@@ -313,7 +313,9 @@ export class GetListTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetList');
+    // Reading a list works against the public AppView; it just returns richer
+    // viewer state when authenticated.
+    super(atpClient, 'GetList', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: { listUri: string; limit?: number; cursor?: string }): Promise<{
@@ -379,7 +381,9 @@ export class GetListTool extends BaseTool {
             handle: response.data.list.creator.handle,
             displayName: response.data.list.creator.displayName,
           },
-          itemCount: response.data.items.length,
+          // The list view carries the true member count; items.length is only the
+          // current page, so prefer listItemCount and fall back when it is absent.
+          itemCount: response.data.list.listItemCount ?? response.data.items.length,
         },
         items: response.data.items.map((item: any) => ({
           uri: item.uri,
@@ -408,7 +412,8 @@ export class GetThreadTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetThread');
+    // Fetching a public thread does not require authentication.
+    super(atpClient, 'GetThread', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: { uri: string; depth?: number; parentHeight?: number }): Promise<{
@@ -509,7 +514,8 @@ export class GetCustomFeedTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetCustomFeed');
+    // Public custom feeds are readable without authentication.
+    super(atpClient, 'GetCustomFeed', ToolAuthMode.ENHANCED);
   }
 
   protected async execute(params: { feedUri: string; limit?: number; cursor?: string }): Promise<{
@@ -518,7 +524,9 @@ export class GetCustomFeedTool extends BaseTool {
       uri: string;
       displayName?: string;
       description?: string;
-      creator: {
+      // Optional: only present when the feed-generator metadata could be fetched
+      // (app.bsky.feed.getFeed does not return it; getFeedGenerator does).
+      creator?: {
         did: string;
         handle: string;
         displayName?: string;
@@ -569,17 +577,41 @@ export class GetCustomFeedTool extends BaseTool {
         postCount: response.data.feed.length,
       });
 
-      // Extract feed metadata safely
+      // app.bsky.feed.getFeed returns only { feed, cursor } — it carries no
+      // displayName/description/creator. Fetch that metadata separately (best
+      // effort) via getFeedGenerator; if it fails (e.g. the URI is not a feed
+      // generator, or the generator is offline) we return just the URI rather
+      // than fabricating always-undefined fields.
       const feedData = response.data.feed as any[];
-      const feedMeta = response.data as any;
+      let feedMeta: { displayName?: string; description?: string; creator?: any } = {};
+      try {
+        const genResponse = await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.app.bsky.feed.getFeedGenerator({ feed: params.feedUri });
+          },
+          'getFeedGenerator',
+          { feedUri: params.feedUri }
+        );
+        const view = (genResponse.data as any).view;
+        if (view) {
+          feedMeta = {
+            displayName: view.displayName,
+            description: view.description,
+            creator: view.creator,
+          };
+        }
+      } catch (metaError) {
+        this.logger.debug('Could not fetch feed generator metadata', metaError);
+      }
 
       return {
         success: true,
         feed: {
           uri: params.feedUri,
-          displayName: feedMeta.displayName,
-          description: feedMeta.description,
-          creator: feedMeta.creator,
+          ...(feedMeta.displayName != null && { displayName: feedMeta.displayName }),
+          ...(feedMeta.description != null && { description: feedMeta.description }),
+          ...(feedMeta.creator != null && { creator: feedMeta.creator }),
         },
         posts: feedData.map((item: any) => ({
           uri: item.post.uri,

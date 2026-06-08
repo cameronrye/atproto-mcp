@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { ATURI, CID, ILikePostParams } from '../../types/index.js';
+import { type ATURI, type CID, type ILikePostParams, ValidationError } from '../../types/index.js';
 
 /**
  * Zod schema for like post parameters
@@ -181,27 +181,25 @@ export class UnlikePostTool extends BaseTool {
         likeUri: params.likeUri,
       });
 
-      // Validate the like URI
+      // Validate the like URI and pin the collection: the URI is untrusted, so we
+      // must NOT delete whatever record type it happens to name. Passing e.g. a
+      // post or follow URI here would otherwise delete that record.
       this.validateAtUri(params.likeUri);
+      const { collection } = this.parseAtUri(params.likeUri);
+      if (collection !== 'app.bsky.feed.like') {
+        throw new ValidationError(
+          `likeUri must reference a like record (collection "${collection}" is not app.bsky.feed.like)`,
+          'likeUri',
+          params.likeUri
+        );
+      }
 
-      // Delete the like record
+      // Delete the like record via the SDK helper, which pins the collection to
+      // app.bsky.feed.like and the repo to the authenticated user's own DID.
       await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          const uriParts = params.likeUri.replace('at://', '').split('/');
-          const did = uriParts[0];
-          const collection = uriParts[1];
-          const rkey = uriParts[2];
-
-          if (!did || !collection || !rkey) {
-            throw new Error(`Invalid AT URI format: ${params.likeUri}`);
-          }
-
-          return await agent.com.atproto.repo.deleteRecord({
-            repo: did,
-            collection,
-            rkey,
-          });
+          return await agent.deleteLike(params.likeUri);
         },
         'deleteLike',
         { likeUri: params.likeUri }

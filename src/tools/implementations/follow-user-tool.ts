@@ -51,20 +51,22 @@ export class FollowUserTool extends BaseTool {
       // Validate the actor identifier
       this.validateActor(params.actor);
 
-      // Resolve the actor to get their DID and profile info
+      // Resolve the actor to get their DID, profile info, and the authoritative
+      // "am I already following this user" signal (viewer.following).
       const userProfile = await this.resolveActor(params.actor);
 
-      // Check if already following this user
-      const existingFollow = await this.checkExistingFollow(userProfile.did);
-      if (existingFollow) {
+      // Check if already following this user. viewer.following is the
+      // authoritative signal — unlike a listRecords scan, it does not miss
+      // follows beyond the first page on accounts that follow >100 users.
+      if (userProfile.followingUri) {
         this.logger.info('User is already being followed', {
           actor: params.actor,
-          followUri: existingFollow.uri,
+          followUri: userProfile.followingUri,
         });
 
         return {
-          uri: existingFollow.uri as ATURI,
-          cid: existingFollow.cid as CID,
+          uri: userProfile.followingUri as ATURI,
+          cid: '' as CID,
           success: true,
           message: 'User was already being followed',
           followedUser: {
@@ -122,9 +124,16 @@ export class FollowUserTool extends BaseTool {
   }
 
   /**
-   * Resolve actor identifier to DID and profile information
+   * Resolve actor identifier to DID, profile information, and existing-follow state.
+   *
+   * `viewer.following` (the follow record's AT-URI when the authenticated user
+   * already follows this actor) is the authoritative duplicate signal — unlike
+   * a listRecords scan it does not miss follows beyond the first page on
+   * accounts that follow >100 users.
    */
-  private async resolveActor(actor: string): Promise<{ did: DID; handle?: string }> {
+  private async resolveActor(
+    actor: string
+  ): Promise<{ did: DID; handle?: string; followingUri?: string }> {
     try {
       const response = await this.executeAtpOperation(
         async () => {
@@ -138,55 +147,13 @@ export class FollowUserTool extends BaseTool {
       return {
         did: response.data.did as DID,
         ...(response.data.handle && { handle: response.data.handle }),
+        ...(response.data.viewer?.following && {
+          followingUri: response.data.viewer.following,
+        }),
       };
     } catch (error) {
       this.logger.error('Failed to resolve actor', error, { actor });
       throw error;
-    }
-  }
-
-  /**
-   * Check if the user is already being followed
-   */
-  private async checkExistingFollow(
-    targetDid: string
-  ): Promise<{ uri: string; cid: string } | null> {
-    try {
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          const userDid = agent.session?.did;
-
-          if (!userDid) {
-            throw new Error('User session not available');
-          }
-
-          // List existing follows to check for duplicates
-          return await agent.com.atproto.repo.listRecords({
-            repo: userDid,
-            collection: 'app.bsky.graph.follow',
-            limit: 100, // Should be enough to find recent follows
-          });
-        },
-        'listFollows',
-        { targetDid }
-      );
-
-      // Check if any of the follows match the target user
-      for (const record of response.data.records) {
-        const followRecord = record.value as any;
-        if (followRecord.subject === targetDid) {
-          return {
-            uri: record.uri,
-            cid: record.cid,
-          };
-        }
-      }
-
-      return null;
-    } catch (error) {
-      this.logger.warn('Could not check for existing follow', error);
-      return null;
     }
   }
 }

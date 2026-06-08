@@ -180,34 +180,45 @@ export class GetUserProfileTool extends BaseTool {
         this.validateActor(actor);
       }
 
-      // Get the user profiles from AT Protocol
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.getProfiles({ actors });
-        },
-        'getProfiles',
-        { actorCount: actors.length }
-      );
+      // app.bsky.actor.getProfiles caps `actors` at 25 per request, so chunk
+      // larger requests into batches of 25 and concatenate the results.
+      const MAX_ACTORS_PER_REQUEST = 25;
+      const batches: string[][] = [];
+      for (let i = 0; i < actors.length; i += MAX_ACTORS_PER_REQUEST) {
+        batches.push(actors.slice(i, i + MAX_ACTORS_PER_REQUEST));
+      }
 
-      const profiles = response.data.profiles.map((profileData: any) => ({
-        did: profileData.did as DID,
-        handle: profileData.handle,
-        displayName: profileData.displayName,
-        description: profileData.description,
-        avatar: profileData.avatar,
-        banner: profileData.banner,
-        followersCount: profileData.followersCount,
-        followsCount: profileData.followsCount,
-        postsCount: profileData.postsCount,
-        indexedAt: profileData.indexedAt,
-        viewer: profileData.viewer
+      const profileData: any[] = [];
+      for (const batch of batches) {
+        const response = await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.getProfiles({ actors: batch });
+          },
+          'getProfiles',
+          { actorCount: batch.length }
+        );
+        profileData.push(...response.data.profiles);
+      }
+
+      const profiles = profileData.map((p: any) => ({
+        did: p.did as DID,
+        handle: p.handle,
+        displayName: p.displayName,
+        description: p.description,
+        avatar: p.avatar,
+        banner: p.banner,
+        followersCount: p.followersCount,
+        followsCount: p.followsCount,
+        postsCount: p.postsCount,
+        indexedAt: p.indexedAt,
+        viewer: p.viewer
           ? {
-              muted: profileData.viewer.muted,
-              blockedBy: profileData.viewer.blockedBy,
-              blocking: profileData.viewer.blocking,
-              following: profileData.viewer.following,
-              followedBy: profileData.viewer.followedBy,
+              muted: p.viewer.muted,
+              blockedBy: p.viewer.blockedBy,
+              blocking: p.viewer.blocking,
+              following: p.viewer.following,
+              followedBy: p.viewer.followedBy,
             }
           : undefined,
       }));

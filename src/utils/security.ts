@@ -9,6 +9,13 @@ export interface IRateLimitConfig {
   maxRequests: number;
   skipSuccessfulRequests?: boolean;
   skipFailedRequests?: boolean;
+  /**
+   * Maximum number of distinct identifiers tracked at once. When exceeded, the
+   * least-recently-used entry is evicted. Bounds memory so a flood of distinct
+   * (e.g. attacker-controlled) keys cannot exhaust the heap between cleanup
+   * sweeps. Defaults to 50_000.
+   */
+  maxTrackedIdentifiers?: number;
 }
 
 export interface ISecurityConfig {
@@ -83,6 +90,15 @@ export class InputSanitizer {
       const sanitized: any = {};
       for (const [key, value] of Object.entries(obj)) {
         const sanitizedKey = this.sanitizeString(key);
+        // Drop prototype-polluting keys so an attacker-supplied `__proto__`/
+        // `constructor`/`prototype` can't reassign the result's prototype.
+        if (
+          sanitizedKey === '__proto__' ||
+          sanitizedKey === 'constructor' ||
+          sanitizedKey === 'prototype'
+        ) {
+          continue;
+        }
         sanitized[sanitizedKey] = this.sanitizeObject(value);
       }
       return sanitized;
@@ -135,10 +151,12 @@ export class RateLimiter {
   private config: IRateLimitConfig;
   private logger: Logger;
   private readonly cleanupTimer: NodeJS.Timeout;
+  private readonly maxTrackedIdentifiers: number;
 
   constructor(config: IRateLimitConfig, logger: Logger) {
     this.config = config;
     this.logger = logger;
+    this.maxTrackedIdentifiers = config.maxTrackedIdentifiers ?? 50_000;
 
     // Clean up old entries periodically. unref() so the timer never keeps the
     // process alive on its own.
@@ -159,14 +177,17 @@ export class RateLimiter {
     const now = Date.now();
     const windowStart = now - this.config.windowMs;
 
-    // Get existing requests for this identifier
-    const userRequests = this.requests.get(identifier) || [];
-
-    // Filter out requests outside the current window
+    // Get existing requests for this identifier and drop those outside the window.
+    const userRequests = this.requests.get(identifier) ?? [];
     const recentRequests = userRequests.filter(timestamp => timestamp > windowStart);
+
+    // Delete first so the subsequent set() moves this key to the most-recently-
+    // used position (Map preserves insertion order; last inserted = most recent).
+    this.requests.delete(identifier);
 
     // Check if limit exceeded
     if (recentRequests.length >= this.config.maxRequests) {
+      this.requests.set(identifier, recentRequests);
       this.logger.warn('Rate limit exceeded', {
         identifier,
         requests: recentRequests.length,
@@ -177,6 +198,17 @@ export class RateLimiter {
 
     // Add current request
     recentRequests.push(now);
+
+    // Bound the identifier cardinality: when at capacity and inserting a NEW
+    // key, evict the least-recently-used (oldest-inserted) entry so a flood of
+    // distinct identifiers cannot exhaust memory between cleanup sweeps.
+    if (this.requests.size >= this.maxTrackedIdentifiers) {
+      const lruKey = this.requests.keys().next().value;
+      if (lruKey !== undefined) {
+        this.requests.delete(lruKey);
+      }
+    }
+
     this.requests.set(identifier, recentRequests);
 
     return true;
@@ -198,12 +230,18 @@ export class RateLimiter {
    * Get reset time for identifier
    */
   getResetTime(identifier: string): number {
-    const userRequests = this.requests.get(identifier) || [];
+    const now = Date.now();
+    const windowStart = now - this.config.windowMs;
+    const userRequests = (this.requests.get(identifier) ?? []).filter(
+      timestamp => timestamp > windowStart
+    );
     if (userRequests.length === 0) {
-      return Date.now();
+      return now;
     }
 
-    const oldestRequest = Math.min(...userRequests);
+    // Reduce-based min (no array spread, which can overflow the call stack for
+    // very large arrays).
+    const oldestRequest = userRequests.reduce((min, t) => (t < min ? t : min), Infinity);
     return oldestRequest + this.config.windowMs;
   }
 

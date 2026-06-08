@@ -132,6 +132,29 @@ const ENV_MAPPINGS = {
 /** Config paths whose env values should be coerced to a number (all others stay strings). */
 const NUMERIC_CONFIG_PATHS = new Set<string>(['port']);
 
+/** Mask a sensitive string for logging, keeping just enough to disambiguate. */
+function maskSensitive(value: string): string {
+  return value.length <= 4 ? '***' : `${value.slice(0, 2)}***`;
+}
+
+/**
+ * Produce a log-safe copy of the configuration: passwords/secrets are fully
+ * redacted, and the identifier/clientId are masked (they are sensitive enough not
+ * to appear in logs verbatim).
+ */
+export function redactConfigForLog(config: IMcpServerConfig): IMcpServerConfig {
+  return {
+    ...config,
+    atproto: {
+      ...config.atproto,
+      ...(config.atproto.identifier && { identifier: maskSensitive(config.atproto.identifier) }),
+      ...(config.atproto.password && { password: '[REDACTED]' }),
+      ...(config.atproto.clientId && { clientId: maskSensitive(config.atproto.clientId) }),
+      ...(config.atproto.clientSecret && { clientSecret: '[REDACTED]' }),
+    },
+  };
+}
+
 /**
  * Configuration manager class
  */
@@ -254,34 +277,42 @@ export class ConfigManager {
   }
 
   /**
+   * Whether the given AT Protocol config carries the credentials required for the
+   * specified auth method. Single source of truth for the credential-presence
+   * check shared by validation, hasAuthentication, and isValidForAuth.
+   */
+  private hasCredentialsFor(authMethod: 'app-password' | 'oauth', atproto: IAtpConfig): boolean {
+    if (authMethod === 'app-password') {
+      return !!(atproto.identifier && atproto.password);
+    }
+    if (authMethod === 'oauth') {
+      return !!(atproto.clientId && atproto.clientSecret);
+    }
+    return false;
+  }
+
+  /**
    * Validate authentication configuration
    * Authentication is now optional - only validate if auth method is specified
    */
   private validateAuthConfiguration(): void {
     const { atproto } = this.config;
 
-    // Skip validation in test environment if credentials are not provided
-    const isTestEnv = process.env['NODE_ENV'] === 'test';
-
     // If no auth method is specified, we're in unauthenticated mode - no validation needed
     if (!atproto.authMethod) {
       return;
     }
 
-    if (atproto.authMethod === 'app-password') {
-      if (!isTestEnv && (!atproto.identifier || !atproto.password)) {
-        throw new ConfigurationError(
-          'App password authentication requires both identifier and password',
-          { authMethod: atproto.authMethod }
-        );
-      }
-    } else if (atproto.authMethod === 'oauth') {
-      if (!isTestEnv && (!atproto.clientId || !atproto.clientSecret)) {
-        throw new ConfigurationError(
-          'OAuth authentication requires both clientId and clientSecret',
-          { authMethod: atproto.authMethod }
-        );
-      }
+    // Skip the credential requirement in the test environment (tests construct
+    // configs without real credentials).
+    const isTestEnv = process.env['NODE_ENV'] === 'test';
+    if (!isTestEnv && !this.hasCredentialsFor(atproto.authMethod, atproto)) {
+      throw new ConfigurationError(
+        atproto.authMethod === 'app-password'
+          ? 'App password authentication requires both identifier and password'
+          : 'OAuth authentication requires both clientId and clientSecret',
+        { authMethod: atproto.authMethod }
+      );
     }
   }
 
@@ -289,16 +320,7 @@ export class ConfigManager {
    * Log configuration (excluding sensitive data)
    */
   private logConfiguration(): void {
-    const safeConfig = {
-      ...this.config,
-      atproto: {
-        ...this.config.atproto,
-        password: this.config.atproto.password ? '[REDACTED]' : undefined,
-        clientSecret: this.config.atproto.clientSecret ? '[REDACTED]' : undefined,
-      },
-    };
-
-    logger.info('Configuration loaded', safeConfig);
+    logger.info('Configuration loaded', redactConfigForLog(this.config));
   }
 
   /**
@@ -348,13 +370,7 @@ export class ConfigManager {
       McpServerConfigSchema.parse(testConfig);
 
       // Additional validation for auth method requirements
-      if (authMethod === 'app-password') {
-        return !!(testConfig.atproto.identifier && testConfig.atproto.password);
-      } else if (authMethod === 'oauth') {
-        return !!(testConfig.atproto.clientId && testConfig.atproto.clientSecret);
-      }
-
-      return true;
+      return this.hasCredentialsFor(authMethod, testConfig.atproto);
     } catch {
       return false;
     }
@@ -365,18 +381,7 @@ export class ConfigManager {
    */
   public hasAuthentication(): boolean {
     const { atproto } = this.config;
-
-    if (!atproto.authMethod) {
-      return false;
-    }
-
-    if (atproto.authMethod === 'app-password') {
-      return !!(atproto.identifier && atproto.password);
-    } else if (atproto.authMethod === 'oauth') {
-      return !!(atproto.clientId && atproto.clientSecret);
-    }
-
-    return false;
+    return atproto.authMethod ? this.hasCredentialsFor(atproto.authMethod, atproto) : false;
   }
 
   /**

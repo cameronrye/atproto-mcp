@@ -415,42 +415,7 @@ export class BatchLikeTool extends BaseTool {
     }
   }
 
-  /**
-   * Get CID from AT Protocol URI by fetching the record
-   */
-  private async getCidFromUri(uri: string): Promise<string> {
-    const response = await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        const uriParts = uri.replace('at://', '').split('/');
-        if (uriParts.length < 3) {
-          throw new Error(`Invalid AT URI format: ${uri}`);
-        }
-
-        const did = uriParts[0];
-        const collection = uriParts[1];
-        const rkey = uriParts[2];
-
-        if (!did || !collection || !rkey) {
-          throw new Error(`Invalid AT URI components: ${uri}`);
-        }
-
-        return await agent.com.atproto.repo.getRecord({
-          repo: did,
-          collection,
-          rkey,
-        });
-      },
-      'getRecord',
-      { uri }
-    );
-
-    const cid = response.data.cid;
-    if (!cid) {
-      throw new Error(`No CID found for URI: ${uri}`);
-    }
-    return cid;
-  }
+  // getCidFromUri is provided by BaseTool.
 }
 
 /**
@@ -655,40 +620,5 @@ export class BatchRepostTool extends BaseTool {
     }
   }
 
-  /**
-   * Get CID from AT Protocol URI by fetching the record
-   */
-  private async getCidFromUri(uri: string): Promise<string> {
-    const response = await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        const uriParts = uri.replace('at://', '').split('/');
-        if (uriParts.length < 3) {
-          throw new Error(`Invalid AT URI format: ${uri}`);
-        }
-
-        const did = uriParts[0];
-        const collection = uriParts[1];
-        const rkey = uriParts[2];
-
-        if (!did || !collection || !rkey) {
-          throw new Error(`Invalid AT URI components: ${uri}`);
-        }
-
-        return await agent.com.atproto.repo.getRecord({
-          repo: did,
-          collection,
-          rkey,
-        });
-      },
-      'getRecord',
-      { uri }
-    );
-
-    const cid = response.data.cid;
-    if (!cid) {
-      throw new Error(`No CID found for URI: ${uri}`);
-    }
-    return cid;
-  }
+  // getCidFromUri is provided by BaseTool.
 }

@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AtpClient } from '../atp-client.js';
-import { AuthenticationError, AtpError } from '../../types/index.js';
+import { AuthenticationError, AtpError, ValidationError } from '../../types/index.js';
 import {
   mockConsole,
   expectToThrow,
@@ -127,15 +127,16 @@ describe('AtpClient', () => {
       );
     });
 
-    it('should handle session refresh', async () => {
+    it('refreshes the session on expiry without a spurious re-login', async () => {
       const mockSession = createMockSession();
       mockAgent.login.mockResolvedValue({
         success: true,
         data: mockSession,
       });
-      mockAgent.refreshSession.mockResolvedValue({
-        success: true,
-      });
+      // The real @atproto/api AtpAgent.refreshSession() returns Promise<void>.
+      // The client must NOT inspect a (non-existent) `.success` field on the
+      // result — doing so throws a TypeError that forces a needless full re-login.
+      mockAgent.refreshSession.mockResolvedValue(undefined);
 
       await client.initialize();
 
@@ -153,6 +154,9 @@ describe('AtpClient', () => {
       await new Promise(resolve => setTimeout(resolve, 10));
 
       expect(mockAgent.refreshSession).toHaveBeenCalled();
+      // login was called exactly once (initial auth) — the void refresh result
+      // must not be misread as a failure that triggers re-authentication.
+      expect(mockAgent.login).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -228,6 +232,42 @@ describe('AtpClient', () => {
         expect(result.error.code).toBe('RATE_LIMIT_EXCEEDED');
       }
     });
+
+    it('maps 404 to a not-found AtpError, not a ValidationError', async () => {
+      const error = { status: 404, message: 'Could not find record' };
+      const result = await client.executeRequest(vi.fn().mockRejectedValue(error));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        // A 404 must not be reported to the LLM as "invalid parameters".
+        expect(result.error).toBeInstanceOf(AtpError);
+        expect(result.error).not.toBeInstanceOf(ValidationError);
+        expect(result.error.code).toBe('NOT_FOUND');
+        expect(result.error.statusCode).toBe(404);
+      }
+    });
+
+    it('maps 403 to a forbidden AtpError, not a ValidationError', async () => {
+      const error = { status: 403, message: 'Blocked by author' };
+      const result = await client.executeRequest(vi.fn().mockRejectedValue(error));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).not.toBeInstanceOf(ValidationError);
+        expect(result.error.code).toBe('FORBIDDEN');
+        expect(result.error.statusCode).toBe(403);
+      }
+    });
+
+    it('still maps 400 to a ValidationError', async () => {
+      const error = { status: 400, message: 'Invalid request body' };
+      const result = await client.executeRequest(vi.fn().mockRejectedValue(error));
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toBeInstanceOf(ValidationError);
+      }
+    });
   });
 
   describe('cleanup', () => {
@@ -242,6 +282,22 @@ describe('AtpClient', () => {
     it('should return the underlying AtpAgent', () => {
       const agent = client.getAgent();
       expect(agent).toBe(mockAgent);
+    });
+  });
+
+  describe('executeAuthenticatedRequest without credentials', () => {
+    it('denies the operation without invoking it when no credentials are configured', async () => {
+      // No authMethod/credentials -> the auth gate must fail closed.
+      const noCredClient = new AtpClient({ service: 'https://bsky.social' } as any);
+      const operation = vi.fn().mockResolvedValue('should not run');
+
+      const result = await noCredClient.executeAuthenticatedRequest(operation);
+
+      expect(result.success).toBe(false);
+      expect(operation).not.toHaveBeenCalled();
+      if (!result.success) {
+        expect(result.error).toBeInstanceOf(AuthenticationError);
+      }
     });
   });
 });

@@ -1,62 +1,59 @@
 # Multi-stage Docker build for AT Protocol MCP Server
+#
+# This project uses pnpm (see packageManager in package.json) and ships only a
+# pnpm-lock.yaml — there is no package-lock.json, so `npm ci` cannot be used.
 FROM node:20-alpine AS builder
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Enable the pnpm version pinned by package.json's "packageManager" field.
+RUN corepack enable
 
-# Install dependencies
-RUN npm ci --only=production
+# Copy manifest + lockfile first for better layer caching.
+COPY package.json pnpm-lock.yaml ./
 
-# Copy source code
+# Install ALL dependencies (including devDeps) — the build needs tsc/tsx.
+RUN pnpm install --frozen-lockfile
+
+# Copy source and build.
 COPY . .
-
-# Build the application
-RUN npm run build
+RUN pnpm run build
 
 # Production stage
 FROM node:20-alpine AS production
 
-# Install dumb-init for proper signal handling
+# Install dumb-init for proper signal handling.
 RUN apk add --no-cache dumb-init
 
-# Create non-root user
+# Enable pnpm for the production install.
+RUN corepack enable
+
+# Create non-root user.
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S atproto -u 1001
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Copy manifest + lockfile and install only production dependencies.
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --prod && \
+    pnpm store prune
 
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
-
-# Copy built application from builder stage
+# Copy built application from the builder stage.
 COPY --from=builder /app/dist ./dist
 
-# Copy configuration files
-COPY --from=builder /app/config ./config
-
-# Create necessary directories
+# Create runtime directories and hand ownership to the non-root user.
 RUN mkdir -p /app/logs /app/data && \
     chown -R atproto:nodejs /app
 
-# Switch to non-root user
 USER atproto
 
-# Expose port
-EXPOSE 3000
-
-# Health check
+# Note: this server speaks MCP over stdio and binds no network port, so there is
+# no EXPOSE. The health check is a process-local smoke check (see health-check.ts).
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD node dist/health-check.js || exit 1
 
-# Use dumb-init to handle signals properly
+# Use dumb-init to handle signals (SIGTERM/SIGINT) properly.
 ENTRYPOINT ["dumb-init", "--"]
 
-# Start the application
 CMD ["node", "dist/cli.js"]

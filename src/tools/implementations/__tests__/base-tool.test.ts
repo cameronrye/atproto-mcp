@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BaseTool, ToolAuthMode } from '../base-tool.js';
 import type { AtpClient } from '../../../utils/atp-client.js';
+import { RateLimitError } from '../../../types/index.js';
 import { z } from 'zod';
 
 // Create a concrete implementation for testing
@@ -103,7 +104,7 @@ describe('BaseTool', () => {
     it('should handle execution errors', async () => {
       const client = createMockAtpClient();
       const tool = new TestTool(client);
-      
+
       // Override execute to throw error
       tool['execute'] = vi.fn().mockRejectedValue(new Error('Test error'));
 
@@ -126,7 +127,9 @@ describe('BaseTool', () => {
     });
 
     it('should validate CID format', () => {
-      expect(() => tool['validateCid']('bafyreigbtj4x7ip5legnfznufuopl4sg4knzc2cof6duas4b3q2fy6swua')).not.toThrow();
+      expect(() =>
+        tool['validateCid']('bafyreigbtj4x7ip5legnfznufuopl4sg4knzc2cof6duas4b3q2fy6swua')
+      ).not.toThrow();
       expect(() => tool['validateCid']('bafkreiabcd1234')).not.toThrow();
       expect(() => tool['validateCid']('')).toThrow();
     });
@@ -134,7 +137,15 @@ describe('BaseTool', () => {
     it('should validate actor (DID or handle)', () => {
       expect(() => tool['validateActor']('did:plc:abc123')).not.toThrow();
       expect(() => tool['validateActor']('user.bsky.social')).not.toThrow();
+      // did:web identifiers legitimately contain colons (host:port:path segments).
+      expect(() => tool['validateActor']('did:web:example.com')).not.toThrow();
+      expect(() => tool['validateActor']('did:web:example.com:user:alice')).not.toThrow();
       expect(() => tool['validateActor']('')).toThrow();
+      // Tightened: traversal/scheme-like junk must NOT be accepted as a handle.
+      expect(() => tool['validateActor']('../../etc/passwd')).toThrow();
+      expect(() => tool['validateActor']('javascript:alert(1)//.x')).toThrow();
+      expect(() => tool['validateActor']('has spaces.com')).toThrow();
+      expect(() => tool['validateActor']('nodot')).toThrow();
     });
 
     it('should validate ISO8601 date format', () => {
@@ -144,5 +155,52 @@ describe('BaseTool', () => {
       expect(() => tool['validateISO8601Date']('')).toThrow();
     });
   });
-});
 
+  describe('parseAtUri', () => {
+    let tool: TestTool;
+    beforeEach(() => {
+      tool = new TestTool(createMockAtpClient());
+    });
+
+    it('parses a well-formed AT URI into repo/collection/rkey', () => {
+      const parsed = tool['parseAtUri']('at://did:plc:abc/app.bsky.feed.post/xyz');
+      expect(parsed).toEqual({
+        repo: 'did:plc:abc',
+        collection: 'app.bsky.feed.post',
+        rkey: 'xyz',
+      });
+    });
+
+    it('throws on a non-at:// URI', () => {
+      expect(() => tool['parseAtUri']('https://example.com/x')).toThrow(/Invalid AT Protocol URI/);
+    });
+
+    it('throws on a malformed AT URI missing components', () => {
+      expect(() => tool['parseAtUri']('at://did:plc:abc')).toThrow(/Malformed AT Protocol URI/);
+      expect(() => tool['parseAtUri']('at://did:plc:abc/coll')).toThrow(
+        /Malformed AT Protocol URI/
+      );
+    });
+  });
+
+  describe('getCidFromUri error propagation', () => {
+    it('preserves a typed error (RateLimitError) instead of collapsing it to a generic Error', async () => {
+      const rateLimited = {
+        isAuthenticated: vi.fn().mockReturnValue(true),
+        hasCredentials: vi.fn().mockReturnValue(true),
+        getAgent: vi.fn().mockReturnValue({ com: { atproto: { repo: { getRecord: vi.fn() } } } }),
+        executeAuthenticatedRequest: vi.fn().mockResolvedValue({
+          success: false,
+          error: new RateLimitError('Rate limit exceeded', 30),
+        }),
+      } as unknown as AtpClient;
+      const tool = new TestTool(rateLimited);
+
+      // The original RateLimitError must survive so the server maps it correctly
+      // (a generic Error would be reported as a plain internal failure).
+      await expect(
+        tool['getCidFromUri']('at://did:plc:abc/app.bsky.feed.post/xyz')
+      ).rejects.toBeInstanceOf(RateLimitError);
+    });
+  });
+});

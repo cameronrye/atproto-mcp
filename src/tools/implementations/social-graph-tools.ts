@@ -90,7 +90,10 @@ export class GetFollowersTool extends BaseTool {
         }
       );
 
-      // Transform followers to our interface
+      // Transform followers to our interface. Note: getFollowers returns
+      // ProfileView entries, which do NOT carry followersCount/followsCount/
+      // postsCount (only ProfileViewDetailed does), so we omit those rather than
+      // emit always-undefined fields that imply the data is available.
       const followers = response.data.followers.map((follower: any) => ({
         did: follower.did as DID,
         handle: follower.handle,
@@ -98,9 +101,6 @@ export class GetFollowersTool extends BaseTool {
         description: follower.description,
         avatar: follower.avatar,
         banner: follower.banner,
-        followersCount: follower.followersCount,
-        followsCount: follower.followsCount,
-        postsCount: follower.postsCount,
         indexedAt: follower.indexedAt,
       }));
 
@@ -177,7 +177,9 @@ export class GetFollowsTool extends BaseTool {
         }
       );
 
-      // Transform follows to our interface
+      // Transform follows to our interface. getFollows returns ProfileView
+      // entries without follower/follow/post counts (see GetFollowersTool), so
+      // those fields are omitted rather than emitted as always-undefined.
       const follows = response.data.follows.map((follow: any) => ({
         did: follow.did as DID,
         handle: follow.handle,
@@ -185,9 +187,6 @@ export class GetFollowsTool extends BaseTool {
         description: follow.description,
         avatar: follow.avatar,
         banner: follow.banner,
-        followersCount: follow.followersCount,
-        followsCount: follow.followsCount,
-        postsCount: follow.postsCount,
         indexedAt: follow.indexedAt,
       }));
 

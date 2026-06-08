@@ -105,12 +105,22 @@ export class AnalyzeNetworkTool extends BaseTool {
       let topFollowers: any[] = [];
       let topFollows: any[] = [];
       let mutualConnectionsCount = 0;
+      // Full DID set of the sampled followers (up to maxSampleSize), kept so
+      // mutual-connection counting intersects the *entire* sample rather than
+      // just the top-10 ranked slice.
+      let followerDidSet = new Set<string>();
 
       if (params.includeFollowers && followersCount > 0) {
         const followersResponse = await this.executeAtpOperation(
           async () => agent.getFollowers({ actor, limit: params.maxSampleSize }),
           'getFollowers',
           { actor, limit: params.maxSampleSize }
+        );
+
+        // Capture the full sampled follower DID set for mutual-connection
+        // counting before we rank/truncate to the top 10.
+        followerDidSet = new Set(
+          (followersResponse.data.followers as any[]).map(f => f.did).filter(Boolean)
         );
 
         // getFollowers returns ProfileView entries WITHOUT followersCount, so we
@@ -148,10 +158,14 @@ export class AnalyzeNetworkTool extends BaseTool {
             followersCount: f.followersCount ?? 0,
           }));
 
-        // Calculate mutual connections
-        if (params.includeFollowers && topFollowers.length > 0) {
-          const followerDids = new Set(topFollowers.map(f => f.did));
-          mutualConnectionsCount = topFollows.filter(f => followerDids.has(f.did)).length;
+        // Calculate mutual connections over the FULL sampled sets (not the
+        // top-10 ranked slices, which would cap the count at 10 and bias it to
+        // high-follower accounts). This is the overlap within the sampled
+        // followers/follows (each up to maxSampleSize), not the lifetime total.
+        if (params.includeFollowers && followerDidSet.size > 0) {
+          mutualConnectionsCount = (followsResponse.data.follows as any[]).filter(f =>
+            followerDidSet.has(f.did)
+          ).length;
         }
       }
 
@@ -771,50 +785,52 @@ export class FindInfluentialUsersTool extends BaseTool {
         };
       }
 
-      // Get profiles for all authors
-      const users: any[] = [];
-
-      for (const did of Array.from(authorDids).slice(0, params.maxResults! * 2)) {
+      // Hydrate author profiles in batches via getProfiles (up to 25 actors per
+      // call) instead of one sequential getProfile round-trip per author.
+      const targetDids = Array.from(authorDids).slice(0, params.maxResults! * 2);
+      const profiles: any[] = [];
+      for (let i = 0; i < targetDids.length; i += 25) {
+        const chunk = targetDids.slice(i, i + 25);
         try {
-          const profileResponse = await this.executeAtpOperation(
-            async () => agent.getProfile({ actor: did }),
-            'getProfile',
-            { actor: did }
+          const resp = await this.executeAtpOperation(
+            async () => agent.getProfiles({ actors: chunk }),
+            'getProfiles',
+            { count: chunk.length }
+          );
+          profiles.push(...((resp.data.profiles as any[]) ?? []));
+        } catch {
+          this.logger.warn('Failed to fetch a profile chunk', { count: chunk.length });
+        }
+      }
+
+      const users: any[] = [];
+      for (const profile of profiles) {
+        const followersCount = profile.followersCount || 0;
+
+        // Filter by minimum followers
+        if (followersCount >= params.minFollowers!) {
+          const influenceScore = this.calculateInfluenceScore(
+            followersCount,
+            profile.followsCount || 0,
+            profile.postsCount || 0
           );
 
-          const profile = profileResponse.data;
-          const followersCount = profile.followersCount || 0;
+          // Relevance = how many of the matched posts are from this author.
+          const relevanceScore = searchResponse.data.posts.filter(
+            p => p.author.did === profile.did
+          ).length;
 
-          // Filter by minimum followers
-          if (followersCount >= params.minFollowers!) {
-            // Calculate influence score
-            const influenceScore = this.calculateInfluenceScore(
-              followersCount,
-              profile.followsCount || 0,
-              profile.postsCount || 0
-            );
-
-            // Calculate relevance score based on how many posts match the query
-            const relevantPosts = searchResponse.data.posts.filter(
-              p => p.author.did === did
-            ).length;
-            const relevanceScore = relevantPosts;
-
-            users.push({
-              did: profile.did,
-              handle: profile.handle,
-              displayName: profile.displayName,
-              description: profile.description,
-              followersCount,
-              followsCount: profile.followsCount || 0,
-              postsCount: profile.postsCount || 0,
-              influenceScore,
-              relevanceScore,
-            });
-          }
-        } catch {
-          // Skip users that can't be fetched
-          this.logger.warn('Failed to fetch profile', { did });
+          users.push({
+            did: profile.did,
+            handle: profile.handle,
+            displayName: profile.displayName,
+            description: profile.description,
+            followersCount,
+            followsCount: profile.followsCount || 0,
+            postsCount: profile.postsCount || 0,
+            influenceScore,
+            relevanceScore,
+          });
         }
       }
 
