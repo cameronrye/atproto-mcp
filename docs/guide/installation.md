@@ -137,16 +137,6 @@ port, so no `-p`/port publishing is required. The `Dockerfile` includes an
 
 :::
 
-::: warning About `docker-compose.yml`
-
-The repository ships a `docker-compose.yml` that also defines Redis, Prometheus,
-and Grafana sidecars. These are leftover scaffolding — the server does **not**
-read any caching or metrics configuration and exposes no metrics endpoint — so
-they are not part of a normal deployment. Ignore (or delete) them and use
-`docker run -i` as shown above.
-
-:::
-
 ## Verification
 
 After installation, verify the server is working:
