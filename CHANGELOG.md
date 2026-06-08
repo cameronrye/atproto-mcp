@@ -16,20 +16,13 @@ and this project adheres to
 - Custom feed generator integration
 - Multi-account management
 
-## [0.2.1] - 2026-05-20
-
-### Fixed
-
-- Documentation accuracy pass: corrected tool/resource/prompt counts, removed
-  references to infrastructure that the stdio server does not provide, and
-  clarified which tools are experimental or placeholders.
-
-## [0.2.0] - 2026-04-30
+## [0.3.0] - 2026-06-07
 
 This release focuses on **honesty and accuracy**: the server now states plainly
-what is functional, what is experimental, and what is a placeholder. Several
-features that were previously described as simulated, planned, or fully working
-have been re-scoped to match the actual implementation.
+what is functional, what is experimental, and what is a placeholder. Features
+that were previously simulated, planned, or described as fully working have been
+re-scoped to match the actual implementation, and the documentation has been
+rewritten to match the shipped server.
 
 ### Added
 
@@ -38,6 +31,9 @@ have been re-scoped to match the actual implementation.
   "two-letter only" assumption.
 - DNS-rebinding hardening for request handling.
 - Pagination support for `remove_from_list` so large lists are fully traversed.
+- Experimental & Roadmap documentation page covering the non-functional stubs
+  (streaming, OAuth completion, `generate_alt_text`, `conversation-context`) and
+  the planned HTTP transport.
 
 ### Changed
 
@@ -46,12 +42,14 @@ have been re-scoped to match the actual implementation.
   `get_recent_events`, `monitor_keywords`, `track_users`) are registered and
   visible to MCP clients but do not decode the firehose: `start_streaming`
   returns `status: 'not_implemented'` and opens no socket, and the buffer-scan
-  tools always return an empty event buffer. See the Experimental & Roadmap
-  documentation.
+  tools always return an empty event buffer.
 - **OAuth is now honest about its state.** `start_oauth_flow` only builds a
   heuristic PKCE URL (no authorization-server metadata discovery or PAR), and
   `handle_oauth_callback`, `refresh_oauth_tokens`, and `revoke_oauth_tokens`
   throw `OAUTH_NOT_IMPLEMENTED`. App passwords remain the supported auth path.
+- **`search_posts` requires authentication** (the AT Protocol search API changed
+  in 2025 to require auth); it is no longer treated as a public/unauthenticated
+  tool.
 - De-fabricated analytics and discovery metrics:
   - `find_similar_users` is graph-only (shared follows/followers); it does not
     compute content/topic similarity.
@@ -67,9 +65,17 @@ have been re-scoped to match the actual implementation.
     not an analysis of image pixels.
   - Analytics and discovery hydrate real profiles via `getProfiles` instead of
     fabricating follower counts.
-- `atproto://conversation-context` is documented as a placeholder resource: it
-  is registered and readable, but the server never auto-populates it, so it
-  returns empty/near-empty content.
+- `atproto://conversation-context` is a placeholder resource: registered and
+  readable, but never auto-populated, so it returns empty/near-empty content.
+- **Documentation rewritten to match the server**: corrected
+  tool/resource/prompt counts (60 tools / 4 resources / 2 prompts), tool auth
+  modes, the environment-variable and CLI surfaces, prompt arguments, and
+  response shapes; consolidated the duplicate changelog/contributing/deployment
+  docs into single sources via includes; and enabled dead-link checking on the
+  docs build.
+- `SECURITY.md` states the logging behavior precisely: the config loader redacts
+  the password and client secret as `[REDACTED]`, and log fields are sanitized
+  against log injection.
 
 ### Removed
 
@@ -79,6 +85,24 @@ have been re-scoped to match the actual implementation.
   check, not a probe of a running server.
 - Removed the bogus `*` wildcard from `search_posts`; an empty query no longer
   returns all of an author's posts.
+- Removed the broken `docker-compose.yml`, which defined unused
+  Redis/Prometheus/Grafana sidecars and mounted a non-existent `./monitoring/`
+  directory the stdio server never used.
+
+### CI
+
+- Upgraded `actions/deploy-pages` to v4 in the release workflow, fixing the
+  GitHub Pages deployment "Cannot find any run with github.run_id" 404.
+
+## [0.2.1] - 2025-11-19
+
+### Changed
+
+- Migrated npm publishing to Trusted Publishers (OIDC) with provenance and added
+  automated GitHub release creation.
+- Dependency updates and cross-platform build/CI improvements.
+- Integrated Mermaid diagrams into the VitePress documentation site and removed
+  development-only documentation files.
 
 ## [0.1.1] - 2025-11-18
 
@@ -157,9 +181,9 @@ have been re-scoped to match the actual implementation.
 
 ---
 
-[Unreleased]: https://github.com/cameronrye/atproto-mcp/compare/v0.2.1...HEAD
-[0.2.1]: https://github.com/cameronrye/atproto-mcp/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/cameronrye/atproto-mcp/compare/v0.1.1...v0.2.0
+[Unreleased]: https://github.com/cameronrye/atproto-mcp/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/cameronrye/atproto-mcp/compare/v0.2.1...v0.3.0
+[0.2.1]: https://github.com/cameronrye/atproto-mcp/compare/v0.1.1...v0.2.1
 [0.1.1]: https://github.com/cameronrye/atproto-mcp/releases/tag/v0.1.1
 [0.1.0]: https://github.com/cameronrye/atproto-mcp/releases/tag/v0.1.0
 [0.0.1]: https://github.com/cameronrye/atproto-mcp/releases/tag/v0.0.1
