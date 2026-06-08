@@ -72,8 +72,8 @@ export class ReplyToPostTool extends BaseTool {
 
       // Get CIDs for the root and parent posts
       const [rootCid, parentCid] = await Promise.all([
-        this.getCidFromUri(params.root),
-        this.getCidFromUri(params.parent),
+        this.getReplyCid(params.root),
+        this.getReplyCid(params.parent),
       ]);
 
       // Detect richtext facets so mentions/links/hashtags are not inert text.
@@ -143,51 +143,17 @@ export class ReplyToPostTool extends BaseTool {
   }
 
   /**
-   * Get CID from AT Protocol URI by fetching the record
+   * Resolve a post's CID via the shared BaseTool.getCidFromUri, adding the
+   * reply-specific guidance on failure.
+   *
+   * A reply must reference the parent/root post by its real CID — falling back
+   * to the rkey (or a literal placeholder) produces a structurally invalid
+   * reply record, so we fail clearly instead.
    */
-  private async getCidFromUri(uri: string): Promise<string> {
+  private async getReplyCid(uri: string): Promise<string> {
     try {
-      this.logger.debug('Resolving CID from URI', { uri });
-
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          // Parse the AT URI to extract components
-          const uriParts = uri.replace('at://', '').split('/');
-          if (uriParts.length < 3) {
-            throw new Error(`Invalid AT URI format: ${uri}`);
-          }
-
-          const did = uriParts[0];
-          const collection = uriParts[1];
-          const rkey = uriParts[2];
-
-          if (!did || !collection || !rkey) {
-            throw new Error(`Invalid AT URI components: ${uri}`);
-          }
-
-          // Get the record to obtain its CID
-          return await agent.com.atproto.repo.getRecord({
-            repo: did,
-            collection,
-            rkey,
-          });
-        },
-        'getRecord',
-        { uri }
-      );
-
-      const cid = response.data.cid;
-      if (!cid) {
-        throw new Error(`No CID found for URI: ${uri}`);
-      }
-      this.logger.debug('Resolved CID from URI', { uri, cid });
-      return cid;
+      return await this.getCidFromUri(uri);
     } catch (error) {
-      this.logger.error('Failed to resolve CID from URI', error);
-      // A reply must reference the parent/root post by its real CID. Previously
-      // this fell back to the rkey (or the literal 'fallback-cid'), producing a
-      // structurally invalid reply record. Fail clearly instead.
       throw new Error(
         `Could not resolve the CID for ${uri}: ${
           error instanceof Error ? error.message : 'Unknown error'

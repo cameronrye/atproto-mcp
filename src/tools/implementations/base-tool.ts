@@ -305,6 +305,59 @@ export abstract class BaseTool implements IMcpTool {
   }
 
   /**
+   * Parse an AT Protocol URI (at://<repo>/<collection>/<rkey>) into its parts.
+   * Throws if the URI is malformed.
+   */
+  protected parseAtUri(uri: string): { repo: string; collection: string; rkey: string } {
+    if (!uri?.startsWith('at://')) {
+      throw new Error(`Invalid AT Protocol URI: ${uri}`);
+    }
+
+    const parts = uri.slice('at://'.length).split('/');
+    const [repo, collection, rkey] = parts;
+    if (parts.length < 3 || !repo || !collection || !rkey) {
+      throw new Error(`Malformed AT Protocol URI: ${uri}`);
+    }
+
+    return { repo, collection, rkey };
+  }
+
+  /**
+   * Resolve the CID of the record referenced by an AT Protocol URI by fetching
+   * the record. Throws a clear error if the URI is malformed or has no CID.
+   */
+  protected async getCidFromUri(uri: string): Promise<string> {
+    try {
+      this.logger.debug('Resolving CID from URI', { uri });
+      const { repo, collection, rkey } = this.parseAtUri(uri);
+
+      const response = await this.executeAtpOperation(
+        async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.com.atproto.repo.getRecord({ repo, collection, rkey });
+        },
+        'getRecord',
+        { uri, repo, collection, rkey }
+      );
+
+      const cid = response.data.cid;
+      if (!cid) {
+        throw new Error(`No CID found in record response for URI: ${uri}`);
+      }
+
+      this.logger.debug('Successfully resolved CID from URI', { uri, cid });
+      return cid;
+    } catch (error) {
+      this.logger.error('Failed to resolve CID from URI', error, { uri });
+      throw new Error(
+        `Could not resolve CID from URI ${uri}: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`
+      );
+    }
+  }
+
+  /**
    * Validate CID
    */
   protected validateCid(cid: string): void {

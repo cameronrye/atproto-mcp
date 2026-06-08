@@ -172,63 +172,7 @@ export class CreatePostTool extends BaseTool {
     }
   }
 
-  /**
-   * Get CID from AT Protocol URI by resolving the record
-   *
-   * AT Protocol URIs have the format: at://did:plc:xxx/collection/rkey
-   * This method fetches the actual record to get its CID
-   */
-  private async getCidFromUri(uri: string): Promise<string> {
-    try {
-      this.logger.debug('Resolving CID from URI', { uri });
-
-      // Parse the AT URI: at://did:plc:xxx/collection/rkey
-      if (!uri.startsWith('at://')) {
-        throw new Error(`Invalid AT Protocol URI: ${uri}`);
-      }
-
-      const uriWithoutProtocol = uri.slice(5); // Remove 'at://'
-      const parts = uriWithoutProtocol.split('/');
-
-      if (parts.length < 3) {
-        throw new Error(`Malformed AT Protocol URI: ${uri}`);
-      }
-
-      const repo = parts[0]!; // DID (guaranteed by length check)
-      const collection = parts[1]!; // e.g., 'app.bsky.feed.post' (guaranteed by length check)
-      const rkey = parts[2]!; // Record key (guaranteed by length check)
-
-      // Fetch the record from AT Protocol to get its CID
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.com.atproto.repo.getRecord({
-            repo,
-            collection,
-            rkey,
-          });
-        },
-        'getRecord',
-        { uri, repo, collection, rkey }
-      );
-
-      if (!response.data.cid) {
-        throw new Error(`No CID found in record response for URI: ${uri}`);
-      }
-
-      this.logger.debug('Successfully resolved CID from URI', {
-        uri,
-        cid: response.data.cid,
-      });
-
-      return response.data.cid;
-    } catch (error) {
-      this.logger.error('Failed to resolve CID from URI', error, { uri });
-      throw new Error(
-        `Could not resolve CID from URI ${uri}: ${error instanceof Error ? error.message : 'Unknown error'}`
-      );
-    }
-  }
+  // getCidFromUri is provided by BaseTool (shared by reply/batch tools).
 
   /**
    * Process embed data for the post

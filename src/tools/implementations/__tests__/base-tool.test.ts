@@ -103,7 +103,7 @@ describe('BaseTool', () => {
     it('should handle execution errors', async () => {
       const client = createMockAtpClient();
       const tool = new TestTool(client);
-      
+
       // Override execute to throw error
       tool['execute'] = vi.fn().mockRejectedValue(new Error('Test error'));
 
@@ -126,7 +126,9 @@ describe('BaseTool', () => {
     });
 
     it('should validate CID format', () => {
-      expect(() => tool['validateCid']('bafyreigbtj4x7ip5legnfznufuopl4sg4knzc2cof6duas4b3q2fy6swua')).not.toThrow();
+      expect(() =>
+        tool['validateCid']('bafyreigbtj4x7ip5legnfznufuopl4sg4knzc2cof6duas4b3q2fy6swua')
+      ).not.toThrow();
       expect(() => tool['validateCid']('bafkreiabcd1234')).not.toThrow();
       expect(() => tool['validateCid']('')).toThrow();
     });
@@ -144,5 +146,31 @@ describe('BaseTool', () => {
       expect(() => tool['validateISO8601Date']('')).toThrow();
     });
   });
-});
 
+  describe('parseAtUri', () => {
+    let tool: TestTool;
+    beforeEach(() => {
+      tool = new TestTool(createMockAtpClient());
+    });
+
+    it('parses a well-formed AT URI into repo/collection/rkey', () => {
+      const parsed = tool['parseAtUri']('at://did:plc:abc/app.bsky.feed.post/xyz');
+      expect(parsed).toEqual({
+        repo: 'did:plc:abc',
+        collection: 'app.bsky.feed.post',
+        rkey: 'xyz',
+      });
+    });
+
+    it('throws on a non-at:// URI', () => {
+      expect(() => tool['parseAtUri']('https://example.com/x')).toThrow(/Invalid AT Protocol URI/);
+    });
+
+    it('throws on a malformed AT URI missing components', () => {
+      expect(() => tool['parseAtUri']('at://did:plc:abc')).toThrow(/Malformed AT Protocol URI/);
+      expect(() => tool['parseAtUri']('at://did:plc:abc/coll')).toThrow(
+        /Malformed AT Protocol URI/
+      );
+    });
+  });
+});
