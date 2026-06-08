@@ -163,8 +163,10 @@ jobs:
             For more information, see the [documentation](https://cameronrye.github.io/atproto-mcp).
           draft: false
           prerelease: false
-          files: |
-            dist/**/*
+          # No `files:` — the npm registry is the canonical artifact. Uploading the
+          # raw dist/ tree as release assets fails because GitHub flattens asset
+          # names and dist has colliding basenames (index.d.ts/index.js in several
+          # subdirs), which 404s the upload and reds the whole publish run.
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Summary
