@@ -315,17 +315,6 @@ export class FindSimilarUsersTool extends BaseTool {
     }
   }
 
-  private extractTopics(posts: any[]): Set<string> {
-    const topics = new Set<string>();
-    for (const post of posts) {
-      const text = post.record?.text || '';
-      // Extract hashtags
-      const hashtags = text.match(/#\w+/g) || [];
-      hashtags.forEach((tag: string) => topics.add(tag.toLowerCase()));
-    }
-    return topics;
-  }
-
   private calculateFollowerRatioSimilarity(profile1: any, profile2: any): number {
     const ratio1 = (profile1.followersCount || 0) / Math.max(profile1.followsCount || 1, 1);
     const ratio2 = (profile2.followersCount || 0) / Math.max(profile2.followsCount || 1, 1);

@@ -289,7 +289,9 @@ export abstract class BaseTool implements IMcpTool {
     // A DID (did:method:id) or a DNS-style handle. The previous "contains a dot"
     // heuristic accepted traversal/scheme-like junk (e.g. "../../etc",
     // "javascript:alert(1)//.x") as handles; validate the real structure instead.
-    const isDid = /^did:[a-z0-9]+:[a-zA-Z0-9._%-]+$/.test(actor);
+    // The identifier portion allows ':' so did:web host:port:path segments
+    // (e.g. did:web:example.com:user:alice) are not rejected.
+    const isDid = /^did:[a-z0-9]+:[a-zA-Z0-9._:%-]+$/.test(actor);
     if (!isDid && !this.isValidHandle(actor)) {
       throw new ValidationError(
         'Actor must be a valid DID (did:...) or handle (user.domain.com)',

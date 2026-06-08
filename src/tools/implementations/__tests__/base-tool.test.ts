@@ -137,6 +137,9 @@ describe('BaseTool', () => {
     it('should validate actor (DID or handle)', () => {
       expect(() => tool['validateActor']('did:plc:abc123')).not.toThrow();
       expect(() => tool['validateActor']('user.bsky.social')).not.toThrow();
+      // did:web identifiers legitimately contain colons (host:port:path segments).
+      expect(() => tool['validateActor']('did:web:example.com')).not.toThrow();
+      expect(() => tool['validateActor']('did:web:example.com:user:alice')).not.toThrow();
       expect(() => tool['validateActor']('')).toThrow();
       // Tightened: traversal/scheme-like junk must NOT be accepted as a handle.
       expect(() => tool['validateActor']('../../etc/passwd')).toThrow();

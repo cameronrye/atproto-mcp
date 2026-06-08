@@ -190,14 +190,24 @@ export function assertSafePath(filePath: string, baseDir: string): string {
   }
 
   // Resolve symlinks so a link planted inside the base directory cannot point
-  // outside it (the lexical check above only catches `..` traversal). This is
-  // enforced for paths that actually exist; a not-yet-created path has no link to
-  // follow, so an ENOENT is treated as "nothing to resolve".
+  // outside it (the lexical check above only catches `..` traversal). Resolve the
+  // base and the target separately: a missing base means there is nothing to
+  // enforce against (the read will fail anyway), while a missing target is a
+  // not-yet-created path with no link to follow.
+  let realBase: string;
   try {
-    const realBase = realpathSync(resolvedBase);
+    realBase = realpathSync(resolvedBase);
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return resolved;
+    }
+    throw err;
+  }
+
+  try {
     const realResolved = realpathSync(resolved);
     const realRel = path.relative(realBase, realResolved);
-    if (realRel.startsWith('..') || path.isAbsolute(realRel)) {
+    if (realRel === '' || realRel.startsWith('..') || path.isAbsolute(realRel)) {
       throw new Error(
         `Refusing to access "${filePath}": resolves outside the allowed directory via a symlink (${realBase})`
       );
