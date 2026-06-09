@@ -13,7 +13,11 @@ import { type ATURI, type CID, type IRepostParams, ValidationError } from '../..
 const RepostSchema = z.object({
   uri: z.string().min(1, 'Post URI is required'),
   cid: z.string().min(1, 'Post CID is required'),
-  text: z.string().max(300, 'Quote text cannot exceed 300 characters').optional(),
+  // Coarse cap; the real 300-grapheme / 3000-byte limit is enforced in buildRichText.
+  text: z
+    .string()
+    .max(3000, 'Quote text is too long (limit is 300 graphemes / 3000 bytes)')
+    .optional(),
 });
 
 /**

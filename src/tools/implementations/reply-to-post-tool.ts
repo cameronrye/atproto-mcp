@@ -14,7 +14,8 @@ const ReplyToPostSchema = z.object({
   text: z
     .string()
     .min(1, 'Reply text cannot be empty')
-    .max(300, 'Reply text cannot exceed 300 characters'),
+    // Coarse cap; the real 300-grapheme / 3000-byte limit is enforced in buildRichText.
+    .max(3000, 'Reply text is too long (limit is 300 graphemes / 3000 bytes)'),
   root: z.string().min(1, 'Root post URI is required'),
   parent: z.string().min(1, 'Parent post URI is required'),
   langs: z

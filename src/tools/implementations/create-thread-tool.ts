@@ -17,7 +17,8 @@ const CreateThreadSchema = z.object({
         text: z
           .string()
           .min(1, 'Post text cannot be empty')
-          .max(300, 'Post text cannot exceed 300 characters'),
+          // Coarse cap; the real 300-grapheme / 3000-byte limit is enforced in buildRichText.
+          .max(3000, 'Post text is too long (limit is 300 graphemes / 3000 bytes)'),
         langs: z
           .array(
             z
