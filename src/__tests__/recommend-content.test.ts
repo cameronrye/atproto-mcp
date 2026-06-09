@@ -72,3 +72,48 @@ describe('recommend_content excludeReposts', () => {
     expect(uris).toContain('at://repost');
   });
 });
+
+describe('recommend_content topic filter', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  function clientWithText(text: string) {
+    const post = {
+      uri: 'at://topical',
+      cid: 'cid-topical',
+      author: { did: 'did:plc:author', handle: 'author.test', displayName: 'Author' },
+      record: { text, createdAt: new Date().toISOString() },
+      likeCount: 10,
+      replyCount: 0,
+      repostCount: 0,
+      indexedAt: new Date().toISOString(),
+      viewer: {},
+    };
+    const agent = {
+      session: { did: 'did:plc:self' },
+      getTimeline: vi.fn().mockResolvedValue({ data: { feed: [{ post }] } }),
+      getProfile: vi.fn().mockResolvedValue({ data: { did: 'did:plc:self', handle: 'self' } }),
+    };
+    return {
+      getAgent: vi.fn().mockReturnValue(agent),
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      hasCredentials: vi.fn().mockReturnValue(true),
+      executeAuthenticatedRequest: vi.fn().mockImplementation(async (op: () => unknown) => {
+        try {
+          return { success: true, data: await op() };
+        } catch (error) {
+          return { success: false, error };
+        }
+      }),
+    } as unknown as AtpClient;
+  }
+
+  it('matches a topic against the post text body, not only hashtags', async () => {
+    // The post mentions "astronomy" in plain text with NO hashtag.
+    const tool = new RecommendContentTool(clientWithText('deep space astronomy is fascinating'));
+
+    const result = await tool.handler({ topics: ['astronomy'] });
+    const uris = result.recommendations.map((r: { uri: string }) => r.uri);
+
+    expect(uris).toContain('at://topical');
+  });
+});

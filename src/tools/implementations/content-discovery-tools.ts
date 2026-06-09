@@ -472,11 +472,15 @@ export class RecommendContentTool extends BaseTool {
         // Extract topics from post
         const postTopics = Array.from(this.extractTopics([post]));
 
-        // Check topic filter
+        // Check topic filter. Match each requested topic against BOTH the post's
+        // hashtags and its text body — most Bluesky posts have no hashtags, so a
+        // hashtag-only filter dropped the majority of genuinely on-topic posts.
         if (params.topics && params.topics.length > 0) {
-          const hasMatchingTopic = postTopics.some(topic =>
-            params.topics!.some(filter => topic.includes(filter.toLowerCase()))
-          );
+          const postText = (postData.record?.text || '').toLowerCase();
+          const hasMatchingTopic = params.topics.some(filter => {
+            const f = filter.toLowerCase();
+            return postTopics.some(topic => topic.includes(f)) || postText.includes(f);
+          });
           if (!hasMatchingTopic) continue;
         }
 
