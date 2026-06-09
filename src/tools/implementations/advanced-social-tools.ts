@@ -25,7 +25,12 @@ const RemoveFromListSchema = z.object({
 const GetListSchema = z.object({
   listUri: z.string().min(1, 'List URI is required'),
   limit: z.number().min(1).max(100).default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
 });
 
 const GetThreadSchema = z.object({
@@ -37,7 +42,12 @@ const GetThreadSchema = z.object({
 const GetCustomFeedSchema = z.object({
   feedUri: z.string().min(1, 'Feed URI is required'),
   limit: z.number().min(1).max(100).default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
 });
 
 export class CreateListTool extends BaseTool {

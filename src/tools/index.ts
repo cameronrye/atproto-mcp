@@ -40,10 +40,12 @@ import {
   GetStreamingStatusTool,
   GetThreadTool,
   GetTimelineTool,
+  GetUnreadCountTool,
   GetUserProfileTool,
   GetUserSummaryTool,
   HandleOAuthCallbackTool,
   LikePostTool,
+  MarkNotificationsSeenTool,
   MonitorKeywordsTool,
   MuteUserTool,
   RecommendContentTool,
@@ -78,8 +80,21 @@ export interface IMcpTool {
     method: string;
     description: string;
     params?: z.ZodSchema;
+    annotations?: IToolAnnotations;
   };
   handler: (params: any) => Promise<any>;
+}
+
+/**
+ * MCP tool annotations (advisory hints, per the MCP spec). Clients MUST NOT trust
+ * these for security, but use them to gate auto-approval and confirmation UI.
+ */
+export interface IToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
 }
 
 /**
@@ -109,6 +124,8 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new GetFollowersTool(atpClient),
     () => new GetFollowsTool(atpClient),
     () => new GetNotificationsTool(atpClient),
+    () => new GetUnreadCountTool(atpClient),
+    () => new MarkNotificationsSeenTool(atpClient),
 
     // Content management
     () => new DeletePostTool(atpClient),

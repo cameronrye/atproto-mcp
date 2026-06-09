@@ -19,7 +19,12 @@ import type {
 const GetFollowersSchema = z.object({
   actor: z.string().min(1, 'Actor (DID or handle) is required'),
   limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
 });
 
 /**
@@ -28,7 +33,12 @@ const GetFollowersSchema = z.object({
 const GetFollowsSchema = z.object({
   actor: z.string().min(1, 'Actor (DID or handle) is required'),
   limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
 });
 
 /**
@@ -36,7 +46,12 @@ const GetFollowsSchema = z.object({
  */
 const GetNotificationsSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
   seenAt: z.string().optional(),
 });
 
@@ -309,21 +324,39 @@ export class GetNotificationsTool extends BaseTool {
       this.formatError(error);
     }
   }
+}
 
-  /**
-   * Mark notifications as read
-   */
-  public async markAsRead(seenAt?: string): Promise<{
-    success: boolean;
-    message: string;
-    seenAt: string;
-  }> {
+const MarkNotificationsSeenSchema = z.object({
+  seenAt: z
+    .string()
+    .optional()
+    .describe(
+      'ISO 8601 timestamp; notifications up to this time are marked seen. Defaults to now.'
+    ),
+});
+
+/**
+ * Mark notifications as seen up to a timestamp so an agent does not re-process
+ * the same notifications on every run. Requires authentication.
+ */
+export class MarkNotificationsSeenTool extends BaseTool {
+  public readonly schema = {
+    method: 'mark_notifications_seen',
+    description:
+      'Mark notifications as seen up to a timestamp (defaults to now) so they are not reprocessed. Requires authentication.',
+    params: MarkNotificationsSeenSchema,
+  };
+
+  constructor(atpClient: AtpClient) {
+    super(atpClient, 'MarkNotificationsSeen', ToolAuthMode.PRIVATE);
+  }
+
+  protected async execute(params: {
+    seenAt?: string;
+  }): Promise<{ success: boolean; message: string; seenAt: string }> {
     try {
-      const timestamp = seenAt || new Date().toISOString();
-
-      this.logger.info('Marking notifications as read', {
-        seenAt: timestamp,
-      });
+      const timestamp = params.seenAt || new Date().toISOString();
+      this.logger.info('Marking notifications as seen', { seenAt: timestamp });
 
       await this.executeAtpOperation(
         async () => {
@@ -334,18 +367,39 @@ export class GetNotificationsTool extends BaseTool {
         { seenAt: timestamp }
       );
 
-      this.logger.info('Notifications marked as read successfully', {
-        seenAt: timestamp,
-      });
-
-      return {
-        success: true,
-        message: 'Notifications marked as read',
-        seenAt: timestamp,
-      };
+      return { success: true, message: 'Notifications marked as seen', seenAt: timestamp };
     } catch (error) {
-      this.logger.error('Failed to mark notifications as read', error);
-      throw error;
+      this.logger.error('Failed to mark notifications as seen', error);
+      this.formatError(error);
+    }
+  }
+}
+
+/**
+ * Get the count of unread notifications — a cheap poll for "is there anything new"
+ * that does not require fetching the full notification list. Requires authentication.
+ */
+export class GetUnreadCountTool extends BaseTool {
+  public readonly schema = {
+    method: 'get_unread_count',
+    description: 'Get the number of unread notifications. Requires authentication.',
+    params: z.object({}),
+  };
+
+  constructor(atpClient: AtpClient) {
+    super(atpClient, 'GetUnreadCount', ToolAuthMode.PRIVATE);
+  }
+
+  protected async execute(): Promise<{ success: boolean; count: number }> {
+    try {
+      const response = await this.executeAtpOperation(async () => {
+        const agent = this.atpClient.getAgent();
+        return await agent.countUnreadNotifications();
+      }, 'countUnreadNotifications');
+      return { success: true, count: response.data.count };
+    } catch (error) {
+      this.logger.error('Failed to get unread notification count', error);
+      this.formatError(error);
     }
   }
 }

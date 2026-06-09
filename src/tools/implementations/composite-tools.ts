@@ -305,9 +305,19 @@ export class GetPostContextTool extends BaseTool {
       let thread: any | undefined;
       if (params.includeThread) {
         const parent = threadData.parent?.post ? toAtpPost(threadData.parent.post) : undefined;
-        const root = threadData.parent?.parent?.post
-          ? toAtpPost(threadData.parent.parent.post)
-          : parent;
+
+        // Walk the full parent chain: the true root is the topmost ancestor (not
+        // the grandparent), and depth is the number of ancestors (the thread view
+        // carries no `depth` field, so the old `threadData.depth || 0` was always 0).
+        let depth = 0;
+        let rootNode: any = threadData;
+        let ancestor: any = threadData.parent;
+        while (ancestor?.post) {
+          depth++;
+          rootNode = ancestor;
+          ancestor = ancestor.parent;
+        }
+        const root = rootNode.post ? toAtpPost(rootNode.post) : parent;
 
         const replies = (threadData.replies || [])
           .filter((r: any) => r.post)
@@ -317,7 +327,7 @@ export class GetPostContextTool extends BaseTool {
           parent,
           root,
           replies,
-          depth: threadData.depth || 0,
+          depth,
         };
       }
 

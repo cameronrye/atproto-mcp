@@ -239,8 +239,9 @@ vulnerability-reports/
 *.tmp
 *.temp
 
-# Lock files (keep package-lock.json and pnpm-lock.yaml for reproducible builds)
+# Lock files: this is a pnpm project (pnpm-lock.yaml is the source of truth).
+# Ignore npm/yarn lockfiles so an accidental `npm install` cannot commit a
+# conflicting lockfile that silently drops pnpm.overrides (the transitive-vuln
+# security pins). CI and the publish flow use `pnpm install --frozen-lockfile`.
 yarn.lock
-
-# Keep package-lock.json and pnpm-lock.yaml for reproducible builds
-# !package-lock.json
+package-lock.json

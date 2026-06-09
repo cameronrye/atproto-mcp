@@ -118,7 +118,7 @@ export class UploadImageTool extends BaseTool {
   public readonly schema = {
     method: 'upload_image',
     description:
-      'Upload an image file to AT Protocol for use in posts. Supports JPEG, PNG, GIF, and WebP formats.',
+      'Upload an image file to AT Protocol for use in posts. Supports JPEG, PNG, GIF, WebP, and AVIF formats.',
     params: UploadImageSchema,
   };
 
@@ -161,6 +161,7 @@ export class UploadImageTool extends BaseTool {
         '.png': 'image/png',
         '.gif': 'image/gif',
         '.webp': 'image/webp',
+        '.avif': 'image/avif',
       };
 
       const mimeType = mimeTypeMap[fileExtension];
@@ -522,6 +523,7 @@ export class CreateRichTextPostTool extends BaseTool {
       '.png': 'image/png',
       '.gif': 'image/gif',
       '.webp': 'image/webp',
+      '.avif': 'image/avif',
     };
     const mimeType = mimeTypeMap[ext];
     if (!mimeType) {

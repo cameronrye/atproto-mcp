@@ -46,6 +46,27 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
     expect(names).toContain('extract_media_from_post');
   });
 
+  it('advertises MCP safety annotations: destructive writes, read-only reads, open-world', async () => {
+    await connect();
+    const { tools } = await client.listTools();
+    const byName = new Map(tools.map(t => [t.name, t]));
+
+    // A destructive write is flagged so clients can gate auto-approval.
+    expect(byName.get('delete_post')?.annotations?.destructiveHint).toBe(true);
+    expect(byName.get('block_user')?.annotations?.destructiveHint).toBe(true);
+    expect(byName.get('unfollow_user')?.annotations?.destructiveHint).toBe(true);
+
+    // A pure read is flagged read-only and is NOT destructive.
+    expect(byName.get('get_timeline')?.annotations?.readOnlyHint).toBe(true);
+    expect(byName.get('get_timeline')?.annotations?.destructiveHint).toBeFalsy();
+
+    // Every tool talks to a live network → open-world.
+    expect(byName.get('create_post')?.annotations?.openWorldHint).toBe(true);
+    // A plain write is neither read-only nor destructive.
+    expect(byName.get('create_post')?.annotations?.readOnlyHint).toBeFalsy();
+    expect(byName.get('create_post')?.annotations?.destructiveHint).toBeFalsy();
+  });
+
   it('routes tools/call to an early-registered tool (not just the last one)', async () => {
     await connect();
     // get_user_profile is registered near the top of createTools(). With the
@@ -75,6 +96,18 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
         /invalid_literal|expected.*extract_media_from_post/i
       );
     }
+  });
+
+  it('emits structuredContent alongside the text result for a successful call', async () => {
+    await connect();
+    // get_streaming_status is PUBLIC and returns a status object with no network
+    // call, so it succeeds in unauthenticated mode.
+    const res = await client.callTool({ name: 'get_streaming_status', arguments: {} });
+    expect(res.isError).toBeFalsy();
+    expect(res.structuredContent).toBeDefined();
+    expect(typeof res.structuredContent).toBe('object');
+    // The text content remains for LLM consumption.
+    expect(Array.isArray(res.content)).toBe(true);
   });
 
   it('returns a clear error for an unknown tool name', async () => {

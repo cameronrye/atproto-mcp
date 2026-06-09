@@ -472,11 +472,15 @@ export class RecommendContentTool extends BaseTool {
         // Extract topics from post
         const postTopics = Array.from(this.extractTopics([post]));
 
-        // Check topic filter
+        // Check topic filter. Match each requested topic against BOTH the post's
+        // hashtags and its text body — most Bluesky posts have no hashtags, so a
+        // hashtag-only filter dropped the majority of genuinely on-topic posts.
         if (params.topics && params.topics.length > 0) {
-          const hasMatchingTopic = postTopics.some(topic =>
-            params.topics!.some(filter => topic.includes(filter.toLowerCase()))
-          );
+          const postText = (postData.record?.text || '').toLowerCase();
+          const hasMatchingTopic = params.topics.some(filter => {
+            const f = filter.toLowerCase();
+            return postTopics.some(topic => topic.includes(f)) || postText.includes(f);
+          });
           if (!hasMatchingTopic) continue;
         }
 
@@ -695,6 +699,35 @@ export class DiscoverCommunitiesTool extends BaseTool {
           const parentAuthor = (post as any).record.reply.parent.uri.split('/')[2];
           if (parentAuthor !== authorDid) {
             data.interactions.add(parentAuthor);
+          }
+        }
+      }
+
+      // Hydrate author profiles. Post authors are ProfileViewBasic and carry no
+      // followersCount, so without this every coreMember.followersCount and the
+      // avgFollowerCount metric would be a fabricated 0. getProfiles returns
+      // ProfileViewDetailed; we update each entry's profile in place (chunks of 25).
+      if (typeof agent.getProfiles === 'function') {
+        const dids = Array.from(authorEngagement.keys());
+        for (let i = 0; i < dids.length; i += 25) {
+          const chunk = dids.slice(i, i + 25);
+          try {
+            const resp = await this.executeAtpOperation(
+              async () => agent.getProfiles({ actors: chunk }),
+              'getProfiles',
+              { count: chunk.length }
+            );
+            for (const detailed of (resp.data.profiles as any[]) ?? []) {
+              const entry = authorEngagement.get(detailed.did);
+              if (entry) {
+                entry.profile = detailed;
+              }
+            }
+          } catch (error) {
+            this.logger.warn(
+              'Community member profile hydration failed for a chunk',
+              error as Error
+            );
           }
         }
       }

@@ -13,6 +13,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { UnlikePostTool } from '../tools/implementations/like-post-tool.js';
 import { UnrepostTool } from '../tools/implementations/repost-tool.js';
+import { UnfollowUserTool } from '../tools/implementations/follow-user-tool.js';
 import { DeletePostTool } from '../tools/implementations/content-management-tools.js';
 import { ValidationError } from '../types/index.js';
 import type { AtpClient } from '../utils/atp-client.js';
@@ -22,12 +23,14 @@ const SELF = 'did:plc:self';
 function mockClient() {
   const deleteLike = vi.fn().mockResolvedValue(undefined);
   const deleteRepost = vi.fn().mockResolvedValue(undefined);
+  const deleteFollow = vi.fn().mockResolvedValue(undefined);
   const deleteRecord = vi.fn().mockResolvedValue({ data: {} });
   const getRecord = vi.fn().mockResolvedValue({ data: { uri: '', cid: 'cid', value: {} } });
 
   const agent = {
     deleteLike,
     deleteRepost,
+    deleteFollow,
     com: { atproto: { repo: { deleteRecord, getRecord } } },
     session: { did: SELF },
   };
@@ -45,7 +48,7 @@ function mockClient() {
     }),
   } as unknown as AtpClient;
 
-  return { client, deleteLike, deleteRepost, deleteRecord, getRecord };
+  return { client, deleteLike, deleteRepost, deleteFollow, deleteRecord, getRecord };
 }
 
 describe('destructive-tool URI safety', () => {
@@ -97,6 +100,32 @@ describe('destructive-tool URI safety', () => {
       const result = await tool.handler({ repostUri });
 
       expect(deleteRepost).toHaveBeenCalledWith(repostUri);
+      expect(result.success).toBe(true);
+    });
+  });
+
+  describe('unfollow_user', () => {
+    it('refuses a URI whose collection is not app.bsky.graph.follow', async () => {
+      const { client, deleteFollow, deleteRecord } = mockClient();
+      const tool = new UnfollowUserTool(client);
+
+      await expect(
+        tool.handler({ followUri: `at://${SELF}/app.bsky.feed.post/abc` })
+      ).rejects.toBeInstanceOf(ValidationError);
+
+      expect(deleteFollow).not.toHaveBeenCalled();
+      expect(deleteRecord).not.toHaveBeenCalled();
+    });
+
+    it('deletes a genuine follow via the collection-pinned helper', async () => {
+      const { client, deleteFollow, deleteRecord } = mockClient();
+      const tool = new UnfollowUserTool(client);
+      const followUri = `at://${SELF}/app.bsky.graph.follow/abc`;
+
+      const result = await tool.handler({ followUri });
+
+      expect(deleteFollow).toHaveBeenCalledWith(followUri);
+      expect(deleteRecord).not.toHaveBeenCalled();
       expect(result.success).toBe(true);
     });
   });

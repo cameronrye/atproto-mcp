@@ -116,7 +116,7 @@ export class AnalyzeEngagementTool extends BaseTool {
         const post = feedItem.post;
         const text = post.record.text || '';
         const hashtags = this.extractHashtags(text);
-        const hasMedia = !!(post.embed?.images || post.embed?.video);
+        const hasMedia = this.embedHasMedia(post.embed);
         const hasLinks = this.hasLinks(text);
         const isReply = !!post.record.reply;
 
@@ -219,14 +219,16 @@ export class AnalyzeEngagementTool extends BaseTool {
         .sort((a, b) => b.avgEngagement - a.avgEngagement)
         .slice(0, 5);
 
-      // Determine optimal text length
+      // Determine optimal text length. Guard the empty case: Math.min()/Math.max()
+      // over an empty array return Infinity/-Infinity, which would leak into the
+      // response as nonsensical optimalTextLength on a feed with no posts.
       const sortedByEngagement = [...posts].sort((a, b) => b.totalEngagement - a.totalEngagement);
       const topPerformers = sortedByEngagement.slice(0, Math.ceil(posts.length * 0.2)); // Top 20%
       const textLengths = topPerformers.map(p => p.textLength);
-      const optimalTextLength = {
-        min: Math.min(...textLengths),
-        max: Math.max(...textLengths),
-      };
+      const optimalTextLength =
+        textLengths.length > 0
+          ? { min: Math.min(...textLengths), max: Math.max(...textLengths) }
+          : { min: 0, max: 0 };
 
       // Determine best performing type
       const replies = posts.filter(p => p.isReply);
@@ -308,6 +310,26 @@ export class AnalyzeEngagementTool extends BaseTool {
       this.logger.error('Failed to analyze engagement', error);
       this.formatError(error);
     }
+  }
+
+  /**
+   * Detect whether a post's embed VIEW carries media (images or video). The
+   * embed on a feed item is a #view (e.g. app.bsky.embed.video#view), so we must
+   * key off `$type` — the old check probed record-level property names that do
+   * not exist on the view, so it missed video and recordWithMedia entirely.
+   */
+  private embedHasMedia(embed: any): boolean {
+    const type = embed?.$type;
+    if (type === 'app.bsky.embed.images#view' || type === 'app.bsky.embed.video#view') {
+      return true;
+    }
+    if (type === 'app.bsky.embed.recordWithMedia#view') {
+      const mediaType = embed?.media?.$type;
+      return (
+        mediaType === 'app.bsky.embed.images#view' || mediaType === 'app.bsky.embed.video#view'
+      );
+    }
+    return false;
   }
 
   /**

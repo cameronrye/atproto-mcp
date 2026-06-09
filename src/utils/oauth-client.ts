@@ -159,8 +159,11 @@ export class AtpOAuthClient extends EventEmitter {
    * Refresh OAuth tokens
    */
   async refreshTokens(refreshToken: string): Promise<IOAuthSession> {
+    // Never log even a prefix of a token — 10 chars is meaningful entropy and the
+    // call always fails anyway. Log only presence, matching the [REDACTED]
+    // convention in redactConfigForLog.
     this.logger.info('OAuth token refresh requested', {
-      refreshToken: `${refreshToken.substring(0, 10)}...`,
+      hasRefreshToken: refreshToken.length > 0,
     });
     // Real token refresh is not implemented. Do NOT fabricate a refreshed session.
     throw new AuthenticationError(OAUTH_NOT_IMPLEMENTED);
@@ -170,8 +173,9 @@ export class AtpOAuthClient extends EventEmitter {
    * Revoke OAuth tokens
    */
   async revokeTokens(accessToken: string, refreshToken?: string): Promise<void> {
+    // Log only presence flags — never a token prefix (see refreshTokens above).
     this.logger.info('OAuth token revocation requested', {
-      accessToken: `${accessToken.substring(0, 10)}...`,
+      hasAccessToken: accessToken.length > 0,
       hasRefreshToken: !!refreshToken,
     });
     // Real token revocation is not implemented. Do NOT report success for a no-op.
