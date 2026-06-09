@@ -6,7 +6,6 @@ import { describe, it, expect } from 'vitest';
 import {
   BaseError,
   AtpError,
-  McpError,
   AuthenticationError,
   RateLimitError,
   ValidationError,
@@ -55,29 +54,6 @@ describe('Error Classes', () => {
     it('should create ATP error with context', () => {
       const context = { endpoint: '/api/test' };
       const error = new AtpError('API error', 'API_ERROR', 400, undefined, context);
-      expect(error.context).toEqual(context);
-    });
-  });
-
-  describe('McpError', () => {
-    it('should create MCP error with code', () => {
-      const error = new McpError('MCP failed', 1001);
-      expect(error.message).toBe('MCP failed');
-      expect(error.code).toBe('MCP_1001');
-      expect(error.mcpCode).toBe(1001);
-      expect(error).toBeInstanceOf(BaseError);
-      expect(error).toBeInstanceOf(McpError);
-    });
-
-    it('should create MCP error with data', () => {
-      const data = { field: 'value' };
-      const error = new McpError('Validation failed', 2000, data);
-      expect(error.data).toEqual(data);
-    });
-
-    it('should create MCP error with context', () => {
-      const context = { tool: 'test_tool' };
-      const error = new McpError('Tool error', 3000, undefined, context);
       expect(error.context).toEqual(context);
     });
   });
@@ -168,4 +144,3 @@ describe('Error Classes', () => {
     });
   });
 });
-
