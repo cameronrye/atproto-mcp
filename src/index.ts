@@ -51,6 +51,7 @@ const READ_ONLY_TOOLS = new Set<string>([
   'get_streaming_status',
   'get_thread',
   'get_timeline',
+  'get_unread_count',
   'get_user_profile',
   'get_user_summary',
   'recommend_content',

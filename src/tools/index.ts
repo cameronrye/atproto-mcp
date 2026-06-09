@@ -40,10 +40,12 @@ import {
   GetStreamingStatusTool,
   GetThreadTool,
   GetTimelineTool,
+  GetUnreadCountTool,
   GetUserProfileTool,
   GetUserSummaryTool,
   HandleOAuthCallbackTool,
   LikePostTool,
+  MarkNotificationsSeenTool,
   MonitorKeywordsTool,
   MuteUserTool,
   RecommendContentTool,
@@ -122,6 +124,8 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new GetFollowersTool(atpClient),
     () => new GetFollowsTool(atpClient),
     () => new GetNotificationsTool(atpClient),
+    () => new GetUnreadCountTool(atpClient),
+    () => new MarkNotificationsSeenTool(atpClient),
 
     // Content management
     () => new DeletePostTool(atpClient),

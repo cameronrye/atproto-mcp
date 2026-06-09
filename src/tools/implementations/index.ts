@@ -21,7 +21,13 @@ export { GetUserProfileTool } from './get-user-profile-tool.js';
 // Data retrieval
 export { SearchPostsTool } from './search-posts-tool.js';
 export { GetTimelineTool } from './timeline-tools.js';
-export { GetFollowersTool, GetFollowsTool, GetNotificationsTool } from './social-graph-tools.js';
+export {
+  GetFollowersTool,
+  GetFollowsTool,
+  GetNotificationsTool,
+  GetUnreadCountTool,
+  MarkNotificationsSeenTool,
+} from './social-graph-tools.js';
 
 // Content management
 export { DeletePostTool, UpdateProfileTool } from './content-management-tools.js';
