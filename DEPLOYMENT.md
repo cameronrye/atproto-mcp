@@ -172,9 +172,8 @@ docker run -i --rm \
 The `-i` flag keeps stdin open so the MCP client can drive the server over
 stdio. There is intentionally no `-p 3000:3000` mapping.
 
-> [!NOTE] The Dockerfile contains an `EXPOSE 3000` line. It is **vestigial and
-> misleading** — the server binds no port and exposes no HTTP endpoint. It can
-> be ignored.
+> [!NOTE] The Dockerfile intentionally has **no `EXPOSE`** directive — the
+> server communicates over stdio, binds no port, and exposes no HTTP endpoint.
 
 ### Using the container from an MCP client
 
@@ -289,9 +288,9 @@ make the following possible (none of which exist yet):
   reverse proxy and proper CORS configuration.
 - Horizontal scaling behind a load balancer.
 
-Until that transport ships, ignore any reference (in older docs, the Dockerfile
-`EXPOSE`, or reserved `--port`/`--host` flags) implying an HTTP server, bound
-port, or `/health` HTTP endpoint.
+Until that transport ships, ignore any reference (in older docs or reserved
+`--port`/`--host` flags) implying an HTTP server, bound port, or `/health` HTTP
+endpoint.
 
 ## Support
 

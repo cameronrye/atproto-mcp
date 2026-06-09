@@ -138,7 +138,6 @@
       "glob": ">=11.1.0",
       "rollup": ">=4.59.0",
       "flatted": ">=3.4.2",
-      "@isaacs/brace-expansion": ">=5.0.1",
       "preact": ">=10.27.3",
       "uuid": ">=11.1.1"
     }
