@@ -190,4 +190,3 @@ describe('NotificationsResource', () => {
     });
   });
 });
-

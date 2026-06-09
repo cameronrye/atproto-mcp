@@ -35,14 +35,6 @@
     "verbatimModuleSyntax": true,
     "baseUrl": "./src"
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "docs",
-    "**/*.test.ts",
-    "**/*.spec.ts"
-  ]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "docs", "**/*.test.ts", "**/*.spec.ts"]
 }
