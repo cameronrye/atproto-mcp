@@ -203,31 +203,42 @@ export class AnalyzeNetworkTool extends BaseTool {
    * Hydrate a sample of ProfileView entries (which lack followersCount) into
    * ProfileViewDetailed via getProfiles, so ranking/scoring uses real counts.
    *
-   * getProfiles accepts up to 25 actors per call; we hydrate the first 25 of the
-   * sample (one call) to keep cost bounded. Falls back to the raw entries if
+   * getProfiles accepts up to 25 actors per call, so we hydrate the WHOLE sample
+   * in ceil(n/25) calls — previously only the first 25 were hydrated, so the most
+   * influential follower/follow beyond index 25 was invisible to the ranking even
+   * though maxSampleSize advertises up to 100. Falls back to the raw entries if
    * getProfiles is unavailable, so callers still get a best-effort result.
    */
   private async hydrateProfiles(agent: any, sample: any[]): Promise<any[]> {
-    const chunk = sample.slice(0, 25);
-    const dids = chunk.map(p => p.did).filter(Boolean);
-    if (dids.length === 0 || typeof agent.getProfiles !== 'function') {
-      return chunk;
+    if (sample.length === 0 || typeof agent.getProfiles !== 'function') {
+      return sample;
     }
-    try {
-      const resp = await this.executeAtpOperation(
-        async () => agent.getProfiles({ actors: dids }),
-        'getProfiles',
-        { count: dids.length }
-      );
-      const byDid = new Map<string, any>();
-      for (const profile of (resp.data.profiles as any[]) ?? []) {
-        byDid.set(profile.did, profile);
+    const byDid = new Map<string, any>();
+    for (let i = 0; i < sample.length; i += 25) {
+      const dids = sample
+        .slice(i, i + 25)
+        .map(p => p.did)
+        .filter(Boolean);
+      if (dids.length === 0) {
+        continue;
       }
-      return chunk.map(p => byDid.get(p.did) ?? p);
-    } catch (error) {
-      this.logger.warn('Profile hydration failed; ranking on unhydrated sample', error as Error);
-      return chunk;
+      try {
+        const resp = await this.executeAtpOperation(
+          async () => agent.getProfiles({ actors: dids }),
+          'getProfiles',
+          { count: dids.length }
+        );
+        for (const profile of (resp.data.profiles as any[]) ?? []) {
+          byDid.set(profile.did, profile);
+        }
+      } catch (error) {
+        this.logger.warn(
+          'Profile hydration failed for a chunk; ranking partially unhydrated',
+          error as Error
+        );
+      }
     }
+    return sample.map(p => byDid.get(p.did) ?? p);
   }
 
   /**

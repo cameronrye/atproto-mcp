@@ -132,6 +132,5 @@ export default tseslint.config(
       'no-useless-escape': 'error',
       'sort-imports': ['error', { ignoreDeclarationSort: true }],
     },
-  },
+  }
 );
-

@@ -1,0 +1,14 @@
+# Build output and generated artifacts
+dist/
+coverage/
+.vitest/
+
+# Lockfiles and generated files (never hand/tool-format these)
+pnpm-lock.yaml
+CHANGELOG.md
+
+# Docs are built by VitePress; prettier mangles ::: container blocks
+docs/
+
+# Workflow and template files are managed separately (SHA-pinned, security-sensitive)
+.github/

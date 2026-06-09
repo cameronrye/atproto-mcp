@@ -6,7 +6,7 @@ We release patches for security vulnerabilities in the following versions:
 
 | Version | Supported |
 | ------- | --------- |
-| 0.2.x   | Yes       |
+| 0.3.x   | Yes       |
 
 ## Reporting a Vulnerability
 

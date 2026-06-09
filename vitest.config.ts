@@ -33,6 +33,23 @@ export default defineConfig({
         functions: 67,
         lines: 59,
         statements: 59,
+        // Per-file floors for security-critical code. The global ratchet can't
+        // protect these files because they contribute little to the global
+        // percentage, so a regression in the SSRF guard or the shared tool base
+        // would not move the global number. These are no-regression floors pinned
+        // just under current real coverage; raise them as targeted tests land.
+        'src/utils/url-safety.ts': {
+          branches: 48,
+          functions: 45,
+          lines: 50,
+          statements: 48,
+        },
+        'src/tools/implementations/base-tool.ts': {
+          branches: 72,
+          functions: 88,
+          lines: 82,
+          statements: 82,
+        },
       },
     },
     setupFiles: ['./src/test/setup.ts'],

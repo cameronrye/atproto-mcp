@@ -26,7 +26,7 @@ const itemsToClean = [
   'dist',
   'coverage',
   '.vitest',
-  '.turbo'
+  '.turbo',
 ];
 
 async function cleanAll() {
@@ -37,7 +37,7 @@ async function cleanAll() {
 
   for (const item of itemsToClean) {
     const itemPath = join(rootDir, item);
-    
+
     if (existsSync(itemPath)) {
       try {
         console.log(chalk.yellow(`  Removing ${item}...`));
@@ -59,7 +59,11 @@ async function cleanAll() {
 
   if (cleaned > 0) {
     console.log(chalk.yellow('💡 Next steps:'));
-    console.log(chalk.gray(`   Run ${chalk.cyan('npm install')} or ${chalk.cyan('pnpm install')} to reinstall dependencies\n`));
+    console.log(
+      chalk.gray(
+        `   Run ${chalk.cyan('npm install')} or ${chalk.cyan('pnpm install')} to reinstall dependencies\n`
+      )
+    );
   }
 }
 
@@ -67,4 +71,3 @@ cleanAll().catch(error => {
   console.error(chalk.red('\n❌ Error during cleanup:'), error);
   process.exit(1);
 });
-

@@ -13,7 +13,11 @@ import { type ATURI, type CID, type IRepostParams, ValidationError } from '../..
 const RepostSchema = z.object({
   uri: z.string().min(1, 'Post URI is required'),
   cid: z.string().min(1, 'Post CID is required'),
-  text: z.string().max(300, 'Quote text cannot exceed 300 characters').optional(),
+  // Coarse cap; the real 300-grapheme / 3000-byte limit is enforced in buildRichText.
+  text: z
+    .string()
+    .max(3000, 'Quote text is too long (limit is 300 graphemes / 3000 bytes)')
+    .optional(),
 });
 
 /**
@@ -45,6 +49,7 @@ export class RepostTool extends BaseTool {
       cid: CID;
     };
     isQuotePost: boolean;
+    alreadyReposted: boolean;
   }> {
     try {
       this.logger.info('Creating repost', {
@@ -60,6 +65,31 @@ export class RepostTool extends BaseTool {
 
       // Check if this is a quote post or simple repost
       const isQuotePost = params.text != null && params.text !== '';
+
+      // Idempotency: a simple repost is a no-op if the post is already reposted.
+      // An LLM that retries on timeout must not create a duplicate repost record.
+      // (Quote posts are genuine new posts, so they are never deduplicated.)
+      if (!isQuotePost) {
+        const existingRepost = await this.checkExistingRepost(params.uri);
+        if (existingRepost) {
+          this.logger.info('Post is already reposted; skipping duplicate', {
+            postUri: params.uri,
+            repostUri: existingRepost.uri,
+          });
+          return {
+            uri: existingRepost.uri as ATURI,
+            cid: existingRepost.cid as CID,
+            success: true,
+            message: 'Post is already reposted',
+            repostedPost: {
+              uri: params.uri,
+              cid: params.cid,
+            },
+            isQuotePost: false,
+            alreadyReposted: true,
+          };
+        }
+      }
 
       let response;
 
@@ -97,10 +127,34 @@ export class RepostTool extends BaseTool {
           cid: params.cid,
         },
         isQuotePost,
+        alreadyReposted: false,
       };
     } catch (error) {
       this.logger.error('Failed to create repost', error);
       this.formatError(error);
+    }
+  }
+
+  /**
+   * Return the authoritative existing repost for a post (viewer.repost), or null.
+   * Uses getPosts so there is no 100-record scan limit, mirroring BatchRepostTool.
+   */
+  private async checkExistingRepost(postUri: string): Promise<{ uri: string; cid: string } | null> {
+    try {
+      const response = await this.executeAtpOperation(
+        async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.getPosts({ uris: [postUri] });
+        },
+        'getPostViewerState',
+        { postUri }
+      );
+      const repostUri = response.data.posts[0]?.viewer?.repost;
+      return repostUri ? { uri: repostUri, cid: '' } : null;
+    } catch (error) {
+      // A failed viewer-state lookup must not block the repost; fall through to create.
+      this.logger.warn('Could not check for existing repost', error);
+      return null;
     }
   }
 

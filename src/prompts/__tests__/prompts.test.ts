@@ -138,6 +138,3 @@ describe('ReplyTemplatePrompt', () => {
     });
   });
 });
-
-
-

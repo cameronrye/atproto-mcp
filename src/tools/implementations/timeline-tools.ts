@@ -13,7 +13,12 @@ import type { IAtpPost, IGetTimelineParams } from '../../types/index.js';
 const GetTimelineSchema = z.object({
   algorithm: z.string().optional(),
   limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
 });
 
 /**

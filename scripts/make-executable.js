@@ -22,7 +22,7 @@ async function makeExecutable() {
   }
 
   const cliPath = join(__dirname, '..', 'dist', 'cli.js');
-  
+
   try {
     await chmod(cliPath, 0o755);
     console.log(`Made ${cliPath} executable`);
@@ -33,4 +33,3 @@ async function makeExecutable() {
 }
 
 makeExecutable();
-

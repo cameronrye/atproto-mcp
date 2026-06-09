@@ -397,8 +397,15 @@ export class AtpClient {
   }
 
   /**
-   * Execute a request with automatic retry and error handling
-   * Supports both authenticated and unauthenticated operations
+   * Execute a request with bounded rate-limit retry and error normalization.
+   * Supports both authenticated and unauthenticated operations.
+   *
+   * Retry policy: only HTTP 429 (rate limit) is retried, honoring the server's
+   * `retry-after` header (capped at MAX_RETRY_WAIT_MS; longer waits fail fast so
+   * the caller can decide). 429 means the request was rejected before being
+   * applied, so retrying is safe for both reads and writes. Other failures
+   * (5xx, network) are NOT auto-retried, because the operation is generic and a
+   * blind retry could double-apply a write.
    */
   public async executeRequest<T>(
     operation: () => Promise<T>,
@@ -424,7 +431,7 @@ export class AtpClient {
         }
       }
 
-      const result = await operation();
+      const result = await this.runWithRateLimitRetry(operation, context);
       return { success: true, data: result };
     } catch (error) {
       return { success: false, error: this.handleError(error, context) };
@@ -439,10 +446,65 @@ export class AtpClient {
     context?: Record<string, unknown>
   ): Promise<Result<T, AtpError>> {
     try {
-      const result = await operation();
+      const result = await this.runWithRateLimitRetry(operation, context);
       return { success: true, data: result };
     } catch (error) {
       return { success: false, error: this.handleError(error, context) };
+    }
+  }
+
+  /**
+   * Maximum number of rate-limit retries and the longest single wait we will
+   * block a tool call for. A retry-after longer than the cap fails fast.
+   */
+  private static readonly MAX_RATE_LIMIT_RETRIES = 2;
+  private static readonly MAX_RETRY_WAIT_MS = 10_000;
+
+  /**
+   * If `error` is a 429, return how long to wait before retrying (ms), or null
+   * to fail fast (non-429, malformed/negative retry-after, or a wait beyond the
+   * cap). A 429 without a retry-after header uses a short default backoff.
+   */
+  private rateLimitWaitMs(error: unknown): number | null {
+    if (typeof error === 'object' && error !== null) {
+      const e = error as { status?: number; headers?: Record<string, string> };
+      if (e.status === 429) {
+        const header = e.headers?.['retry-after'];
+        if (header != null) {
+          const secs = parseInt(String(header), 10);
+          if (!Number.isFinite(secs) || secs < 0) {
+            return null;
+          }
+          const ms = secs * 1000;
+          return ms <= AtpClient.MAX_RETRY_WAIT_MS ? ms : null;
+        }
+        return 1000;
+      }
+    }
+    return null;
+  }
+
+  private async runWithRateLimitRetry<T>(
+    operation: () => Promise<T>,
+    context?: Record<string, unknown>
+  ): Promise<T> {
+    let attempt = 0;
+    for (;;) {
+      try {
+        return await operation();
+      } catch (error) {
+        const waitMs = this.rateLimitWaitMs(error);
+        if (waitMs === null || attempt >= AtpClient.MAX_RATE_LIMIT_RETRIES) {
+          throw error;
+        }
+        attempt++;
+        this.logger.warn('Rate limited by the PDS; backing off before retry', {
+          ...context,
+          attempt,
+          waitMs,
+        });
+        await new Promise(resolve => setTimeout(resolve, waitMs));
+      }
     }
   }
 
@@ -470,14 +532,37 @@ export class AtpClient {
     if (typeof error === 'object' && error !== null) {
       const errorObj = error as any;
 
+      // The XRPC lexicon error NAME (e.g. "DuplicateRecord", "BlockedActor") is
+      // the one field that lets the LLM react correctly — it distinguishes "you
+      // already did this" from a malformed request. The server surfaces only the
+      // error `.message` to the caller, so thread the name INTO the message.
+      const lexiconName =
+        typeof errorObj.error === 'string' && errorObj.error.length > 0
+          ? errorObj.error
+          : undefined;
+      const rawMessage =
+        typeof errorObj.message === 'string' && errorObj.message.length > 0
+          ? errorObj.message
+          : undefined;
+      const describe = (fallback: string): string => {
+        const base = rawMessage ?? fallback;
+        return lexiconName != null && !base.includes(lexiconName)
+          ? `${lexiconName}: ${base}`
+          : base;
+      };
+
       if (errorObj.status === 401) {
-        return new AuthenticationError('Authentication required or invalid', errorObj, context);
+        return new AuthenticationError(
+          describe('Authentication required or invalid'),
+          errorObj,
+          context
+        );
       }
 
       if (errorObj.status === 429) {
         const retryAfter = errorObj.headers?.['retry-after'];
         return new RateLimitError(
-          'Rate limit exceeded',
+          describe('Rate limit exceeded'),
           retryAfter ? parseInt(retryAfter, 10) : undefined,
           context
         );
@@ -489,12 +574,7 @@ export class AtpClient {
       // into "fixing" arguments that were correct. Preserve the status and a
       // meaningful code instead.
       if (errorObj.status === 400 || errorObj.status === 422) {
-        return new ValidationError(
-          errorObj.message || 'Invalid request',
-          undefined,
-          errorObj,
-          context
-        );
+        return new ValidationError(describe('Invalid request'), undefined, errorObj, context);
       }
 
       if (errorObj.status >= 400 && errorObj.status < 500) {
@@ -504,8 +584,8 @@ export class AtpClient {
           409: 'CONFLICT',
         };
         return new AtpError(
-          errorObj.message || `Request failed with status ${errorObj.status}`,
-          codeByStatus[errorObj.status] ?? 'CLIENT_ERROR',
+          describe(`Request failed with status ${errorObj.status}`),
+          lexiconName ?? codeByStatus[errorObj.status] ?? 'CLIENT_ERROR',
           errorObj.status,
           errorObj,
           context

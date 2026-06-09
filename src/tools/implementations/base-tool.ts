@@ -241,6 +241,22 @@ export abstract class BaseTool implements IMcpTool {
     text: string
   ): Promise<{ text: string; facets?: RichText['facets'] }> {
     const rt = new RichText({ text });
+
+    // AT Protocol limits post text to 300 GRAPHEMES and 3000 UTF-8 BYTES. Enforce
+    // on graphemes (not String.length / UTF-16 code units) so an emoji-heavy post
+    // — e.g. 300 emoji = 600 code units but only 300 graphemes — is not falsely
+    // rejected, and so the 3000-byte cap is actually checked.
+    if (rt.graphemeLength > 300) {
+      throw new ValidationError(
+        `Post text is ${rt.graphemeLength} graphemes; the maximum is 300.`,
+        'text'
+      );
+    }
+    const byteLength = Buffer.byteLength(rt.text, 'utf8');
+    if (byteLength > 3000) {
+      throw new ValidationError(`Post text is ${byteLength} bytes; the maximum is 3000.`, 'text');
+    }
+
     try {
       await rt.detectFacets(this.atpClient.getAgent());
     } catch (error) {

@@ -5,7 +5,13 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { ATURI, CID, DID, IFollowUserParams } from '../../types/index.js';
+import {
+  type ATURI,
+  type CID,
+  type DID,
+  type IFollowUserParams,
+  ValidationError,
+} from '../../types/index.js';
 
 /**
  * Zod schema for follow user parameters
@@ -190,27 +196,26 @@ export class UnfollowUserTool extends BaseTool {
         followUri: params.followUri,
       });
 
-      // Validate the follow URI
+      // Validate the follow URI and pin the collection: the URI is untrusted, so
+      // we must NOT delete whatever record type it happens to name. A crafted URI
+      // such as at://<self-did>/app.bsky.feed.post/<rkey> would otherwise delete
+      // that post instead of a follow.
       this.validateAtUri(params.followUri);
+      const { collection } = this.parseAtUri(params.followUri);
+      if (collection !== 'app.bsky.graph.follow') {
+        throw new ValidationError(
+          `followUri must reference a follow record (collection "${collection}" is not app.bsky.graph.follow)`,
+          'followUri',
+          params.followUri
+        );
+      }
 
-      // Delete the follow record
+      // Delete the follow record via the SDK helper, which pins the collection to
+      // app.bsky.graph.follow and the repo to the authenticated user's own DID.
       await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          const uriParts = params.followUri.replace('at://', '').split('/');
-          const did = uriParts[0];
-          const collection = uriParts[1];
-          const rkey = uriParts[2];
-
-          if (!did || !collection || !rkey) {
-            throw new Error(`Invalid AT URI format: ${params.followUri}`);
-          }
-
-          return await agent.com.atproto.repo.deleteRecord({
-            repo: did,
-            collection,
-            rkey,
-          });
+          return await agent.deleteFollow(params.followUri);
         },
         'deleteFollow',
         { followUri: params.followUri }

@@ -372,17 +372,6 @@ export class AtpError extends BaseError {
   }
 }
 
-export class McpError extends BaseError {
-  constructor(
-    message: string,
-    public readonly mcpCode: number,
-    public readonly data?: unknown,
-    context?: Record<string, unknown>
-  ) {
-    super(message, `MCP_${mcpCode}`, context);
-  }
-}
-
 export class AuthenticationError extends AtpError {
   constructor(message: string, details?: unknown, context?: Record<string, unknown>) {
     super(message, 'AUTHENTICATION_FAILED', 401, details, context);

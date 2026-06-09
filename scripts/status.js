@@ -79,7 +79,7 @@ async function showStatus() {
 
   // Development Tools
   console.log(chalk.yellow('\nDevelopment Tools:'));
-  
+
   const gitInstalled = await checkCommand('git');
   if (gitInstalled) {
     console.log(`  Git:         ${chalk.green(getVersion('git --version'))} ${chalk.green('✓')}`);
@@ -89,7 +89,9 @@ async function showStatus() {
 
   const dockerInstalled = await checkCommand('docker');
   if (dockerInstalled) {
-    console.log(`  Docker:      ${chalk.green(getVersion('docker --version'))} ${chalk.green('✓')}`);
+    console.log(
+      `  Docker:      ${chalk.green(getVersion('docker --version'))} ${chalk.green('✓')}`
+    );
   } else {
     console.log(`  Docker:      ${chalk.gray('Not installed (optional)')}`);
   }
@@ -97,14 +99,16 @@ async function showStatus() {
   // Available Scripts
   console.log(chalk.yellow('\nAvailable Scripts:'));
   const mainScripts = ['dev', 'build', 'test', 'lint', 'format', 'check', 'clean'];
-  
+
   for (const script of mainScripts) {
     if (packageJson.scripts[script]) {
       console.log(`  ${chalk.cyan(script.padEnd(12))} ${chalk.gray(packageJson.scripts[script])}`);
     }
   }
 
-  console.log(chalk.gray(`\n  ... and ${Object.keys(packageJson.scripts).length - mainScripts.length} more`));
+  console.log(
+    chalk.gray(`\n  ... and ${Object.keys(packageJson.scripts).length - mainScripts.length} more`)
+  );
   console.log(chalk.gray(`  Run ${chalk.cyan('npm run help')} to see all available scripts\n`));
 
   // Recommendations
@@ -113,7 +117,9 @@ async function showStatus() {
     console.log(chalk.red('  • Install a package manager (npm or pnpm)'));
   } else if (!pnpmInstalled) {
     console.log(chalk.yellow('💡 Tip:'));
-    console.log(`  • This project uses pnpm. Install it with: ${chalk.cyan('npm install -g pnpm')}`);
+    console.log(
+      `  • This project uses pnpm. Install it with: ${chalk.cyan('npm install -g pnpm')}`
+    );
   }
 
   if (!gitInstalled) {
@@ -125,4 +131,3 @@ async function showStatus() {
 }
 
 showStatus();
-
