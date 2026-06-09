@@ -97,6 +97,18 @@ export class Logger {
   }
 
   /**
+   * Sanitize a multi-line stack trace for logging. Unlike single-line fields, a
+   * stack legitimately spans multiple lines, so newlines and tabs are kept while
+   * other control chars (incl. CR) are stripped — the stack's first line echoes
+   * the (attacker-influenceable) error message, so a raw CR/control char there
+   * could otherwise forge extra log lines.
+   */
+  private sanitizeStack(stack: string): string {
+    // eslint-disable-next-line no-control-regex
+    return stack.replace(/\r/g, '').replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '');
+  }
+
+  /**
    * Format log entry for output
    */
   private formatLogEntry(entry: ILogEntry): string {
@@ -116,7 +128,7 @@ export class Logger {
     if (entry.error) {
       formatted += `\n  Error: ${this.sanitizeForLog(entry.error.message)}`;
       if (entry.error.stack) {
-        formatted += `\n  Stack: ${entry.error.stack}`;
+        formatted += `\n  Stack: ${this.sanitizeStack(entry.error.stack)}`;
       }
     }
 

@@ -30,6 +30,10 @@ const createMockAtpClient = () => {
         },
       },
     })),
+    // batch_like/batch_repost fetch the post view (CID + viewer state) in one call.
+    getPosts: vi.fn().mockImplementation(async ({ uris }: { uris: string[] }) => ({
+      data: { posts: uris.map((uri: string) => ({ uri, cid: 'cid123', viewer: {} })) },
+    })),
     com: {
       atproto: {
         repo: {
@@ -183,19 +187,15 @@ describe('BatchLikeTool', () => {
 
   it('should handle invalid URIs', async () => {
     const agent = mockClient.getAgent();
-    // Mock getRecord to fail for the second URI
-    agent.com.atproto.repo.getRecord
+    // The post lookup succeeds for the first URI and returns no post for the
+    // second (not found), so that item fails.
+    agent.getPosts
       .mockResolvedValueOnce({
         data: {
-          uri: 'at://did:plc:user1/app.bsky.feed.post/1',
-          cid: 'cid123',
-          value: {
-            text: 'Test post',
-            createdAt: new Date().toISOString(),
-          },
+          posts: [{ uri: 'at://did:plc:user1/app.bsky.feed.post/1', cid: 'cid123', viewer: {} }],
         },
       })
-      .mockRejectedValueOnce(new Error('Post not found'));
+      .mockResolvedValueOnce({ data: { posts: [] } });
 
     const result = await tool.handler({
       uris: [

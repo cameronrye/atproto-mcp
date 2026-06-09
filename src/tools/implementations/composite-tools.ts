@@ -8,6 +8,33 @@ import type { AtpClient } from '../../utils/atp-client.js';
 import type { IAtpPost, IAtpProfile } from '../../types/index.js';
 
 /**
+ * Map a post view to the internal IAtpPost shape (record passed through as-is).
+ * Shared by the composite tools so they don't each carry an identical copy.
+ */
+function toAtpPost(post: any): IAtpPost {
+  return {
+    uri: post.uri,
+    cid: post.cid,
+    author: {
+      did: post.author.did,
+      handle: post.author.handle,
+      displayName: post.author.displayName,
+      avatar: post.author.avatar,
+      description: post.author.description,
+      followersCount: post.author.followersCount,
+      followsCount: post.author.followsCount,
+      postsCount: post.author.postsCount,
+    },
+    record: post.record,
+    replyCount: post.replyCount,
+    repostCount: post.repostCount,
+    likeCount: post.likeCount,
+    indexedAt: post.indexedAt,
+    ...(post.viewer && { viewer: post.viewer }),
+  };
+}
+
+/**
  * Zod schema for get user summary parameters
  */
 const GetUserSummarySchema = z.object({
@@ -122,7 +149,7 @@ export class GetUserSummaryTool extends BaseTool {
           { actor: params.actor, limit: params.postLimit }
         );
 
-        const posts = feedResponse.data.feed.map((item: any) => this.transformPost(item.post));
+        const posts = feedResponse.data.feed.map((item: any) => toAtpPost(item.post));
 
         if (params.includeRecentPosts) {
           recentPosts = posts;
@@ -180,32 +207,6 @@ export class GetUserSummaryTool extends BaseTool {
       this.logger.error('Failed to get user summary', error);
       this.formatError(error);
     }
-  }
-
-  /**
-   * Transform post data to internal interface
-   */
-  private transformPost(post: any): IAtpPost {
-    return {
-      uri: post.uri,
-      cid: post.cid,
-      author: {
-        did: post.author.did,
-        handle: post.author.handle,
-        displayName: post.author.displayName,
-        avatar: post.author.avatar,
-        description: post.author.description,
-        followersCount: post.author.followersCount,
-        followsCount: post.author.followsCount,
-        postsCount: post.author.postsCount,
-      },
-      record: post.record,
-      replyCount: post.replyCount,
-      repostCount: post.repostCount,
-      likeCount: post.likeCount,
-      indexedAt: post.indexedAt,
-      ...(post.viewer && { viewer: post.viewer }),
-    };
   }
 }
 
@@ -298,21 +299,19 @@ export class GetPostContextTool extends BaseTool {
         throw new Error('Post not found or blocked');
       }
 
-      const post = this.transformPost(threadData.post);
+      const post = toAtpPost(threadData.post);
 
       // Extract thread information
       let thread: any | undefined;
       if (params.includeThread) {
-        const parent = threadData.parent?.post
-          ? this.transformPost(threadData.parent.post)
-          : undefined;
+        const parent = threadData.parent?.post ? toAtpPost(threadData.parent.post) : undefined;
         const root = threadData.parent?.parent?.post
-          ? this.transformPost(threadData.parent.parent.post)
+          ? toAtpPost(threadData.parent.parent.post)
           : parent;
 
         const replies = (threadData.replies || [])
           .filter((r: any) => r.post)
-          .map((r: any) => this.transformPost(r.post));
+          .map((r: any) => toAtpPost(r.post));
 
         thread = {
           parent,
@@ -377,31 +376,5 @@ export class GetPostContextTool extends BaseTool {
       this.logger.error('Failed to get post context', error);
       this.formatError(error);
     }
-  }
-
-  /**
-   * Transform post data to internal interface
-   */
-  private transformPost(post: any): IAtpPost {
-    return {
-      uri: post.uri,
-      cid: post.cid,
-      author: {
-        did: post.author.did,
-        handle: post.author.handle,
-        displayName: post.author.displayName,
-        avatar: post.author.avatar,
-        description: post.author.description,
-        followersCount: post.author.followersCount,
-        followsCount: post.author.followsCount,
-        postsCount: post.author.postsCount,
-      },
-      record: post.record,
-      replyCount: post.replyCount,
-      repostCount: post.repostCount,
-      likeCount: post.likeCount,
-      indexedAt: post.indexedAt,
-      ...(post.viewer && { viewer: post.viewer }),
-    };
   }
 }

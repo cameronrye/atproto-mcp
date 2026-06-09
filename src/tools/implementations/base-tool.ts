@@ -354,12 +354,36 @@ export abstract class BaseTool implements IMcpTool {
     return await this.executeAtpOperation(
       async () => {
         const agent = this.atpClient.getAgent();
-        const response = await agent.uploadBlob(blob, { encoding: blob.type });
+        // A Blob with no type yields an empty encoding (invalid Content-Type);
+        // fall back to a generic binary type so the upload is well-formed.
+        const encoding = blob.type || 'application/octet-stream';
+        const response = await agent.uploadBlob(blob, { encoding });
         return response.data;
       },
       'uploadBlob',
       { blobSize: blob.size, blobType: blob.type }
     );
+  }
+
+  /**
+   * Fetch a single post view (app.bsky.feed.getPosts) for the given AT-URI. The
+   * returned view carries both the post CID and the caller's viewer state
+   * (like/repost), so callers that need both can do it in one round-trip rather
+   * than a separate getRecord + getPosts. Returns undefined if the post is not
+   * found.
+   */
+  protected async getPostView(
+    uri: string
+  ): Promise<{ cid?: string; viewer?: { like?: string; repost?: string } } | undefined> {
+    const response = await this.executeAtpOperation(
+      async () => {
+        const agent = this.atpClient.getAgent();
+        return await agent.getPosts({ uris: [uri] });
+      },
+      'getPosts',
+      { uri }
+    );
+    return response.data.posts[0];
   }
 
   /**

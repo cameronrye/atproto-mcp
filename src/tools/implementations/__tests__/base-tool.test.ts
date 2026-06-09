@@ -183,6 +183,27 @@ describe('BaseTool', () => {
     });
   });
 
+  describe('uploadBlob encoding', () => {
+    it('defaults the encoding when the blob has no MIME type', async () => {
+      const uploadBlob = vi.fn().mockResolvedValue({ data: { blob: { ref: 'x' } } });
+      const client = {
+        isAuthenticated: vi.fn().mockReturnValue(true),
+        hasCredentials: vi.fn().mockReturnValue(true),
+        getAgent: vi.fn().mockReturnValue({ uploadBlob }),
+        executeAuthenticatedRequest: vi
+          .fn()
+          .mockImplementation(async (op: () => unknown) => ({ success: true, data: await op() })),
+      } as unknown as AtpClient;
+      const tool = new TestTool(client);
+      const blob = new Blob(['data'], { type: '' });
+
+      await tool['uploadBlob'](blob);
+
+      // An empty encoding produces an invalid/empty Content-Type; default it.
+      expect(uploadBlob).toHaveBeenCalledWith(blob, { encoding: 'application/octet-stream' });
+    });
+  });
+
   describe('getCidFromUri error propagation', () => {
     it('preserves a typed error (RateLimitError) instead of collapsing it to a generic Error', async () => {
       const rateLimited = {
