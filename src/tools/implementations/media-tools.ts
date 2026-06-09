@@ -5,6 +5,7 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
+import { ValidationError } from '../../types/index.js';
 import { readFile } from 'fs/promises';
 import { extname } from 'path';
 import { assertSafePath, safeFetch } from '../../utils/url-safety.js';
@@ -401,32 +402,45 @@ export class CreateRichTextPostTool extends BaseTool {
         createdAt: new Date().toISOString(),
       };
 
-      // Add facets if provided
+      // Add facets if provided. Caller-supplied facets are UNTRUSTED: validate the
+      // byte range against the text's UTF-8 length (a bad range silently links the
+      // wrong substring or is rejected by the PDS), and resolve mention handles to
+      // DIDs (a mention facet must carry a DID, not a handle).
       if (params.facets && params.facets.length > 0) {
-        postRecord.facets = params.facets.map(facet => ({
-          index: facet.index,
-          features: facet.features.map(feature => {
+        const textByteLength = Buffer.byteLength(params.text, 'utf8');
+        const builtFacets = [];
+        for (const facet of params.facets) {
+          const { byteStart, byteEnd } = facet.index;
+          if (byteStart >= byteEnd || byteEnd > textByteLength) {
+            throw new ValidationError(
+              `Invalid facet byte range [${byteStart}, ${byteEnd}); must satisfy ` +
+                `byteStart < byteEnd <= ${textByteLength} (the text's UTF-8 byte length).`,
+              'facets'
+            );
+          }
+          const features = [];
+          for (const feature of facet.features) {
             switch (feature.type) {
-              case 'mention':
-                return {
-                  $type: 'app.bsky.richtext.facet#mention',
-                  did: feature.value,
-                };
+              case 'mention': {
+                const did = feature.value.startsWith('did:')
+                  ? feature.value
+                  : await this.resolveDid(feature.value);
+                features.push({ $type: 'app.bsky.richtext.facet#mention', did });
+                break;
+              }
               case 'link':
-                return {
-                  $type: 'app.bsky.richtext.facet#link',
-                  uri: feature.value,
-                };
+                features.push({ $type: 'app.bsky.richtext.facet#link', uri: feature.value });
+                break;
               case 'hashtag':
-                return {
-                  $type: 'app.bsky.richtext.facet#tag',
-                  tag: feature.value,
-                };
+                features.push({ $type: 'app.bsky.richtext.facet#tag', tag: feature.value });
+                break;
               default:
-                return feature;
+                features.push(feature);
             }
-          }),
-        }));
+          }
+          builtFacets.push({ index: facet.index, features });
+        }
+        postRecord.facets = builtFacets;
       }
 
       // Add embed if provided. Image/thumbnail blobs MUST be real uploaded
