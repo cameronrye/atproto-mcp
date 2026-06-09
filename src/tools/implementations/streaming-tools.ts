@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import {
   FIREHOSE_DECODING_IMPLEMENTED,
@@ -178,7 +178,7 @@ export class StartStreamingTool extends BaseTool {
         firehoseStatus: {
           connected: StartStreamingTool.firehoseClient.isConnected(),
           lastSeq: StartStreamingTool.firehoseClient.getLastSeq(),
-          subscriptionCount: (StartStreamingTool.firehoseClient as any).subscriptions?.size || 0,
+          subscriptionCount: StartStreamingTool.firehoseClient.getSubscriptionCount(),
         },
       };
     } catch (error) {
@@ -196,7 +196,7 @@ export class StopStreamingTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'StopStreaming');
+    super(atpClient, 'StopStreaming', ToolAuthMode.PUBLIC);
   }
 
   protected async execute(params: { subscriptionId: string }): Promise<{
@@ -254,7 +254,7 @@ export class GetStreamingStatusTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetStreamingStatus');
+    super(atpClient, 'GetStreamingStatus', ToolAuthMode.PUBLIC);
   }
 
   protected async execute(): Promise<{
@@ -283,7 +283,7 @@ export class GetStreamingStatusTool extends BaseTool {
       const firehoseStatus = {
         connected: StartStreamingTool.firehoseClient?.isConnected() || false,
         lastSeq: StartStreamingTool.firehoseClient?.getLastSeq() || null,
-        subscriptionCount: (StartStreamingTool.firehoseClient as any)?.subscriptions?.size || 0,
+        subscriptionCount: StartStreamingTool.firehoseClient?.getSubscriptionCount() ?? 0,
       };
 
       const recentEvents = StartStreamingTool.eventBuffer.slice(-10).map(event => ({
@@ -324,7 +324,7 @@ export class GetRecentEventsTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetRecentEvents');
+    super(atpClient, 'GetRecentEvents', ToolAuthMode.PUBLIC);
   }
 
   protected async execute(params: { limit?: number; collection?: string }): Promise<{
@@ -401,7 +401,7 @@ export class MonitorKeywordsTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'MonitorKeywords');
+    super(atpClient, 'MonitorKeywords', ToolAuthMode.PUBLIC);
   }
 
   protected async execute(params: {
@@ -531,7 +531,7 @@ export class TrackUsersTool extends BaseTool {
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'TrackUsers');
+    super(atpClient, 'TrackUsers', ToolAuthMode.PUBLIC);
   }
 
   protected async execute(params: {
