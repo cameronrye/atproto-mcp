@@ -24,7 +24,7 @@ This means there are only two supported deployment shapes today:
 
 ## Prerequisites
 
-- Node.js 20+ (the published runtime target; CI tests Node 20, 21, and 22)
+- Node.js 20+ (the published runtime target; CI tests Node 20, 22, and 24)
 - An MCP-compatible client (e.g. Claude Desktop)
 - (Optional) An AT Protocol account with an **app password** for authenticated
   tools — without it, only public/enhanced tools such as `get_user_profile`,
