@@ -45,6 +45,7 @@ export class RepostTool extends BaseTool {
       cid: CID;
     };
     isQuotePost: boolean;
+    alreadyReposted: boolean;
   }> {
     try {
       this.logger.info('Creating repost', {
@@ -60,6 +61,31 @@ export class RepostTool extends BaseTool {
 
       // Check if this is a quote post or simple repost
       const isQuotePost = params.text != null && params.text !== '';
+
+      // Idempotency: a simple repost is a no-op if the post is already reposted.
+      // An LLM that retries on timeout must not create a duplicate repost record.
+      // (Quote posts are genuine new posts, so they are never deduplicated.)
+      if (!isQuotePost) {
+        const existingRepost = await this.checkExistingRepost(params.uri);
+        if (existingRepost) {
+          this.logger.info('Post is already reposted; skipping duplicate', {
+            postUri: params.uri,
+            repostUri: existingRepost.uri,
+          });
+          return {
+            uri: existingRepost.uri as ATURI,
+            cid: existingRepost.cid as CID,
+            success: true,
+            message: 'Post is already reposted',
+            repostedPost: {
+              uri: params.uri,
+              cid: params.cid,
+            },
+            isQuotePost: false,
+            alreadyReposted: true,
+          };
+        }
+      }
 
       let response;
 
@@ -97,10 +123,34 @@ export class RepostTool extends BaseTool {
           cid: params.cid,
         },
         isQuotePost,
+        alreadyReposted: false,
       };
     } catch (error) {
       this.logger.error('Failed to create repost', error);
       this.formatError(error);
+    }
+  }
+
+  /**
+   * Return the authoritative existing repost for a post (viewer.repost), or null.
+   * Uses getPosts so there is no 100-record scan limit, mirroring BatchRepostTool.
+   */
+  private async checkExistingRepost(postUri: string): Promise<{ uri: string; cid: string } | null> {
+    try {
+      const response = await this.executeAtpOperation(
+        async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.getPosts({ uris: [postUri] });
+        },
+        'getPostViewerState',
+        { postUri }
+      );
+      const repostUri = response.data.posts[0]?.viewer?.repost;
+      return repostUri ? { uri: repostUri, cid: '' } : null;
+    } catch (error) {
+      // A failed viewer-state lookup must not block the repost; fall through to create.
+      this.logger.warn('Could not check for existing repost', error);
+      return null;
     }
   }
 

@@ -85,23 +85,25 @@ export class CreateThreadTool extends BaseTool {
       cid: CID;
     };
     totalPosts: number;
+    failedAtPosition?: number;
   }> {
+    const createdPosts: Array<{
+      uri: ATURI;
+      cid: CID;
+      text: string;
+      position: number;
+      isRoot: boolean;
+    }> = [];
+
+    let rootUri: ATURI | null = null;
+    let rootCid: CID | null = null;
+
     try {
       this.logger.info('Creating thread', {
         postCount: params.posts.length,
         totalCharacters: params.posts.reduce((sum, p) => sum + p.text.length, 0),
       });
 
-      const createdPosts: Array<{
-        uri: ATURI;
-        cid: CID;
-        text: string;
-        position: number;
-        isRoot: boolean;
-      }> = [];
-
-      let rootUri: ATURI | null = null;
-      let rootCid: CID | null = null;
       let previousUri: ATURI | null = null;
       let previousCid: CID | null = null;
 
@@ -210,6 +212,27 @@ export class CreateThreadTool extends BaseTool {
         totalPosts: createdPosts.length,
       };
     } catch (error) {
+      // If some posts were already published, they are LIVE on the network. Return
+      // them (with the failing position) so the caller can delete or resume rather
+      // than retrying and creating a second partial thread. Only a clean failure
+      // (nothing created yet) propagates as an error.
+      if (createdPosts.length > 0 && rootUri && rootCid) {
+        this.logger.error('Thread partially created; returning created posts for recovery', error, {
+          createdCount: createdPosts.length,
+          createdUris: createdPosts.map(p => p.uri),
+        });
+        return {
+          success: false,
+          message:
+            `Thread partially created: ${createdPosts.length} of ${params.posts.length} ` +
+            `posts were published before an error occurred. Use the returned thread URIs ` +
+            `to delete the partial thread or resume from the failed position.`,
+          thread: createdPosts,
+          rootPost: { uri: rootUri, cid: rootCid },
+          totalPosts: createdPosts.length,
+          failedAtPosition: createdPosts.length + 1,
+        };
+      }
       this.logger.error('Failed to create thread', error);
       this.formatError(error);
     }

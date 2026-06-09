@@ -699,6 +699,35 @@ export class DiscoverCommunitiesTool extends BaseTool {
         }
       }
 
+      // Hydrate author profiles. Post authors are ProfileViewBasic and carry no
+      // followersCount, so without this every coreMember.followersCount and the
+      // avgFollowerCount metric would be a fabricated 0. getProfiles returns
+      // ProfileViewDetailed; we update each entry's profile in place (chunks of 25).
+      if (typeof agent.getProfiles === 'function') {
+        const dids = Array.from(authorEngagement.keys());
+        for (let i = 0; i < dids.length; i += 25) {
+          const chunk = dids.slice(i, i + 25);
+          try {
+            const resp = await this.executeAtpOperation(
+              async () => agent.getProfiles({ actors: chunk }),
+              'getProfiles',
+              { count: chunk.length }
+            );
+            for (const detailed of (resp.data.profiles as any[]) ?? []) {
+              const entry = authorEngagement.get(detailed.did);
+              if (entry) {
+                entry.profile = detailed;
+              }
+            }
+          } catch (error) {
+            this.logger.warn(
+              'Community member profile hydration failed for a chunk',
+              error as Error
+            );
+          }
+        }
+      }
+
       // Filter authors by minimum activity
       const activeAuthors = Array.from(authorEngagement.entries())
         .filter(([_, data]) => data.postCount >= 1)

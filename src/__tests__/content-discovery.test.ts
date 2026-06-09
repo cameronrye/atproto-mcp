@@ -316,8 +316,8 @@ describe('DiscoverCommunitiesTool', () => {
     if (result.communities.length > 0) {
       const community = result.communities[0];
       expect(community.topic).toBeDefined();
-      expect(community.keyUsers).toBeDefined();
-      expect(Array.isArray(community.keyUsers)).toBe(true);
+      expect(community.coreMembers).toBeDefined();
+      expect(Array.isArray(community.coreMembers)).toBe(true);
     }
   });
 
