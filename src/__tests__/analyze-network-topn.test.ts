@@ -25,11 +25,9 @@ function mockClient() {
 
   const agent = {
     session: { did: SELF },
-    getProfile: vi
-      .fn()
-      .mockResolvedValue({
-        data: { did: SELF, handle: 'self.test', followersCount: 30, followsCount: 0 },
-      }),
+    getProfile: vi.fn().mockResolvedValue({
+      data: { did: SELF, handle: 'self.test', followersCount: 30, followsCount: 0 },
+    }),
     getFollowers: vi.fn().mockResolvedValue({ data: { followers } }),
     getFollows: vi.fn().mockResolvedValue({ data: { follows: [] } }),
     getProfiles: vi.fn().mockImplementation(async ({ actors }: { actors: string[] }) => ({
