@@ -17,12 +17,78 @@ import { ConfigurationError, type IMcpServerConfig, ValidationError } from './ty
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
-import { type IMcpTool, createTools } from './tools/index.js';
+import { type IMcpTool, type IToolAnnotations, createTools } from './tools/index.js';
 import { StartStreamingTool } from './tools/implementations/streaming-tools.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
 import { type IPerformanceMetrics, PerformanceMonitor } from './utils/performance.js';
 import { type ISecurityConfig, SecurityManager } from './utils/security.js';
+
+/**
+ * Pure read tools (no writes to the network). readOnlyHint:true lets clients
+ * auto-approve them. Curated explicitly per tool — NOT derived from auth mode,
+ * which encodes auth requirement, not destructiveness.
+ */
+const READ_ONLY_TOOLS = new Set<string>([
+  'analyze_engagement',
+  'analyze_image',
+  'analyze_moderation_status',
+  'analyze_network',
+  'discover_communities',
+  'discover_trending',
+  'extract_media_from_post',
+  'find_influential_users',
+  'find_similar_users',
+  'generate_alt_text',
+  'generate_link_preview',
+  'get_custom_feed',
+  'get_followers',
+  'get_follows',
+  'get_list',
+  'get_notifications',
+  'get_post_context',
+  'get_recent_events',
+  'get_streaming_status',
+  'get_thread',
+  'get_timeline',
+  'get_user_profile',
+  'get_user_summary',
+  'recommend_content',
+  'search_posts',
+  'suggest_content_strategy',
+]);
+
+/**
+ * Tools whose effect is irreversible or removes/limits data (deletes, blocks,
+ * mutes, reports, removals, token revocation). destructiveHint:true lets clients
+ * surface confirmation UI and withhold auto-approval.
+ */
+const DESTRUCTIVE_TOOLS = new Set<string>([
+  'block_user',
+  'delete_post',
+  'mute_user',
+  'remove_from_list',
+  'report_content',
+  'report_user',
+  'revoke_oauth_tokens',
+  'unfollow_user',
+  'unlike_post',
+  'unrepost',
+]);
+
+/**
+ * Build the advertised annotations for a tool. openWorldHint is true for every
+ * tool (they all reach a live network). A per-tool `schema.annotations` override
+ * wins over these defaults.
+ */
+function computeToolAnnotations(method: string, override?: IToolAnnotations): IToolAnnotations {
+  return {
+    openWorldHint: true,
+    ...(READ_ONLY_TOOLS.has(method) ? { readOnlyHint: true } : {}),
+    ...(DESTRUCTIVE_TOOLS.has(method) ? { destructiveHint: true } : {}),
+    ...(override ?? {}),
+  };
+}
 
 /**
  * Main server class for AT Protocol MCP Server
@@ -144,6 +210,7 @@ export class AtpMcpServer {
           inputSchema: tool.schema.params
             ? this.zodToJsonSchema(tool.schema.params)
             : { type: 'object', properties: {} },
+          annotations: computeToolAnnotations(tool.schema.method, tool.schema.annotations),
         })),
       })
     );
@@ -220,34 +287,25 @@ export class AtpMcpServer {
         try {
           const result = await tool.handler(request.params.arguments || {});
 
-          // DESIGN DECISION: Return results as formatted JSON text for LLM consumption
+          // Return BOTH representations:
           //
-          // This server intentionally returns all tool results as stringified JSON text
-          // rather than using MCP's structured content types. This is a deliberate
-          // architectural choice with the following rationale:
+          // - content[].text: pretty-printed JSON, optimized for LLM consumption.
+          //   LLMs parse formatted JSON text effectively and it is universally
+          //   supported across all MCP clients, so it stays the primary channel.
           //
-          // 1. Consistency: All tools return the same format, making it easier for LLMs
-          //    to parse and understand responses without needing to handle multiple
-          //    content type variations.
+          // - structuredContent: the same result as a machine-readable object, for
+          //   non-LLM consumers and tool-chaining clients that would otherwise have
+          //   to re-parse the pretty-printed string. SDK structuredContent must be a
+          //   JSON object, so bare arrays/primitives are wrapped under `result`.
           //
-          // 2. Readability: Pretty-printed JSON (with 2-space indentation) is optimized
-          //    for LLM token processing and human readability during debugging.
-          //
-          // 3. Compatibility: Text content is universally supported across all MCP clients,
-          //    ensuring maximum compatibility without client-specific handling.
-          //
-          // 4. Debugging: Formatted JSON makes it easier to debug and inspect responses
-          //    in logs and during development.
-          //
-          // 5. LLM Processing: LLMs are highly effective at parsing JSON text and can
-          //    extract structured information from formatted JSON strings.
-          //
-          // Alternative Approach: MCP supports structured content types (e.g., JSON objects,
-          // arrays, etc.) which could be used instead. However, testing has shown that
-          // stringified JSON provides better results for LLM clients in practice.
-          //
-          // If you need structured content types for programmatic processing, consider
-          // parsing the JSON text in your client application.
+          // NOTE: we intentionally do NOT declare per-tool `outputSchema` — doing so
+          // makes the SDK REQUIRE and validate structuredContent on every call and
+          // throw on any non-conforming object. structuredContent here is additive
+          // and best-effort.
+          const structuredContent =
+            result != null && typeof result === 'object' && !Array.isArray(result)
+              ? (result as Record<string, unknown>)
+              : { result };
           return {
             content: [
               {
@@ -255,6 +313,7 @@ export class AtpMcpServer {
                 text: JSON.stringify(result, null, 2),
               },
             ],
+            structuredContent,
           };
         } catch (error) {
           this.logger.error(`Tool ${toolName} execution failed`, error);

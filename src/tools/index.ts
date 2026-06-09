@@ -78,8 +78,21 @@ export interface IMcpTool {
     method: string;
     description: string;
     params?: z.ZodSchema;
+    annotations?: IToolAnnotations;
   };
   handler: (params: any) => Promise<any>;
+}
+
+/**
+ * MCP tool annotations (advisory hints, per the MCP spec). Clients MUST NOT trust
+ * these for security, but use them to gate auto-approval and confirmation UI.
+ */
+export interface IToolAnnotations {
+  title?: string;
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
 }
 
 /**

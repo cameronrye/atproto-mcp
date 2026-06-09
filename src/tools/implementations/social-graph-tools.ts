@@ -19,7 +19,12 @@ import type {
 const GetFollowersSchema = z.object({
   actor: z.string().min(1, 'Actor (DID or handle) is required'),
   limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
 });
 
 /**
@@ -28,7 +33,12 @@ const GetFollowersSchema = z.object({
 const GetFollowsSchema = z.object({
   actor: z.string().min(1, 'Actor (DID or handle) is required'),
   limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
 });
 
 /**
@@ -36,7 +46,12 @@ const GetFollowsSchema = z.object({
  */
 const GetNotificationsSchema = z.object({
   limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
   seenAt: z.string().optional(),
 });
 

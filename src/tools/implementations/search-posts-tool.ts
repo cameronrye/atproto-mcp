@@ -16,7 +16,12 @@ const SearchPostsSchema = z.object({
     .min(1, 'Search query is required')
     .max(300, 'Search query cannot exceed 300 characters'),
   limit: z.number().int().min(1).max(100).optional().default(25),
-  cursor: z.string().optional(),
+  cursor: z
+    .string()
+    .optional()
+    .describe(
+      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
+    ),
   sort: z.enum(['top', 'latest']).optional().default('latest'),
   since: z.string().optional(),
   until: z.string().optional(),
