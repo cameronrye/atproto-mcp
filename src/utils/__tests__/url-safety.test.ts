@@ -83,6 +83,18 @@ describe('parseSafeHttpUrl', () => {
       );
     }
   });
+
+  it('rejects decimal/hex-encoded loopback that WHATWG-URL normalizes to a dotted IP', () => {
+    // The WHATWG URL parser normalizes these to 127.0.0.1, so parseSafeHttpUrl's
+    // literal-IP check catches them. Asserting this directly (not just via
+    // safeFetch) locks the normalization behavior so a future refactor that stops
+    // using `new URL()` cannot silently reopen the bypass.
+    for (const url of ['http://2130706433/', 'http://0x7f000001/', 'http://0177.0.0.1/']) {
+      expect(() => parseSafeHttpUrl(url), `${url} should be rejected`).toThrow(
+        /private|internal|blocked/i
+      );
+    }
+  });
 });
 
 describe('assertSafePath', () => {
@@ -135,8 +147,10 @@ describe('safeFetch SSRF rejection', () => {
       'http://10.0.0.1/',
       'http://169.254.169.254/latest/meta-data/', // cloud metadata endpoint
       'http://[::1]/',
-      'http://0177.0.0.1/', // octal-obfuscated loopback
-      'http://2130706433/', // decimal-obfuscated loopback
+      // These are normalized to 127.0.0.1 by the WHATWG URL parser and rejected
+      // by parseSafeHttpUrl's literal-IP check (they never reach DNS resolution).
+      'http://0177.0.0.1/', // octal form of 127.0.0.1
+      'http://2130706433/', // decimal form of 127.0.0.1
     ]) {
       await expect(safeFetch(url), `should reject ${url}`).rejects.toThrow();
     }
