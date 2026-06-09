@@ -33,8 +33,8 @@
     "type-check": "tsc --noEmit",
     "clean": "rimraf dist coverage .vitest",
     "clean:all": "node scripts/clean-all.js",
-    "check": "npm run lint && npm run format:check && npm run type-check && npm run test",
-    "ci": "npm install && npm run check && npm run build",
+    "check": "pnpm run lint && pnpm run format:check && pnpm run type-check && pnpm run test",
+    "ci": "pnpm install --frozen-lockfile && pnpm run check && pnpm run build",
     "prepare": "husky",
     "prepublishOnly": "npm run clean && npm run build && vitest run",
     "docs:dev": "vitepress dev docs",
@@ -42,7 +42,7 @@
     "docs:preview": "vitepress preview docs",
     "help": "node scripts/help.js",
     "status": "node scripts/status.js",
-    "deps:update": "npm update",
+    "deps:update": "pnpm update",
     "deps:audit": "npm audit"
   },
   "keywords": [
