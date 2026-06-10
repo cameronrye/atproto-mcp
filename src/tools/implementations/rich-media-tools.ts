@@ -184,7 +184,7 @@ export class AnalyzeImageTool extends BaseTool {
     }
 
     // Accessibility suggestions
-    suggestions.push('Always include alt text for accessibility - use generate_alt_text tool');
+    suggestions.push('Always include alt text for accessibility when uploading images');
 
     // General best practices
     if (suggestions.length === 1) {

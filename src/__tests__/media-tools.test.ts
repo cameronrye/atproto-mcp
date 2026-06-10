@@ -4,7 +4,6 @@
  * These lock the on-the-wire shapes produced by:
  * - UploadImageTool       (src/tools/implementations/media-tools.ts)
  * - CreateRichTextPostTool(src/tools/implementations/media-tools.ts)
- * - GenerateAltTextTool   (src/tools/implementations/generate-alt-text-tool.ts)
  * - ExtractMediaFromPostTool (src/tools/implementations/rich-media-tools.ts)
  *
  * The path-based tools read real files under mediaBaseDir() (ATPROTO_MEDIA_DIR
@@ -19,7 +18,6 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { CreateRichTextPostTool, UploadImageTool } from '../tools/implementations/media-tools.js';
-import { GenerateAltTextTool } from '../tools/implementations/generate-alt-text-tool.js';
 import { ExtractMediaFromPostTool } from '../tools/implementations/rich-media-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
@@ -203,48 +201,6 @@ describe('CreateRichTextPostTool', () => {
       $type: 'app.bsky.embed.record',
       record: { uri: 'at://did:plc:other/app.bsky.feed.post/x', cid: 'cidx' },
     });
-  });
-});
-
-describe('GenerateAltTextTool', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('returns guidance (no network) including dos/donts and incorporates context', async () => {
-    // PUBLIC tool: works even when unauthenticated, never touches the agent.
-    const client = makeClient({}, { authenticated: false });
-    const tool = new GenerateAltTextTool(client);
-
-    const result = await tool.handler({
-      imageUrl: 'https://example.com/cat.jpg',
-      context: 'a cat on a sofa',
-    });
-
-    expect(result.success).toBe(true);
-    expect(typeof result.altText).toBe('string');
-    expect(result.altText.length).toBeGreaterThan(0);
-    expect(result.guidelines.dos.length).toBeGreaterThan(0);
-    expect(result.guidelines.donts.length).toBeGreaterThan(0);
-    // The provided context is echoed into the suggestions.
-    expect(result.suggestions.some((s: string) => s.includes('a cat on a sofa'))).toBe(true);
-    // It never calls the agent (no vision model wired in).
-    expect(client.getAgent as any).not.toHaveBeenCalled();
-  });
-
-  it('truncates altText to the requested maxLength', async () => {
-    const client = makeClient({}, { authenticated: false });
-    const tool = new GenerateAltTextTool(client);
-
-    const result = await tool.handler({ imageUrl: 'https://example.com/x.jpg', maxLength: 20 });
-
-    expect(result.altText.length).toBeLessThanOrEqual(20);
-    expect(result.altText.endsWith('...')).toBe(true);
-  });
-
-  it('rejects when neither imageUrl nor imageData is provided (zod refine)', async () => {
-    const client = makeClient({}, { authenticated: false });
-    const tool = new GenerateAltTextTool(client);
-
-    await expect(tool.handler({ context: 'no image here' })).rejects.toThrow();
   });
 });
 

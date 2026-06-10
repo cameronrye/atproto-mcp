@@ -28,7 +28,6 @@ import {
   FindInfluentialUsersTool,
   FindSimilarUsersTool,
   FollowUserTool,
-  GenerateAltTextTool,
   GenerateLinkPreviewTool,
   GetCustomFeedTool,
   GetFollowersTool,
@@ -36,32 +35,22 @@ import {
   GetListTool,
   GetNotificationsTool,
   GetPostContextTool,
-  GetRecentEventsTool,
-  GetStreamingStatusTool,
   GetThreadTool,
   GetTimelineTool,
   GetUnreadCountTool,
   GetUserProfileTool,
   GetUserSummaryTool,
-  HandleOAuthCallbackTool,
   LikePostTool,
   MarkNotificationsSeenTool,
-  MonitorKeywordsTool,
   MuteUserTool,
   RecommendContentTool,
-  RefreshOAuthTokensTool,
   RemoveFromListTool,
   ReplyToPostTool,
   ReportContentTool,
   ReportUserTool,
   RepostTool,
-  RevokeOAuthTokensTool,
   SearchPostsTool,
-  StartOAuthFlowTool,
-  StartStreamingTool,
-  StopStreamingTool,
   SuggestContentStrategyTool,
-  TrackUsersTool,
   UnblockUserTool,
   UnfollowUserTool,
   UnlikePostTool,
@@ -131,12 +120,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new DeletePostTool(atpClient),
     () => new UpdateProfileTool(atpClient),
 
-    // OAuth authentication
-    () => new StartOAuthFlowTool(atpClient),
-    () => new HandleOAuthCallbackTool(atpClient),
-    () => new RefreshOAuthTokensTool(atpClient),
-    () => new RevokeOAuthTokensTool(atpClient),
-
     // Content moderation
     () => new MuteUserTool(atpClient),
     () => new UnmuteUserTool(atpClient),
@@ -145,14 +128,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new ReportContentTool(atpClient),
     () => new ReportUserTool(atpClient),
     () => new AnalyzeModerationStatusTool(atpClient),
-
-    // Real-time streaming
-    () => new StartStreamingTool(atpClient),
-    () => new StopStreamingTool(atpClient),
-    () => new GetStreamingStatusTool(atpClient),
-    () => new GetRecentEventsTool(atpClient),
-    () => new MonitorKeywordsTool(atpClient),
-    () => new TrackUsersTool(atpClient),
 
     // Advanced social features
     () => new CreateListTool(atpClient),
@@ -167,7 +142,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new UploadVideoTool(atpClient),
     () => new CreateRichTextPostTool(atpClient),
     () => new GenerateLinkPreviewTool(atpClient),
-    () => new GenerateAltTextTool(atpClient),
 
     // Analytics and insights
     () => new AnalyzeEngagementTool(atpClient),

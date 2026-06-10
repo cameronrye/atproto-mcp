@@ -100,9 +100,15 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
 
   it('emits structuredContent alongside the text result for a successful call', async () => {
     await connect();
-    // get_streaming_status is PUBLIC and returns a status object with no network
-    // call, so it succeeds in unauthenticated mode.
-    const res = await client.callTool({ name: 'get_streaming_status', arguments: {} });
+    // analyze_image is PUBLIC and performs no network call — it only inspects the
+    // blob metadata supplied inline, so it succeeds in unauthenticated mode.
+    const res = await client.callTool({
+      name: 'analyze_image',
+      arguments: {
+        blob: { ref: { $link: 'bafkreitest' }, mimeType: 'image/jpeg', size: 102400 },
+        includeOptimizationSuggestions: false,
+      },
+    });
     expect(res.isError).toBeFalsy();
     expect(res.structuredContent).toBeDefined();
     expect(typeof res.structuredContent).toBe('object');

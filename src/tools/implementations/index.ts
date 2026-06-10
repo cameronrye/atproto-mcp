@@ -32,14 +32,6 @@ export {
 // Content management
 export { DeletePostTool, UpdateProfileTool } from './content-management-tools.js';
 
-// OAuth authentication
-export {
-  StartOAuthFlowTool,
-  HandleOAuthCallbackTool,
-  RefreshOAuthTokensTool,
-  RevokeOAuthTokensTool,
-} from './oauth-tools.js';
-
 // Content moderation
 export {
   MuteUserTool,
@@ -50,16 +42,6 @@ export {
   ReportUserTool,
   AnalyzeModerationStatusTool,
 } from './moderation-tools.js';
-
-// Real-time streaming
-export {
-  StartStreamingTool,
-  StopStreamingTool,
-  GetStreamingStatusTool,
-  GetRecentEventsTool,
-  MonitorKeywordsTool,
-  TrackUsersTool,
-} from './streaming-tools.js';
 
 // Advanced social features
 export {
@@ -78,7 +60,6 @@ export {
   CreateRichTextPostTool,
   GenerateLinkPreviewTool,
 } from './media-tools.js';
-export { GenerateAltTextTool } from './generate-alt-text-tool.js';
 
 // Analytics and insights
 export { AnalyzeEngagementTool } from './analyze-engagement-tool.js';

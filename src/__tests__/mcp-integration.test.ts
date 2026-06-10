@@ -196,7 +196,6 @@ describe('MCP Integration Tests', () => {
 
       // Check for tools that should always be available (public/enhanced mode)
       expect(toolNames).toContain('get_user_profile'); // ENHANCED mode
-      expect(toolNames).toContain('start_oauth_flow'); // PUBLIC mode
 
       // Note: search_posts, create_post, like_post, follow_user are PRIVATE mode tools that may be filtered out
       // due to authentication mocking complexities in the test environment

@@ -18,7 +18,6 @@ import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
 import { type IMcpTool, type IToolAnnotations, createTools } from './tools/index.js';
-import { StartStreamingTool } from './tools/implementations/streaming-tools.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
 import { type IPerformanceMetrics, PerformanceMonitor } from './utils/performance.js';
@@ -39,7 +38,6 @@ const READ_ONLY_TOOLS = new Set<string>([
   'extract_media_from_post',
   'find_influential_users',
   'find_similar_users',
-  'generate_alt_text',
   'generate_link_preview',
   'get_custom_feed',
   'get_followers',
@@ -47,8 +45,6 @@ const READ_ONLY_TOOLS = new Set<string>([
   'get_list',
   'get_notifications',
   'get_post_context',
-  'get_recent_events',
-  'get_streaming_status',
   'get_thread',
   'get_timeline',
   'get_unread_count',
@@ -71,7 +67,6 @@ const DESTRUCTIVE_TOOLS = new Set<string>([
   'remove_from_list',
   'report_content',
   'report_user',
-  'revoke_oauth_tokens',
   'unfollow_user',
   'unlike_post',
   'unrepost',
@@ -616,10 +611,6 @@ export class AtpMcpServer {
 
       // Release security manager background timers (rate-limiter cleanup).
       this.securityManager.destroy();
-
-      // Disconnect the shared firehose client (if a streaming tool opened one)
-      // so its socket and heartbeat timer do not outlive the server.
-      await StartStreamingTool.shutdown();
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }
