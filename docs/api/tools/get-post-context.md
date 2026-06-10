@@ -1,7 +1,10 @@
 # get_post_context
 
-Get post with thread, author, and engagement data. Combines post details, thread
-context, author profile, and engagement metrics in a single call.
+Get post with thread, author, engagement, and media data. Combines post details,
+thread context, author profile, engagement metrics, and extracted media in a
+single call. This is the single post reader — it replaces the former `get_thread`
+and `extract_media_from_post` tools (use the `include*` flags below to control
+what is returned).
 
 ## Authentication
 
@@ -10,12 +13,15 @@ data when authenticated.
 
 ## Parameters
 
-| Parameter              | Type      | Required | Default | Description                                             |
-| ---------------------- | --------- | -------- | ------- | ------------------------------------------------------- |
-| `uri`                  | `string`  | Yes      | -       | AT-URI of the post to get context for.                  |
-| `includeThread`        | `boolean` | No       | `true`  | Whether to include thread context (parent and replies). |
-| `includeAuthorProfile` | `boolean` | No       | `true`  | Whether to include detailed author profile.             |
-| `includeEngagement`    | `boolean` | No       | `true`  | Whether to calculate engagement metrics.                |
+| Parameter              | Type      | Required | Default | Description                                                                                      |
+| ---------------------- | --------- | -------- | ------- | ------------------------------------------------------------------------------------------------ |
+| `uri`                  | `string`  | Yes      | -       | AT-URI of the post to get context for.                                                           |
+| `includeThread`        | `boolean` | No       | `true`  | Whether to include thread context (parent chain, root, and replies).                             |
+| `includeAuthorProfile` | `boolean` | No       | `true`  | Whether to include detailed author profile.                                                      |
+| `includeEngagement`    | `boolean` | No       | `true`  | Whether to calculate engagement metrics.                                                         |
+| `depth`                | `number`  | No       | `6`     | How many levels of replies to fetch (0-10).                                                       |
+| `parentHeight`         | `number`  | No       | `80`    | How many parent posts up the chain to fetch (0-80).                                               |
+| `includeMedia`         | `boolean` | No       | `false` | Extract media embeds (images, videos, external links, quote posts) from the post.                |
 
 ## Response
 
@@ -76,8 +82,18 @@ illustrative.
     engagementRate: number;
     ageHours: number;
   };
+  media?: {
+    images: Array<{ uri: string; alt?: string; aspectRatio?: any; thumb?: string }>;
+    videos: Array<{ uri: string; alt?: string; aspectRatio?: any; thumbnail?: string }>;
+    externalLinks: Array<{ uri: string; title?: string; description?: string; thumb?: string }>;
+    quotePosts: Array<{ uri: string; cid: string }>;
+  };
 }
 ```
+
+The `media` object is present only when `includeMedia` is `true`. It handles the
+AppView `#view` embed shapes — images, video, external link cards, record (quote
+post), and `recordWithMedia` (quote post plus attached media).
 
 ## Examples
 
@@ -109,6 +125,33 @@ illustrative.
 {
   "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz1",
   "includeThread": false
+}
+```
+
+### Extract Media from a Post
+
+Replaces the former `extract_media_from_post` tool — set `includeMedia: true`
+(and disable the other sections if you only want media):
+
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz1",
+  "includeThread": false,
+  "includeAuthorProfile": false,
+  "includeEngagement": false,
+  "includeMedia": true
+}
+```
+
+### Deeper Thread
+
+Pull more of the reply tree and parent chain:
+
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz1",
+  "depth": 10,
+  "parentHeight": 80
 }
 ```
 
@@ -171,7 +214,6 @@ may issue multiple AT Protocol requests (`getPostThread`, plus `getProfile` when
 
 ## Related Tools
 
-- **[get_thread](./get-thread.md)** - Get detailed thread structure
 - **[get_user_profile](./get-user-profile.md)** - Get author profile
 - **[reply_to_post](./reply-to-post.md)** - Reply to a post
 - **[like_post](./like-post.md)** - Like a post

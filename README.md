@@ -35,10 +35,13 @@ direct access to the AT Protocol ecosystem, enabling seamless interaction with
 Bluesky and other AT Protocol-based social networks.
 
 **Supports both authenticated and unauthenticated modes** - Start immediately
-with public data access (view profiles, fetch follower/following lists), or add
-authentication for full functionality (search, write operations, private data,
-feeds).
+with public data access (view profiles, search accounts, fetch
+follower/following lists), or add authentication for full functionality (search,
+write operations, private data, feeds).
 
+> **Zero-config launch**: `npx atproto-mcp` runs the server in unauthenticated
+> public-data mode — no credentials required.
+>
 > **Recent additions**: Batch operations for bulk actions, advanced analytics
 > and insights, intelligent content discovery, and a conversation-context
 > scratchpad resource.
@@ -91,21 +94,23 @@ server to access AT Protocol functionality.
 
 ### Core Features
 
-- **Unauthenticated Mode**: Access public data without any setup - view basic
-  profiles and manage OAuth flows
-- **Optional Authentication**: Enable full functionality with app passwords or
-  OAuth for write operations, feeds, and private data
+- **Zero-config Unauthenticated Mode**: Run `npx atproto-mcp` to access public
+  data without any setup - view profiles, search accounts, and fetch
+  follower/following lists
+- **Optional Authentication**: Enable full functionality with app passwords for
+  write operations, feeds, and private data
 - **Complete AT Protocol Integration**: Full implementation using official
   `@atproto/api`
 - **MCP Server Compliance**: Built with `@modelcontextprotocol/sdk` following
   MCP specification
 - **Type-Safe**: Written in TypeScript with strict type checking
-- **Comprehensive Tools**: 60 MCP tools for social networking operations
-- **Real-time Support** _(experimental)_: WebSocket firehose scaffolding with
-  keyword/user buffer scanning — frame decoding is not yet implemented, so no
-  live events are delivered yet
+- **Comprehensive Tools**: 43 MCP tools for social networking operations
 - **Rate Limiting**: Built-in respect for AT Protocol rate limits
 - **Extensible**: Modular architecture for easy customization
+
+> **Planned**: OAuth login and real-time firehose streaming are on the roadmap
+> but not yet functional. App-password authentication is the supported auth path
+> today.
 
 ## Who Is This For?
 
@@ -151,14 +156,30 @@ should either:
 
 ## Installation
 
+Run it with no install and no configuration — `npx atproto-mcp` launches the
+server in unauthenticated public-data mode immediately:
+
+```bash
+npx atproto-mcp
+```
+
+Or install globally:
+
 ```bash
 npm install -g atproto-mcp
 ```
 
-Or use with npx:
+### Claude Desktop
 
-```bash
-npx atproto-mcp
+Add this to your Claude Desktop MCP configuration to run the server with zero
+config:
+
+```json
+{
+  "mcpServers": {
+    "atproto": { "command": "npx", "args": ["-y", "atproto-mcp"] }
+  }
+}
 ```
 
 ## Quick Start
@@ -192,16 +213,18 @@ npx atproto-mcp
 
 - View user profiles (`get_user_profile` - works without auth, provides
   additional viewer-specific data when authenticated)
-- View follower/following lists (`get_followers`, `get_follows` - ENHANCED mode:
-  work without auth, enrich the underlying API call when authenticated)
-- Manage OAuth authentication flows (`start_oauth_flow`,
-  `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`)
+- Search for accounts by handle or name (`search_actors`)
+- List a user's posts (`get_author_feed`)
+- View follower/following lists (`get_user_connections` with
+  `direction: 'followers' | 'follows'` - ENHANCED mode: works without auth,
+  enriches the underlying API call when authenticated)
 
 **Note:** The following features require authentication:
 
 - Searching posts and hashtags (`search_posts`) - **API changed in 2025 to
   require authentication**
-- Browsing feeds and threads (`get_thread`, `get_custom_feed`, `get_timeline`)
+- Browsing feeds and threads (`get_post_context`, `get_custom_feed`,
+  `get_timeline`)
 - All write operations (create, like, repost, follow, etc.)
 - Resources (timeline, profile, notifications) - these are listed but require
   authentication to return data (the `conversation-context` scratchpad resource
@@ -247,7 +270,7 @@ credentials.
 
 ## Available Tools
 
-The server provides **60 MCP tools** across multiple categories. See the
+The server provides **43 MCP tools** across multiple categories. See the
 [complete API documentation](https://cameronrye.github.io/atproto-mcp/api/) for
 detailed information on each tool.
 
@@ -257,34 +280,20 @@ detailed information on each tool.
 
 - `get_user_profile` - Retrieve basic user information (ENHANCED mode: works
   without auth, provides additional viewer-specific data when authenticated)
-- `get_followers` - Get follower lists (ENHANCED mode: works without auth,
+- `get_user_summary` - Get a profile with recent posts and engagement stats in
+  one call (ENHANCED mode)
+- `search_actors` - Find accounts by handle or display name (ENHANCED mode)
+- `get_author_feed` - List a specific user's posts (ENHANCED mode)
+- `get_user_connections` - Get follower or following lists via
+  `direction: 'followers' | 'follows'` (ENHANCED mode: works without auth,
   enriches the underlying API call when authenticated)
-- `get_follows` - Get following lists (ENHANCED mode: works without auth,
-  enriches the underlying API call when authenticated)
+- `get_post_context` - Get a post with optional thread, author profile,
+  engagement metrics, and media (ENHANCED mode)
 
 **Rich Media**
 
-- `generate_alt_text` - Generate descriptive alt text for images (PUBLIC mode:
-  no auth required; experimental — returns an alt-text writing
-  template/guidance, does not analyze image pixels)
 - `analyze_image` - Report blob-declared size and MIME type for an image (PUBLIC
   mode: no auth required; does not decode pixels, so no dimensions/aspect ratio)
-- `extract_media_from_post` - Extract media from posts (ENHANCED mode: works
-  without auth)
-
-**OAuth Management** _(experimental — token exchange not implemented)_
-
-> ⚠️ Only the authorization-URL step is functional. The token-exchange steps
-> (`handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`) are
-> **not implemented** and return an error. For working authentication, use app
-> passwords (`ATPROTO_IDENTIFIER` + `ATPROTO_PASSWORD`).
-
-- `start_oauth_flow` - Generate a PKCE authorization URL (experimental)
-- `handle_oauth_callback` - Complete OAuth flow (not implemented — returns
-  error)
-- `refresh_oauth_tokens` - Refresh authentication tokens (not implemented —
-  returns error)
-- `revoke_oauth_tokens` - Revoke OAuth tokens (not implemented — returns error)
 
 **Note:** As of 2025, the AT Protocol API has changed to require authentication
 for most endpoints that were previously public, including `search_posts`.
@@ -293,8 +302,9 @@ for most endpoints that were previously public, including `search_posts`.
 
 **Social Operations**
 
-- `create_post` - Create new posts with rich text support
-- `create_rich_text_post` - Create posts with advanced formatting
+- `create_post` - Create posts with text, auto-detected or explicit richtext
+  facets, replies, image/external embeds, and quote posts
+- `create_thread` - Create multi-post threads in one call
 - `reply_to_post` - Reply to existing posts with threading
 - `like_post` / `unlike_post` - Like and unlike posts
 - `repost` / `unrepost` - Repost content with optional quotes
@@ -304,10 +314,11 @@ for most endpoints that were previously public, including `search_posts`.
 
 - `search_posts` - Search for posts and content across the network (⚠️ API
   changed in 2025 to require auth)
-- `get_thread` - View post threads and conversations
 - `get_custom_feed` - Access custom feeds
 - `get_timeline` - Retrieve personalized timelines
-- `get_notifications` - Access notification feeds
+- `get_notifications` - Access notification feeds (use `countOnly: true` for a
+  cheap unread badge count)
+- `mark_notifications_seen` - Mark notifications as seen up to a timestamp
 
 **Content Management**
 
@@ -327,55 +338,24 @@ for most endpoints that were previously public, including `search_posts`.
 - `mute_user` / `unmute_user` - Mute and unmute users
 - `block_user` / `unblock_user` - Block and unblock users
 - `report_content` / `report_user` - Report content and users
-
-**Real-time Streaming & Intelligence** _(experimental — not yet functional)_
-
-> ⚠️ Firehose frame (CAR/DAG-CBOR) decoding is **not implemented** yet, so these
-> tools currently decode no events: `start_streaming` returns a
-> `not_implemented` status, and the buffer-scanning tools always return empty
-> results. The tool descriptions and responses disclose this. Tracked for a
-> future release.
-
-- `start_streaming` - Start a real-time event stream (returns `not_implemented`)
-- `stop_streaming` - Stop an event stream subscription
-- `get_streaming_status` - Check streaming status (reports decoding
-  availability)
-- `get_recent_events` - Retrieve buffered events (empty until decoding lands)
-- `monitor_keywords` - Scan the event buffer for keywords (empty until decoding
-  lands)
-- `track_users` - Scan the event buffer for specific users (empty until decoding
-  lands)
+- `analyze_moderation_status` - Check moderation status of content
 
 **Batch Operations**
 
-- `batch_follow` - Follow multiple users at once (up to 25)
-- `batch_like` - Like multiple posts at once (up to 25)
-- `batch_repost` - Repost multiple posts at once (up to 25)
+- `batch_action` - Apply one action across up to 25 targets in a single call via
+  `action: 'follow' | 'like' | 'repost'`
 
 **Analytics & Insights**
 
-- `analyze_engagement` - Analyze engagement patterns across posts
-- `analyze_network` - Analyze user's network and connections
-- `suggest_content_strategy` - Get content strategy recommendations based on
-  performance
+- `analyze_account` - Analyze a single account along one dimension via
+  `dimension: 'engagement' | 'network' | 'strategy'`
 - `find_influential_users` - Find influential users in a topic area
 
 **Content Discovery**
 
-- `discover_trending` - Discover trending topics and posts
+- `discover` - Surface timeline content via `mode: 'trending' | 'recommended'`
 - `find_similar_users` - Find users similar to a given user
-- `recommend_content` - Get personalized content recommendations
 - `discover_communities` - Discover communities around topics
-
-**Composite Operations**
-
-- `get_user_summary` - Get complete user profile with stats and analysis
-- `get_post_context` - Get post with thread, author, and engagement data
-- `create_thread` - Create multi-post threads in one call
-
-**Enhanced Moderation**
-
-- `analyze_moderation_status` - Check moderation status of content
 
 ## Documentation
 
@@ -400,17 +380,8 @@ export ATPROTO_PASSWORD="your-app-password"
 atproto-mcp
 ```
 
-### OAuth (experimental — not yet functional)
-
-> ⚠️ OAuth token exchange is not implemented, so this cannot complete a login
-> yet. App passwords (above) are the recommended/working method. The variables
-> below configure the experimental authorization-URL generator.
-
-```bash
-export ATPROTO_CLIENT_ID="your-client-id"
-export ATPROTO_CLIENT_SECRET="your-client-secret"  # optional for public clients
-atproto-mcp --auth oauth
-```
+App passwords are the supported authentication path. OAuth login is planned but
+not yet functional.
 
 ## Development
 
@@ -508,8 +479,9 @@ npm run test:integration
 
 **What's tested:**
 
-- Public/enhanced tools (`get_user_profile`, `get_followers`, `get_follows`) and
-  authenticated tools (`search_posts`, `get_thread`, `get_custom_feed`)
+- Public/enhanced tools (`get_user_profile`, `get_user_connections`,
+  `get_author_feed`) and authenticated tools (`search_posts`,
+  `get_post_context`, `get_custom_feed`)
 - DID and handle resolution
 - Pagination support
 - Error handling

@@ -252,6 +252,13 @@ data. The LLM receives image data from the user's client.
 
 ## Rich Text Posts
 
+Rich text is handled by `create_post`. Mentions, links, and `#hashtags` in the
+text are **auto-detected** into richtext facets, so for most posts you can just
+pass `text`. Supply explicit `facets` only when you need precise control — each
+feature is `{ "type": "mention" | "link" | "hashtag", "value": "..." }`, where
+`value` is a handle/DID for a mention, the URL for a link, or the tag (without
+`#`) for a hashtag.
+
 ### Post with Mentions
 
 **User Request:**
@@ -274,9 +281,9 @@ data. The LLM receives image data from the user's client.
 }
 ```
 
-**Step 2: Create Rich Text Post**
+**Step 2: Create the Post**
 
-**Tool Call:** `create_rich_text_post`
+**Tool Call:** `create_post`
 
 **Parameters (JSON):**
 
@@ -291,8 +298,8 @@ data. The LLM receives image data from the user's client.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#mention",
-          "did": "did:plc:alice123"
+          "type": "mention",
+          "value": "alice.bsky.social"
         }
       ]
     }
@@ -301,6 +308,9 @@ data. The LLM receives image data from the user's client.
 ```
 
 **Note:** Byte positions must be calculated based on UTF-8 encoding of the text.
+Mention handles supplied in `value` are resolved to DIDs automatically. In
+practice you can also just pass the text and let `create_post` auto-detect the
+mention.
 
 ### Post with Links
 
@@ -310,7 +320,7 @@ data. The LLM receives image data from the user's client.
 "Create a post with a link: 'Check out this article: https://example.com'"
 ```
 
-**Tool Call:** `create_rich_text_post`
+**Tool Call:** `create_post`
 
 **Parameters (JSON):**
 
@@ -325,8 +335,8 @@ data. The LLM receives image data from the user's client.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#link",
-          "uri": "https://example.com"
+          "type": "link",
+          "value": "https://example.com"
         }
       ]
     }
@@ -342,7 +352,7 @@ data. The LLM receives image data from the user's client.
 "Create a post saying 'Loving the #atproto community!'"
 ```
 
-**Tool Call:** `create_rich_text_post`
+**Tool Call:** `create_post`
 
 **Parameters (JSON):**
 
@@ -357,8 +367,8 @@ data. The LLM receives image data from the user's client.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#tag",
-          "tag": "atproto"
+          "type": "hashtag",
+          "value": "atproto"
         }
       ]
     }
@@ -388,9 +398,9 @@ data. The LLM receives image data from the user's client.
 }
 ```
 
-**Step 2: Create Rich Text Post**
+**Step 2: Create the Post**
 
-**Tool Call:** `create_rich_text_post`
+**Tool Call:** `create_post`
 
 **Parameters (JSON):**
 
@@ -405,8 +415,8 @@ data. The LLM receives image data from the user's client.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#mention",
-          "did": "did:plc:alice123"
+          "type": "mention",
+          "value": "alice.bsky.social"
         }
       ]
     },
@@ -417,8 +427,8 @@ data. The LLM receives image data from the user's client.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#tag",
-          "tag": "atproto"
+          "type": "hashtag",
+          "value": "atproto"
         }
       ]
     },
@@ -429,8 +439,8 @@ data. The LLM receives image data from the user's client.
       },
       "features": [
         {
-          "$type": "app.bsky.richtext.facet#link",
-          "uri": "https://atproto.com"
+          "type": "link",
+          "value": "https://atproto.com"
         }
       ]
     }

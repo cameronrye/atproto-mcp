@@ -123,20 +123,17 @@ Each tool has:
 
 ### Available Tools
 
-The AT Protocol MCP Server provides 60 tools across categories:
+The AT Protocol MCP Server provides 43 tools across categories:
 
 - **Social Operations**: create_post, like_post, repost, follow_user
-- **Data Retrieval**: search_posts, get_user_profile, get_timeline
+- **Data Retrieval**: search_posts, get_user_profile, get_timeline,
+  get_author_feed, get_user_connections
 - **Content Management**: delete_post, update_profile, upload_image
 - **Moderation**: mute_user, block_user, report_content
-- **OAuth (experimental)**: start_oauth_flow builds a PKCE URL only;
-  refresh_oauth_tokens and the other callback tools are registered but **not
-  implemented** (they throw)
-- **Streaming (not implemented)**: start_streaming, get_recent_events and the
-  other streaming tools are registered but **not functional** — firehose
-  decoding is gated off, so they open no socket and return no events
+- **Batch & Analytics**: batch_action, analyze_account, discover
 
-The not-implemented tools are described on the
+OAuth login and real-time streaming are planned but not yet functional, so they
+are not exposed as tools. See the
 [Experimental & Roadmap](./experimental.md) page.
 
 See the [API Reference](../api/index.md) for the complete list.

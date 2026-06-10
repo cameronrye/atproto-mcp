@@ -264,20 +264,14 @@ names the offending field.
 **Symptom**: A tool returns `status: "not_implemented"`, an empty result, or
 guidance text instead of doing the work.
 
-**Fix**: This is expected for the experimental/placeholder tools, not a bug:
+**Fix**: This is expected for the placeholder resource, not a bug:
 
-- The streaming tools (`start_streaming`, `get_recent_events`,
-  `monitor_keywords`, and friends) are stubs — firehose decoding is not wired
-  up.
-- The OAuth completion tools (`handle_oauth_callback`, `refresh_oauth_tokens`,
-  `revoke_oauth_tokens`) intentionally fail; only `start_oauth_flow` builds a
-  URL, and the flow is a dead end.
-- `generate_alt_text` returns writing guidance, not a vision-model analysis.
 - The `atproto://conversation-context` resource is a placeholder and reads as
   empty.
 
-See [Experimental & Roadmap](./experimental.md) for the full list and current
-status.
+Real-time streaming and OAuth login are planned but not yet functional, so they
+are not exposed as tools. See [Experimental & Roadmap](./experimental.md) for
+the current status.
 
 ### Resource Not Available or Read Fails
 

@@ -82,15 +82,16 @@ Unfollow a user on AT Protocol.
 
 If you don't have the follow URI stored:
 
-1. Use `get_follows` to list users you follow
+1. Use `get_user_connections` with `direction: "follows"` to list users you
+   follow
 2. Find the target user in the list
 3. Extract the follow URI from the response
 
 ## Related Tools
 
 - **[follow_user](./follow-user.md)** - Follow a user
-- **[get_follows](./get-follows.md)** - Get users you follow (includes follow
-  URIs)
+- **[get_user_connections](./get-user-connections.md)** - Get users you follow
+  via `direction: "follows"` (includes follow URIs)
 
 ## See Also
 

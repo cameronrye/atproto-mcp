@@ -66,9 +66,9 @@ events. See [Experimental & Roadmap](../guide/experimental.md).
 
 Every tool invocation is rate limited per tool (100 requests per minute per
 tool) before it runs. Most tools require an authenticated session; a few
-public/enhanced tools (such as `get_user_profile`, `get_followers`, and
-`get_follows`) run unauthenticated. `search_posts` is **not** one of them — it
-requires authentication, since the AT Protocol search API changed in 2025 to
+public/enhanced tools (such as `get_user_profile`, `get_user_connections`, and
+`get_author_feed`) run unauthenticated. `search_posts` is **not** one of them —
+it requires authentication, since the AT Protocol search API changed in 2025 to
 require auth.
 
 ```mermaid

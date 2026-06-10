@@ -131,7 +131,8 @@ calls.
   overlapping follow graphs
 - **[discover_communities](./discover-communities.md)** - Discover communities
   around topics
-- **[analyze_network](./analyze-network.md)** - Analyze your social network
+- **[analyze_account](./analyze-account.md)** - Analyze your social network
+  (`dimension: 'network'`)
 - **[search_posts](./search-posts.md)** - Search for posts on specific topics
 - **[get_user_profile](./get-user-profile.md)** - Get detailed user profile
 

@@ -117,9 +117,8 @@ automatically.
    `ATPROTO_IDENTIFIER` and `ATPROTO_PASSWORD`.
 2. **Unauthenticated** - For accessing public data only.
 
-OAuth tooling exists but is experimental: `start_oauth_flow` only builds a PKCE
-URL, and the callback/refresh/revoke tools always error. See
-[Experimental & Roadmap](./guide/experimental).
+OAuth login is on the roadmap but not yet functional, so it is not exposed as a
+tool. Use app passwords. See [Experimental & Roadmap](./guide/experimental).
 
 ### How do I get an app password?
 
@@ -137,9 +136,12 @@ authentication, so unauthenticated mode only exposes public read-only tools.
 
 - `get_user_profile` - View public profiles (provides additional viewer-specific
   data when authenticated)
-- `get_followers` / `get_follows` - View social graphs (return richer
-  viewer-state data when authenticated)
-- `analyze_image` / `generate_alt_text` - Vision-based media tools
+- `search_actors` - Find accounts by handle or display name
+- `get_author_feed` - List a user's posts
+- `get_user_connections` - View social graphs via
+  `direction: 'followers' | 'follows'` (returns richer viewer-state data when
+  authenticated)
+- `analyze_image` - Report an image blob's declared size and MIME type
 - `get_post_context`, `find_similar_users`, and other public/enhanced discovery
   tools
 
@@ -147,14 +149,12 @@ authentication, so unauthenticated mode only exposes public read-only tools.
 
 - `search_posts` - Search posts (the AT Protocol search API changed in 2025 to
   require authentication)
-- `get_thread` - Read conversations
 - `get_custom_feed` - Browse feeds
 - All write operations (posting, following, liking, etc.) and most other data
   retrieval
 
-> The OAuth tools (`start_oauth_flow`, `handle_oauth_callback`,
-> `refresh_oauth_tokens`, `revoke_oauth_tokens`) are registered but not
-> functional and should not be relied on for authentication.
+> OAuth login is not yet functional and is not exposed as a tool. Use app
+> passwords for authentication.
 
 ## How LLMs Use This Server
 
@@ -299,10 +299,8 @@ Common issues:
 
 ### Is streaming supported?
 
-Not yet. The firehose/streaming tools are registered but firehose decoding is
-not implemented, so `start_streaming` opens no connection and the event-reading
-tools always return an empty buffer. See
-[Experimental & Roadmap](./guide/experimental).
+Not yet. Real-time firehose streaming is on the roadmap but not yet built, so no
+streaming tools are exposed. See [Experimental & Roadmap](./guide/experimental).
 
 ## Performance
 
@@ -461,14 +459,11 @@ Yes! Configure the MCP server to use your custom PDS:
 
 ### Can LLMs process the entire AT Protocol firehose?
 
-Not yet. The streaming tools (`start_streaming`, `monitor_keywords`,
-`track_users`, and the event-reading tools) are registered and visible to MCP
-clients, but firehose decoding is not implemented. `start_streaming` opens no
-connection and returns a `not_implemented` status, and the event buffer is
-always empty.
+Not yet. Real-time firehose streaming is on the roadmap but not yet built —
+firehose frame (CAR / DAG-CBOR) decoding is not implemented, so no streaming
+tools are exposed.
 
-This is on the roadmap. See [Experimental & Roadmap](./guide/experimental) for
-the current status.
+See [Experimental & Roadmap](./guide/experimental) for the current status.
 
 ### How does the MCP server handle deleted content?
 

@@ -79,9 +79,9 @@ async function callTool<T = unknown>(
 Most tools require authentication. Set `ATPROTO_IDENTIFIER` and
 `ATPROTO_PASSWORD` (an app password from Bluesky **Settings → App Passwords**)
 in the environment of the spawned server process. Without credentials only the
-public/enhanced tools — notably `get_user_profile` (and `get_followers` /
-`get_follows`) — are available. `search_posts` requires authentication: the AT
-Protocol search API changed in 2025 to require auth.
+public/enhanced tools — notably `get_user_profile`, `get_user_connections`,
+`search_actors`, and `get_author_feed` — are available. `search_posts` requires
+authentication: the AT Protocol search API changed in 2025 to require auth.
 
 :::
 
@@ -327,15 +327,14 @@ process.on('SIGINT', shutdown);
 ## Streaming-based integrations
 
 Real-time patterns such as live analytics, firehose-driven moderation, and
-event-driven bots are **not supported** by this server today. The streaming
-tools (`start_streaming`, `get_recent_events`, `monitor_keywords`, and the rest)
-are registered but non-functional — firehose decoding is gated off, so they open
-no socket and never return events. See
+event-driven bots are **not supported** by this server today. Real-time firehose
+streaming is on the roadmap but not yet built — firehose decoding is not
+implemented, so no streaming tools are exposed. See
 [Experimental & Roadmap](../guide/experimental.md) for the current status.
 
-If you need a polling-based approximation, `discover_trending` samples your own
-home timeline (roughly the latest 100 posts, not the network firehose) and can
-be called on an interval the same way as the tools above.
+If you need a polling-based approximation, `discover` with `mode: "trending"`
+samples your own home timeline (roughly the latest 100 posts, not the network
+firehose) and can be called on an interval the same way as the tools above.
 
 ## See Also
 

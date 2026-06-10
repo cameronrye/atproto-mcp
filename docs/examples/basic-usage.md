@@ -165,7 +165,7 @@ Your LLM client calls the `search_posts` tool via MCP:
 
 **What Happens Behind the Scenes:**
 
-Your LLM client calls the `get_thread` tool:
+Your LLM client calls the `get_post_context` tool:
 
 ```json
 {

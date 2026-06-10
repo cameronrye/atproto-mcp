@@ -1,14 +1,8 @@
 # Experimental & Roadmap
 
-This page is the single source of truth for features that are **registered and
-visible to MCP clients but not yet functional**, plus capabilities that are
-**planned but not yet built**.
-
-The server deliberately lists every tool and resource in `tools/list` /
-`resources/list` regardless of whether it is fully implemented, so a connected
-client can discover the full surface area. The features below will appear in
-that listing but behave as described here until their underlying implementation
-lands.
+This page is the single source of truth for capabilities that are **planned but
+not yet built**. These features are not exposed as MCP tools today; they are
+documented here so you know what is and is not on the roadmap.
 
 ::: warning Not production-ready
 
@@ -20,59 +14,41 @@ in the [main API reference](../api/index.md).
 
 ## Status at a glance
 
-| Feature              | Tools / resources                                                                                                   | Status                                                     |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Firehose streaming   | `start_streaming`, `stop_streaming`, `get_streaming_status`, `get_recent_events`, `monitor_keywords`, `track_users` | Not implemented — firehose decoding is gated off           |
-| OAuth login          | `start_oauth_flow`, `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens`                          | Experimental / not implemented — cannot complete a login   |
-| AI alt-text          | `generate_alt_text`                                                                                                 | Placeholder — returns writing guidance, not image analysis |
-| Conversation context | `atproto://conversation-context`                                                                                    | Placeholder — registered but never auto-populated          |
-| HTTP transport       | —                                                                                                                   | Planned — server is stdio-only today                       |
+| Feature              | Status                                                            |
+| -------------------- | ---------------------------------------------------------------- |
+| Firehose streaming   | Planned — not exposed as tools; firehose decoding not built      |
+| OAuth login          | Planned — not exposed as tools; app passwords are the supported path |
+| AI alt-text          | Planned — no vision model wired in                               |
+| Conversation context | Placeholder — `atproto://conversation-context` never auto-populated |
+| HTTP transport       | Planned — server is stdio-only today                             |
 
 ## Firehose streaming
 
-The six streaming tools are wired up but the firehose decoder is disabled behind
-a feature flag (`FIREHOSE_DECODING_IMPLEMENTED = false`). AT Protocol firehose
-frames are CAR / DAG-CBOR encoded, and that decoding has not been implemented
-yet.
+Real-time firehose streaming (keyword/user monitoring of the AT Protocol
+firehose) is on the roadmap but **not yet built**. AT Protocol firehose frames
+are CAR / DAG-CBOR encoded, and that decoding has not been implemented yet, so no
+streaming tools are exposed.
 
-Concretely:
-
-- **`start_streaming`** returns `success: false` with
-  `subscription.status: "not_implemented"` and never opens a socket.
-- **`stop_streaming`** runs, but there is never an active subscription to stop.
-- **`get_streaming_status`**, **`get_recent_events`**, **`monitor_keywords`**,
-  and **`track_users`** operate on a permanently-empty in-memory event buffer.
-  They never error, but they always return zero events and include
-  `firehoseDecodingImplemented: false` plus an explanatory `note` in their
-  response.
-
-There is no way to receive real-time events until firehose decoding is
-implemented.
+If you need a polling-based approximation, [`discover`](../api/tools/discover.md)
+with `mode: "trending"` samples your own home timeline.
 
 ## OAuth login
 
 App-password authentication is the supported way to authenticate (see
-[Authentication](./authentication.md)). The OAuth tools exist but cannot
-complete a login:
-
-- **`start_oauth_flow`** builds a heuristic PKCE authorization URL. It does
-  **not** perform AT Protocol authorization-server metadata discovery or pushed
-  authorization requests (PAR), and because the callback exchange is
-  unimplemented, the flow is a dead end. Treat it as **experimental**.
-- **`handle_oauth_callback`**, **`refresh_oauth_tokens`**, and
-  **`revoke_oauth_tokens`** always return an error (`OAUTH_NOT_IMPLEMENTED`).
+[Authentication](./authentication.md)). OAuth login is on the roadmap but **not
+yet functional**, so it is not exposed as a configuration path or a tool.
 
 Use [app passwords](./authentication.md#app-passwords) for any authenticated
 workflow.
 
 ## AI alt-text generation
 
-**`generate_alt_text`** is a placeholder. No vision model is wired in, so it
-does not analyze image content. It returns alt-text **writing guidance and a
-template** to help a human (or an upstream LLM) compose good alt text. For media
-metadata that is actually derived from the upload, see
-[`analyze_image`](../api/tools/analyze-image.md) and
-[`extract_media_from_post`](../api/tools/extract-media-from-post.md).
+AI-assisted alt-text generation is planned but **not yet built** — no vision
+model is wired in, so there is no tool that analyzes image content. For media
+metadata that is actually derived from an upload, see
+[`analyze_image`](../api/tools/analyze-image.md). To extract media references
+from an existing post, use
+[`get_post_context`](../api/tools/get-post-context.md) with `includeMedia: true`.
 
 ## Conversation context resource
 

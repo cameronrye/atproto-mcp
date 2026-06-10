@@ -138,9 +138,9 @@ or engagement stats are requested.
 ## Related Tools
 
 - **[get_user_profile](./get-user-profile.md)** - Get basic user profile
-- **[analyze_engagement](./analyze-engagement.md)** - Detailed engagement
-  analysis
-- **[analyze_network](./analyze-network.md)** - Network analysis
+- **[get_author_feed](./get-author-feed.md)** - List a user's posts
+- **[analyze_account](./analyze-account.md)** - Detailed engagement, network, or
+  strategy analysis (`dimension`)
 - **[get_timeline](./get-timeline.md)** - Get user's timeline
 - **[find_similar_users](./find-similar-users.md)** - Find similar users
 

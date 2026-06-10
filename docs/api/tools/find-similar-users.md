@@ -149,8 +149,10 @@ it consumes the per-minute budget faster than single-call tools.
 - **[discover_communities](./discover-communities.md)** - Discover communities
   around topics
 - **[get_user_profile](./get-user-profile.md)** - Get detailed user profile
-- **[get_followers](./get-followers.md)** - Get a user's followers
-- **[analyze_network](./analyze-network.md)** - Analyze social network structure
+- **[get_user_connections](./get-user-connections.md)** - Get a user's followers
+  or follows
+- **[analyze_account](./analyze-account.md)** - Analyze social network structure
+  (`dimension: 'network'`)
 
 ## See Also
 

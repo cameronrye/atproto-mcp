@@ -139,7 +139,7 @@ consumes several requests against that limit.
 
 - **[create_post](./create-post.md)** - Create a single post
 - **[reply_to_post](./reply-to-post.md)** - Reply to an existing post
-- **[get_thread](./get-thread.md)** - View an existing thread
+- **[get_post_context](./get-post-context.md)** - View an existing thread
 - **[delete_post](./delete-post.md)** - Delete posts from a thread
 
 ## See Also
