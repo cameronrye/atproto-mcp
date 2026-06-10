@@ -416,35 +416,6 @@ export class GetNotificationsTool extends BaseTool {
   }
 }
 
-/**
- * Get the count of unread notifications — a cheap poll for "is there anything new"
- * that does not require fetching the full notification list. Requires authentication.
- */
-export class GetUnreadCountTool extends BaseTool {
-  public readonly schema = {
-    method: 'get_unread_count',
-    description: 'Get the number of unread notifications. Requires authentication.',
-    params: z.object({}),
-  };
-
-  constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetUnreadCount', ToolAuthMode.PRIVATE);
-  }
-
-  protected async execute(): Promise<{ success: boolean; count: number }> {
-    try {
-      const response = await this.executeAtpOperation(async () => {
-        const agent = this.atpClient.getAgent();
-        return await agent.countUnreadNotifications();
-      }, 'countUnreadNotifications');
-      return { success: true, count: response.data.count };
-    } catch (error) {
-      this.logger.error('Failed to get unread notification count', error);
-      this.formatError(error);
-    }
-  }
-}
-
 const MarkNotificationsSeenSchema = z.object({
   seenAt: z
     .string()

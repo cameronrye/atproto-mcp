@@ -24,7 +24,6 @@ export { GetTimelineTool } from './timeline-tools.js';
 export {
   GetUserConnectionsTool,
   GetNotificationsTool,
-  GetUnreadCountTool,
   MarkNotificationsSeenTool,
 } from './social-graph-tools.js';
 

@@ -1,22 +1,30 @@
 /**
- * Tests for the notification-loop tools. Previously markAsRead() existed on
- * GetNotificationsTool but was bound to no MCP method (dead code), so an agent
- * re-processed the same notifications every run and could not poll unread count.
+ * Tests for the notification-loop tools.
+ *
+ * - mark_notifications_seen: marks the seen cursor so an agent does not
+ *   re-process the same notifications on every run.
+ * - get_notifications (countOnly: true): cheap poll for the unread badge number
+ *   without fetching the full notification list.
+ * - get_notifications (full): returns the notification list plus the unread count.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   MarkNotificationsSeenTool,
-  GetUnreadCountTool,
+  GetNotificationsTool,
 } from '../tools/implementations/social-graph-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 function mockClient() {
   const updateSeenNotifications = vi.fn().mockResolvedValue({});
   const countUnreadNotifications = vi.fn().mockResolvedValue({ data: { count: 7 } });
+  const listNotifications = vi.fn().mockResolvedValue({
+    data: { notifications: [], cursor: undefined, seenAt: undefined },
+  });
   const agent = {
     updateSeenNotifications,
     countUnreadNotifications,
+    listNotifications,
     session: { did: 'did:plc:self' },
   };
   const client = {
@@ -31,7 +39,7 @@ function mockClient() {
       }
     }),
   } as unknown as AtpClient;
-  return { client, updateSeenNotifications, countUnreadNotifications };
+  return { client, updateSeenNotifications, countUnreadNotifications, listNotifications };
 }
 
 describe('mark_notifications_seen', () => {
@@ -60,17 +68,92 @@ describe('mark_notifications_seen', () => {
   });
 });
 
-describe('get_unread_count', () => {
+describe('get_notifications with countOnly: true', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('returns the unread notification count', async () => {
-    const { client, countUnreadNotifications } = mockClient();
-    const tool = new GetUnreadCountTool(client);
+  it('returns only unreadCount and does NOT fetch the notification list', async () => {
+    const { client, countUnreadNotifications, listNotifications } = mockClient();
+    const tool = new GetNotificationsTool(client);
 
-    const result = await tool.handler({});
+    const result = await tool.handler({ countOnly: true });
 
+    // Only the count endpoint should be called.
     expect(countUnreadNotifications).toHaveBeenCalledTimes(1);
+    expect(listNotifications).not.toHaveBeenCalled();
+
     expect(result.success).toBe(true);
-    expect(result.count).toBe(7);
+    expect(result.unreadCount).toBe(7);
+    // Notification list fields must NOT be present.
+    expect(result).not.toHaveProperty('notifications');
+    expect(result).not.toHaveProperty('cursor');
+    expect(result).not.toHaveProperty('hasMore');
+  });
+});
+
+describe('get_notifications (full list)', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('returns notifications list plus unreadCount when countOnly is absent', async () => {
+    const sampleNotif = {
+      uri: 'at://did:plc:liker/app.bsky.feed.like/abc',
+      cid: 'cidnotif',
+      author: {
+        did: 'did:plc:liker',
+        handle: 'liker.bsky.social',
+        displayName: 'Liker',
+        description: 'fan',
+        avatar: 'https://cdn.example/liker.jpg',
+        followersCount: 10,
+        followsCount: 20,
+        postsCount: 5,
+      },
+      reason: 'like',
+      record: { $type: 'app.bsky.feed.like' },
+      isRead: false,
+      indexedAt: '2026-02-02T00:00:00.000Z',
+      labels: [],
+    };
+
+    const countUnreadNotifications = vi.fn().mockResolvedValue({ data: { count: 3 } });
+    const listNotifications = vi.fn().mockResolvedValue({
+      data: {
+        notifications: [sampleNotif],
+        cursor: 'notifNext',
+        seenAt: '2026-02-01T00:00:00.000Z',
+      },
+    });
+    const agent = {
+      countUnreadNotifications,
+      listNotifications,
+      session: { did: 'did:plc:self' },
+    };
+    const client = {
+      getAgent: vi.fn().mockReturnValue(agent),
+      isAuthenticated: vi.fn().mockReturnValue(true),
+      hasCredentials: vi.fn().mockReturnValue(true),
+      executeAuthenticatedRequest: vi.fn().mockImplementation(async (op: () => unknown) => {
+        try {
+          return { success: true, data: await op() };
+        } catch (error) {
+          return { success: false, error };
+        }
+      }),
+    } as unknown as AtpClient;
+
+    const tool = new GetNotificationsTool(client);
+    const result = await tool.handler({ limit: 10 });
+
+    expect(listNotifications).toHaveBeenCalledWith({
+      limit: 10,
+      cursor: undefined,
+      seenAt: undefined,
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.unreadCount).toBe(3);
+    expect(result.notifications).toHaveLength(1);
+    expect(result.cursor).toBe('notifNext');
+    expect(result.hasMore).toBe(true);
+    expect(result.seenAt).toBe('2026-02-01T00:00:00.000Z');
   });
 });

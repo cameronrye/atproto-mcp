@@ -34,7 +34,6 @@ import {
   GetPostContextTool,
   GetThreadTool,
   GetTimelineTool,
-  GetUnreadCountTool,
   GetUserConnectionsTool,
   GetUserProfileTool,
   GetUserSummaryTool,
@@ -115,7 +114,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new GetTimelineTool(atpClient),
     () => new GetUserConnectionsTool(atpClient),
     () => new GetNotificationsTool(atpClient),
-    () => new GetUnreadCountTool(atpClient),
     () => new MarkNotificationsSeenTool(atpClient),
 
     // Content management
