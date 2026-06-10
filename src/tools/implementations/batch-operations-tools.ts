@@ -8,11 +8,23 @@ import type { AtpClient } from '../../utils/atp-client.js';
 import type { ATURI, CID, DID } from '../../types/index.js';
 
 /**
- * Zod schema for batch follow parameters
+ * Zod schema for batch_action parameters
  */
-const BatchFollowSchema = z.object({
-  actors: z.array(z.string().min(1)).min(1).max(25),
-  continueOnError: z.boolean().optional().default(true),
+const BatchActionSchema = z.object({
+  action: z.enum(['follow', 'like', 'repost']).describe('The action to apply to every target.'),
+  targets: z
+    .array(z.string().min(1))
+    .min(1)
+    .max(25)
+    .describe(
+      'For action=follow: handles or DIDs. For action=like/repost: post AT-URIs. 1–25 items.'
+    ),
+  continueOnError: z
+    .boolean()
+    .optional()
+    .describe(
+      'Continue processing remaining targets after an individual failure (preserve the previous default behavior).'
+    ),
 });
 
 interface IFollowResult {
@@ -26,29 +38,109 @@ interface IFollowResult {
   alreadyFollowing?: boolean;
 }
 
+interface ILikeResult {
+  uri: string;
+  success: boolean;
+  likeUri?: ATURI;
+  likeCid?: CID;
+  error?: string;
+  alreadyLiked?: boolean;
+}
+
+interface IRepostResult {
+  uri: string;
+  success: boolean;
+  repostUri?: ATURI;
+  repostCid?: CID;
+  error?: string;
+  alreadyReposted?: boolean;
+}
+
 /**
- * Batch Follow Tool - Follow multiple users in a single operation
- *
- * This tool allows following multiple users at once, reducing round-trips
- * and making it easier to manage bulk follow operations.
+ * Batch Action Tool — batch the same action across up to 25 targets in one call.
  *
  * AUTHENTICATION REQUIREMENT:
- * - Requires authentication (PRIVATE mode)
- * - Must have valid credentials to follow users
+ * - Requires authentication (app password); PRIVATE mode.
+ *
+ * SIDE EFFECTS:
+ * - Performs real writes (follows/likes/reposts) to the network on the caller's behalf.
+ *
+ * RATE LIMITS:
+ * - Subject to per-tool rate limiting.
  */
-export class BatchFollowTool extends BaseTool {
+export class BatchActionTool extends BaseTool {
   public readonly schema = {
-    method: 'batch_follow',
+    method: 'batch_action',
     description:
-      'Follow multiple users in a single operation. Supports up to 25 users at once. Can continue on errors or stop at first failure. Requires authentication.',
-    params: BatchFollowSchema,
+      'Batch the same action across up to 25 targets in one call. ' +
+      'Supported actions: follow (handles/DIDs), like (AT-URIs), repost (AT-URIs). ' +
+      'Requires authentication (app password). ' +
+      "Performs real writes (follows/likes/reposts) to the network on the caller's behalf. " +
+      'Subject to per-tool rate limiting.',
+    params: BatchActionSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        action: { type: 'string', enum: ['follow', 'like', 'repost'] },
+        results: {
+          type: 'array',
+          description: 'Per-target outcome {target/uri, success, error?}.',
+        },
+        summary: {
+          type: 'object',
+          description: 'Counts: total, succeeded, failed, skipped.',
+        },
+      },
+      required: ['success', 'action', 'results', 'summary'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
-    super(atpClient, 'BatchFollow', ToolAuthMode.PRIVATE);
+    super(atpClient, 'BatchAction', ToolAuthMode.PRIVATE);
   }
 
-  protected async execute(params: { actors: string[]; continueOnError?: boolean }): Promise<{
+  protected async execute(params: {
+    action: 'follow' | 'like' | 'repost';
+    targets: string[];
+    continueOnError?: boolean;
+  }): Promise<{
+    success: boolean;
+    action: 'follow' | 'like' | 'repost';
+    results: Array<IFollowResult | ILikeResult | IRepostResult>;
+    summary: {
+      total: number;
+      processed: number;
+      skipped: number;
+      succeeded: number;
+      failed: number;
+    };
+  }> {
+    const continueOnError = params.continueOnError ?? true;
+    switch (params.action) {
+      case 'follow': {
+        const r = await this.batchFollow(params.targets, continueOnError);
+        return { ...r, action: 'follow' };
+      }
+      case 'like': {
+        const r = await this.batchLike(params.targets, continueOnError);
+        return { ...r, action: 'like' };
+      }
+      case 'repost': {
+        const r = await this.batchRepost(params.targets, continueOnError);
+        return { ...r, action: 'repost' };
+      }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Private action implementations (verbatim ports of the old execute bodies)
+  // -------------------------------------------------------------------------
+
+  private async batchFollow(
+    actors: string[],
+    continueOnError: boolean
+  ): Promise<{
     success: boolean;
     results: IFollowResult[];
     summary: {
@@ -62,8 +154,8 @@ export class BatchFollowTool extends BaseTool {
   }> {
     try {
       this.logger.info('Batch following users', {
-        count: params.actors.length,
-        continueOnError: params.continueOnError,
+        count: actors.length,
+        continueOnError,
       });
 
       const results: IFollowResult[] = [];
@@ -71,7 +163,7 @@ export class BatchFollowTool extends BaseTool {
       let failed = 0;
       let alreadyFollowing = 0;
 
-      for (const actor of params.actors) {
+      for (const actor of actors) {
         try {
           // Validate the actor identifier
           this.validateActor(actor);
@@ -153,14 +245,14 @@ export class BatchFollowTool extends BaseTool {
 
           failed++;
 
-          if (!params.continueOnError) {
+          if (!continueOnError) {
             break;
           }
         }
       }
 
       this.logger.info('Batch follow completed', {
-        total: params.actors.length,
+        total: actors.length,
         succeeded,
         failed,
         alreadyFollowing,
@@ -170,12 +262,12 @@ export class BatchFollowTool extends BaseTool {
         success: failed === 0,
         results,
         summary: {
-          total: params.actors.length,
+          total: actors.length,
           // When continueOnError is false the loop stops early; report how many
           // items were actually processed vs skipped so `total` is not mistaken
           // for "all processed".
           processed: results.length,
-          skipped: params.actors.length - results.length,
+          skipped: actors.length - results.length,
           succeeded,
           failed,
           alreadyFollowing,
@@ -187,71 +279,10 @@ export class BatchFollowTool extends BaseTool {
     }
   }
 
-  /**
-   * Resolve actor identifier to DID and profile information
-   */
-  private async resolveActor(
-    actor: string
-  ): Promise<{ did: DID; handle?: string; followingUri?: string }> {
-    const response = await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        return await agent.getProfile({ actor });
-      },
-      'getProfile',
-      { actor }
-    );
-
-    return {
-      did: response.data.did as DID,
-      ...(response.data.handle && { handle: response.data.handle }),
-      // viewer.following is the authoritative "am I already following this user"
-      // signal (the follow record's URI), with no 100-record scan limit.
-      ...(response.data.viewer?.following && { followingUri: response.data.viewer.following }),
-    };
-  }
-}
-
-/**
- * Zod schema for batch like parameters
- */
-const BatchLikeSchema = z.object({
-  uris: z.array(z.string().min(1)).min(1).max(25),
-  continueOnError: z.boolean().optional().default(true),
-});
-
-interface ILikeResult {
-  uri: string;
-  success: boolean;
-  likeUri?: ATURI;
-  likeCid?: CID;
-  error?: string;
-  alreadyLiked?: boolean;
-}
-
-/**
- * Batch Like Tool - Like multiple posts in a single operation
- *
- * This tool allows liking multiple posts at once, reducing round-trips
- * and making it easier to manage bulk like operations.
- *
- * AUTHENTICATION REQUIREMENT:
- * - Requires authentication (PRIVATE mode)
- * - Must have valid credentials to like posts
- */
-export class BatchLikeTool extends BaseTool {
-  public readonly schema = {
-    method: 'batch_like',
-    description:
-      'Like multiple posts in a single operation. Supports up to 25 posts at once. Can continue on errors or stop at first failure. Requires authentication.',
-    params: BatchLikeSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    super(atpClient, 'BatchLike', ToolAuthMode.PRIVATE);
-  }
-
-  protected async execute(params: { uris: string[]; continueOnError?: boolean }): Promise<{
+  private async batchLike(
+    uris: string[],
+    continueOnError: boolean
+  ): Promise<{
     success: boolean;
     results: ILikeResult[];
     summary: {
@@ -265,8 +296,8 @@ export class BatchLikeTool extends BaseTool {
   }> {
     try {
       this.logger.info('Batch liking posts', {
-        count: params.uris.length,
-        continueOnError: params.continueOnError,
+        count: uris.length,
+        continueOnError,
       });
 
       const results: ILikeResult[] = [];
@@ -274,7 +305,7 @@ export class BatchLikeTool extends BaseTool {
       let failed = 0;
       let alreadyLiked = 0;
 
-      for (const uri of params.uris) {
+      for (const uri of uris) {
         try {
           // Validate the URI
           this.validateAtUri(uri);
@@ -353,14 +384,14 @@ export class BatchLikeTool extends BaseTool {
 
           failed++;
 
-          if (!params.continueOnError) {
+          if (!continueOnError) {
             break;
           }
         }
       }
 
       this.logger.info('Batch like completed', {
-        total: params.uris.length,
+        total: uris.length,
         succeeded,
         failed,
         alreadyLiked,
@@ -370,12 +401,12 @@ export class BatchLikeTool extends BaseTool {
         success: failed === 0,
         results,
         summary: {
-          total: params.uris.length,
+          total: uris.length,
           // When continueOnError is false the loop stops early; report how many
           // items were actually processed vs skipped so `total` is not mistaken
           // for "all processed".
           processed: results.length,
-          skipped: params.uris.length - results.length,
+          skipped: uris.length - results.length,
           succeeded,
           failed,
           alreadyLiked,
@@ -387,49 +418,10 @@ export class BatchLikeTool extends BaseTool {
     }
   }
 
-  // Post lookup (CID + viewer state) is provided by BaseTool.getPostView.
-}
-
-/**
- * Zod schema for batch repost parameters
- */
-const BatchRepostSchema = z.object({
-  uris: z.array(z.string().min(1)).min(1).max(25),
-  continueOnError: z.boolean().optional().default(true),
-});
-
-interface IRepostResult {
-  uri: string;
-  success: boolean;
-  repostUri?: ATURI;
-  repostCid?: CID;
-  error?: string;
-  alreadyReposted?: boolean;
-}
-
-/**
- * Batch Repost Tool - Repost multiple posts in a single operation
- *
- * This tool allows reposting multiple posts at once, reducing round-trips
- * and making it easier to manage bulk repost operations.
- *
- * AUTHENTICATION REQUIREMENT:
- * - Requires authentication (PRIVATE mode)
- * - Must have valid credentials to repost
- */
-export class BatchRepostTool extends BaseTool {
-  public readonly schema = {
-    method: 'batch_repost',
-    description:
-      'Repost multiple posts in a single operation. Supports up to 25 posts at once. Can continue on errors or stop at first failure. Requires authentication.',
-    params: BatchRepostSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    super(atpClient, 'BatchRepost', ToolAuthMode.PRIVATE);
-  }
-
-  protected async execute(params: { uris: string[]; continueOnError?: boolean }): Promise<{
+  private async batchRepost(
+    uris: string[],
+    continueOnError: boolean
+  ): Promise<{
     success: boolean;
     results: IRepostResult[];
     summary: {
@@ -443,8 +435,8 @@ export class BatchRepostTool extends BaseTool {
   }> {
     try {
       this.logger.info('Batch reposting posts', {
-        count: params.uris.length,
-        continueOnError: params.continueOnError,
+        count: uris.length,
+        continueOnError,
       });
 
       const results: IRepostResult[] = [];
@@ -452,7 +444,7 @@ export class BatchRepostTool extends BaseTool {
       let failed = 0;
       let alreadyReposted = 0;
 
-      for (const uri of params.uris) {
+      for (const uri of uris) {
         try {
           // Validate the URI
           this.validateAtUri(uri);
@@ -531,14 +523,14 @@ export class BatchRepostTool extends BaseTool {
 
           failed++;
 
-          if (!params.continueOnError) {
+          if (!continueOnError) {
             break;
           }
         }
       }
 
       this.logger.info('Batch repost completed', {
-        total: params.uris.length,
+        total: uris.length,
         succeeded,
         failed,
         alreadyReposted,
@@ -548,12 +540,12 @@ export class BatchRepostTool extends BaseTool {
         success: failed === 0,
         results,
         summary: {
-          total: params.uris.length,
+          total: uris.length,
           // When continueOnError is false the loop stops early; report how many
           // items were actually processed vs skipped so `total` is not mistaken
           // for "all processed".
           processed: results.length,
-          skipped: params.uris.length - results.length,
+          skipped: uris.length - results.length,
           succeeded,
           failed,
           alreadyReposted,
@@ -565,5 +557,27 @@ export class BatchRepostTool extends BaseTool {
     }
   }
 
-  // Post lookup (CID + viewer state) is provided by BaseTool.getPostView.
+  /**
+   * Resolve actor identifier to DID and profile information
+   */
+  private async resolveActor(
+    actor: string
+  ): Promise<{ did: DID; handle?: string; followingUri?: string }> {
+    const response = await this.executeAtpOperation(
+      async () => {
+        const agent = this.atpClient.getAgent();
+        return await agent.getProfile({ actor });
+      },
+      'getProfile',
+      { actor }
+    );
+
+    return {
+      did: response.data.did as DID,
+      ...(response.data.handle && { handle: response.data.handle }),
+      // viewer.following is the authoritative "am I already following this user"
+      // signal (the follow record's URI), with no 100-record scan limit.
+      ...(response.data.viewer?.following && { followingUri: response.data.viewer.following }),
+    };
+  }
 }

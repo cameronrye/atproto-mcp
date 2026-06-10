@@ -12,9 +12,7 @@ import {
   AnalyzeAccountTool,
   AnalyzeImageTool,
   AnalyzeModerationStatusTool,
-  BatchFollowTool,
-  BatchLikeTool,
-  BatchRepostTool,
+  BatchActionTool,
   BlockUserTool,
   CreateListTool,
   CreatePostTool,
@@ -146,9 +144,7 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new DiscoverCommunitiesTool(atpClient),
 
     // Batch operations
-    () => new BatchFollowTool(atpClient),
-    () => new BatchLikeTool(atpClient),
-    () => new BatchRepostTool(atpClient),
+    () => new BatchActionTool(atpClient),
 
     // Composite operations
     () => new GetUserSummaryTool(atpClient),

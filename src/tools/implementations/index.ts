@@ -64,7 +64,7 @@ export { FindSimilarUsersTool, DiscoverCommunitiesTool } from './content-discove
 export { DiscoverTool } from './discover-tool.js';
 
 // Batch operations
-export { BatchFollowTool, BatchLikeTool, BatchRepostTool } from './batch-operations-tools.js';
+export { BatchActionTool } from './batch-operations-tools.js';
 
 // Composite operations
 export { GetUserSummaryTool, GetPostContextTool } from './composite-tools.js';
