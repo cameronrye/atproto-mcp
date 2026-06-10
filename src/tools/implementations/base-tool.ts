@@ -37,6 +37,7 @@ export abstract class BaseTool implements IMcpTool {
     method: string;
     description: string;
     params?: z.ZodSchema;
+    outputSchema?: Record<string, unknown>;
   };
 
   constructor(

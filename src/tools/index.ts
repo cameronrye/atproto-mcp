@@ -70,6 +70,11 @@ export interface IMcpTool {
     description: string;
     params?: z.ZodSchema;
     annotations?: IToolAnnotations;
+    // Optional JSON Schema describing the tool's result, advertised in tools/list.
+    // Purely descriptive: the server builds tools/call responses manually (it does
+    // not use the SDK's high-level registerTool), so this does NOT trigger any SDK
+    // structuredContent validation.
+    outputSchema?: Record<string, unknown>;
   };
   handler: (params: any) => Promise<any>;
 }

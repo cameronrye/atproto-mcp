@@ -206,6 +206,11 @@ export class AtpMcpServer {
           inputSchema: tool.schema.params
             ? this.zodToJsonSchema(tool.schema.params)
             : { type: 'object', properties: {} },
+          // Advertise an output schema when the tool declares one. This is purely
+          // descriptive metadata in the tools/list payload; because tools/call
+          // responses are built by this custom handler (not the SDK's high-level
+          // registerTool), it does not trigger structuredContent validation.
+          ...(tool.schema.outputSchema ? { outputSchema: tool.schema.outputSchema } : {}),
           annotations: computeToolAnnotations(tool.schema.method, tool.schema.annotations),
         })),
       })
