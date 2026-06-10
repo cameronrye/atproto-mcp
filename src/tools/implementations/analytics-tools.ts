@@ -6,11 +6,38 @@ import type { AtpClient } from '../../utils/atp-client.js';
  * Zod schema for find influential users parameters
  */
 const FindInfluentialUsersSchema = z.object({
-  topic: z.string().optional(),
-  searchQuery: z.string().optional(),
-  minFollowers: z.number().min(0).optional().default(100),
-  maxResults: z.number().min(1).max(50).optional().default(20),
-  sortBy: z.enum(['followers', 'engagement', 'relevance']).optional().default('followers'),
+  topic: z
+    .string()
+    .optional()
+    .describe(
+      'Topic keyword(s) to search for (e.g. "climate change"). Used as the search query when searchQuery is not provided.'
+    ),
+  searchQuery: z
+    .string()
+    .optional()
+    .describe(
+      'Explicit search query string. When provided, takes precedence over topic. At least one of topic or searchQuery must be supplied.'
+    ),
+  minFollowers: z
+    .number()
+    .min(0)
+    .optional()
+    .default(100)
+    .describe('Minimum follower count a user must have to be included in results (default 100).'),
+  maxResults: z
+    .number()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(20)
+    .describe('Maximum number of users to return (1–50, default 20).'),
+  sortBy: z
+    .enum(['followers', 'engagement', 'relevance'])
+    .optional()
+    .default('followers')
+    .describe(
+      'Sort order for results: "followers" (by follower count), "engagement" (by computed influence score), or "relevance" (by how many matched posts are from that user). Default "followers".'
+    ),
 });
 
 /**
@@ -30,8 +57,81 @@ export class FindInfluentialUsersTool extends BaseTool {
   public readonly schema = {
     method: 'find_influential_users',
     description:
-      'Find influential users in a topic or network. Search by topic/query and filter by follower count. Returns users sorted by followers, engagement, or relevance.',
+      "Find influential users in a topic or network by searching recent posts and ranking their authors. Works without authentication; richer with auth. Read-only — produces no side effects. Use this instead of find_similar_users when you want topic-driven discovery of high-reach accounts rather than a specific user's social graph. Subject to per-tool rate limiting.",
     params: FindInfluentialUsersSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the operation completed successfully.',
+        },
+        query: {
+          type: 'string',
+          description: 'The search query that was used.',
+        },
+        users: {
+          type: 'array',
+          description: 'List of influential users found, sorted per the sortBy parameter.',
+          items: {
+            type: 'object',
+            properties: {
+              did: {
+                type: 'string',
+                description: 'Decentralized identifier of the user.',
+              },
+              handle: {
+                type: 'string',
+                description: 'Bluesky handle of the user (e.g. alice.bsky.social).',
+              },
+              displayName: {
+                type: 'string',
+                description: "User's display name, if set.",
+              },
+              description: {
+                type: 'string',
+                description: "User's profile bio/description, if set.",
+              },
+              followersCount: {
+                type: 'number',
+                description: 'Number of followers the user has.',
+              },
+              followsCount: {
+                type: 'number',
+                description: 'Number of accounts the user follows.',
+              },
+              postsCount: {
+                type: 'number',
+                description: 'Total posts published by the user.',
+              },
+              influenceScore: {
+                type: 'number',
+                description:
+                  'Computed influence score based on follower count, follower/following ratio, and post activity.',
+              },
+              relevanceScore: {
+                type: 'number',
+                description: 'Number of matched search-result posts authored by this user.',
+              },
+            },
+            required: [
+              'did',
+              'handle',
+              'followersCount',
+              'followsCount',
+              'postsCount',
+              'influenceScore',
+            ],
+          },
+        },
+        insights: {
+          type: 'array',
+          description: 'Human-readable insight strings summarising the results.',
+          items: { type: 'string' },
+        },
+      },
+      required: ['success', 'query', 'users', 'insights'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

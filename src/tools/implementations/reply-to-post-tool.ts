@@ -15,9 +15,22 @@ const ReplyToPostSchema = z.object({
     .string()
     .min(1, 'Reply text cannot be empty')
     // Coarse cap; the real 300-grapheme / 3000-byte limit is enforced in buildRichText.
-    .max(3000, 'Reply text is too long (limit is 300 graphemes / 3000 bytes)'),
-  root: z.string().min(1, 'Root post URI is required'),
-  parent: z.string().min(1, 'Parent post URI is required'),
+    .max(3000, 'Reply text is too long (limit is 300 graphemes / 3000 bytes)')
+    .describe(
+      'Text content of the reply (1–300 graphemes / up to 3000 bytes). Mentions (@handle), links, and hashtags are automatically resolved into rich-text facets.'
+    ),
+  root: z
+    .string()
+    .min(1, 'Root post URI is required')
+    .describe(
+      'AT-URI of the top-level post that started the thread (at://did/app.bsky.feed.post/rkey). Must be the original root even when replying to a nested reply.'
+    ),
+  parent: z
+    .string()
+    .min(1, 'Parent post URI is required')
+    .describe(
+      'AT-URI of the immediate post being replied to (at://did/app.bsky.feed.post/rkey). May equal root when replying directly to the thread starter.'
+    ),
   langs: z
     .array(
       z
@@ -26,8 +39,12 @@ const ReplyToPostSchema = z.object({
           /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
           'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
         )
+        .describe('A single BCP-47 language tag for the reply text (e.g. "en", "en-US", "pt-BR").')
     )
-    .optional(),
+    .optional()
+    .describe(
+      'List of BCP-47 language tags indicating the language(s) of the reply text. Omit if unknown.'
+    ),
 });
 
 /**
@@ -41,8 +58,45 @@ export class ReplyToPostTool extends BaseTool {
   public readonly schema = {
     method: 'reply_to_post',
     description:
-      'Reply to an existing post on AT Protocol. Creates a threaded reply with proper parent/root references. Requires authentication.',
+      'Reply to an existing post on AT Protocol, creating a threaded reply with proper parent and root CID references. Requires authentication (app password). Creates a new post record linked into the thread; the action cannot be undone (use delete_post to remove it afterwards). Use this instead of create_post whenever the new content belongs inside an existing thread; use create_thread to start a multi-post thread from scratch. Subject to per-tool rate limiting.',
     params: ReplyToPostSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          type: 'string',
+          description: 'AT-URI of the newly created reply post (at://did/app.bsky.feed.post/rkey).',
+        },
+        cid: {
+          type: 'string',
+          description: 'Content identifier (CID) of the newly created reply record.',
+        },
+        success: {
+          type: 'boolean',
+          description: 'True when the reply was created successfully.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable status message describing the outcome.',
+        },
+        replyTo: {
+          type: 'object',
+          description: 'The root and parent URIs that this reply is linked to.',
+          properties: {
+            root: {
+              type: 'string',
+              description: 'AT-URI of the top-level post that started the thread.',
+            },
+            parent: {
+              type: 'string',
+              description: 'AT-URI of the immediate post that was replied to.',
+            },
+          },
+          required: ['root', 'parent'],
+        },
+      },
+      required: ['uri', 'cid', 'success', 'message', 'replyTo'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

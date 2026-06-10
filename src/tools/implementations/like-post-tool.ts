@@ -11,8 +11,14 @@ import { type ATURI, type CID, type ILikePostParams, ValidationError } from '../
  * Zod schema for like post parameters
  */
 const LikePostSchema = z.object({
-  uri: z.string().min(1, 'Post URI is required'),
-  cid: z.string().min(1, 'Post CID is required'),
+  uri: z
+    .string()
+    .min(1, 'Post URI is required')
+    .describe('AT-URI of the post to like (at://did/app.bsky.feed.post/rkey).'),
+  cid: z
+    .string()
+    .min(1, 'Post CID is required')
+    .describe('CID of the post record; used to confirm the exact version being liked.'),
 });
 
 /**
@@ -26,8 +32,30 @@ export class LikePostTool extends BaseTool {
   public readonly schema = {
     method: 'like_post',
     description:
-      'Like a post on AT Protocol. Creates a like record that references the target post. Requires authentication.',
+      'Like a post on AT Protocol by creating a like record that references the target post. If the post is already liked the existing like is returned without creating a duplicate. Requires authentication (app password). Use unlike_post to remove a like. Subject to per-tool rate limiting.',
     params: LikePostSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          type: 'string',
+          description: 'AT-URI of the newly created (or existing) like record.',
+        },
+        cid: { type: 'string', description: 'CID of the like record.' },
+        success: { type: 'boolean', description: 'Whether the like operation succeeded.' },
+        message: { type: 'string', description: 'Human-readable status message.' },
+        likedPost: {
+          type: 'object',
+          description: 'The post that was liked.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the liked post.' },
+            cid: { type: 'string', description: 'CID of the liked post.' },
+          },
+          required: ['uri', 'cid'],
+        },
+      },
+      required: ['uri', 'cid', 'success', 'message', 'likedPost'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -159,10 +187,32 @@ export class LikePostTool extends BaseTool {
 export class UnlikePostTool extends BaseTool {
   public readonly schema = {
     method: 'unlike_post',
-    description: 'Remove a like from a post on AT Protocol. Deletes the like record.',
+    description:
+      'Remove a like from a post on AT Protocol by deleting the like record identified by its AT-URI. This action permanently removes the like and cannot be undone. Requires authentication (app password). Use like_post to add a like. Subject to per-tool rate limiting.',
     params: z.object({
-      likeUri: z.string().min(1, 'Like URI is required'),
+      likeUri: z
+        .string()
+        .min(1, 'Like URI is required')
+        .describe(
+          'AT-URI of the like record to delete (at://did/app.bsky.feed.like/rkey); obtained from a previous like_post response or post viewer state.'
+        ),
     }),
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the unlike operation succeeded.' },
+        message: { type: 'string', description: 'Human-readable status message.' },
+        deletedLike: {
+          type: 'object',
+          description: 'The like record that was deleted.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the deleted like record.' },
+          },
+          required: ['uri'],
+        },
+      },
+      required: ['success', 'message', 'deletedLike'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

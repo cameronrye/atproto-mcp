@@ -6,14 +6,34 @@ import type { AtpClient } from '../../utils/atp-client.js';
  * Zod schema for analyze image parameters
  */
 const AnalyzeImageSchema = z.object({
-  blob: z.object({
-    ref: z.object({
-      $link: z.string(),
-    }),
-    mimeType: z.string(),
-    size: z.number(),
-  }),
-  includeOptimizationSuggestions: z.boolean().optional().default(true),
+  blob: z
+    .object({
+      ref: z
+        .object({
+          $link: z
+            .string()
+            .describe(
+              'CID link string of the uploaded blob, as returned by the upload_image tool (e.g. "bafkreigh2akiscaild...") .'
+            ),
+        })
+        .describe('Blob reference object containing the CID link.'),
+      mimeType: z
+        .string()
+        .describe(
+          'MIME type of the image blob (e.g. "image/jpeg", "image/png", "image/webp", "image/gif").'
+        ),
+      size: z.number().describe('Size of the blob in bytes, as reported by the upload response.'),
+    })
+    .describe(
+      'Blob metadata object as returned by upload_image; contains the ref, mimeType, and size fields.'
+    ),
+  includeOptimizationSuggestions: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'When true (default), the response includes a list of human-readable optimization and accessibility suggestions based on the blob size and MIME type.'
+    ),
 });
 
 /**
@@ -35,10 +55,66 @@ export class AnalyzeImageTool extends BaseTool {
   public readonly schema = {
     method: 'analyze_image',
     description:
-      "Analyze an image blob's metadata (file size, format/MIME type) and provide optimization " +
-      'and accessibility suggestions. Does not decode the image, so it does not report pixel ' +
-      'dimensions or aspect ratio.',
+      "Analyze an image blob's metadata (MIME type, file size in bytes/KB/MB, derived format, and " +
+      'whether it is within optimized-size thresholds) and optionally return human-readable ' +
+      'optimization and accessibility suggestions. Does not decode the image, so it cannot report ' +
+      'pixel dimensions or aspect ratio. No authentication required. ' +
+      'Use upload_image to obtain the blob reference first, then pass it here; ' +
+      'prefer this tool over upload_image for pre-flight size checks before actually posting. ' +
+      'Subject to per-tool rate limiting.',
     params: AnalyzeImageSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'True when the analysis completed without errors.',
+        },
+        analysis: {
+          type: 'object',
+          description: 'Metadata derived from the blob.',
+          properties: {
+            mimeType: {
+              type: 'string',
+              description: 'MIME type of the image as declared in the blob (e.g. "image/jpeg").',
+            },
+            size: {
+              type: 'number',
+              description: 'Raw blob size in bytes.',
+            },
+            sizeKB: {
+              type: 'number',
+              description: 'Blob size converted to kilobytes, rounded to two decimal places.',
+            },
+            sizeMB: {
+              type: 'number',
+              description: 'Blob size converted to megabytes, rounded to two decimal places.',
+            },
+            format: {
+              type: 'string',
+              description:
+                'Format string derived from the MIME type subtype (e.g. "jpeg", "png", "webp").',
+            },
+            isOptimized: {
+              type: 'boolean',
+              description:
+                'True when the blob is within the format-specific size threshold considered optimized for web use.',
+            },
+          },
+          required: ['mimeType', 'size', 'sizeKB', 'sizeMB', 'format', 'isOptimized'],
+        },
+        suggestions: {
+          type: 'array',
+          description:
+            'List of human-readable optimization and accessibility suggestions. Present only when includeOptimizationSuggestions is true.',
+          items: {
+            type: 'string',
+            description: 'A single optimization or accessibility recommendation.',
+          },
+        },
+      },
+      required: ['success', 'analysis'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

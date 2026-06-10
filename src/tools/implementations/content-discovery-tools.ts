@@ -10,20 +10,72 @@ import type { AtpClient } from '../../utils/atp-client.js';
  * Zod schema for find similar users parameters
  */
 const FindSimilarUsersSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
-  maxResults: z.number().int().min(1).max(50).optional().default(20),
-  minFollowerCount: z.number().int().min(0).optional().default(0),
-  includeMetrics: z.boolean().optional().default(true),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe(
+      'Handle (e.g. alice.bsky.social) or DID of the target account to find similar users for.'
+    ),
+  maxResults: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(20)
+    .describe('Maximum number of similar users to return (1–50, default 20).'),
+  minFollowerCount: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .default(0)
+    .describe(
+      'Minimum follower count a candidate must have to be included in results (default 0, meaning no minimum).'
+    ),
+  includeMetrics: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'When true, includes a metrics object on each result with mutualFollowers and followerRatioSimilarity values (default true).'
+    ),
 });
 
 /**
  * Zod schema for discover communities parameters
  */
 const DiscoverCommunitiesSchema = z.object({
-  topic: z.string().min(1, 'Topic is required'),
-  maxResults: z.number().int().min(1).max(50).optional().default(20),
-  minCommunitySize: z.number().int().min(2).optional().default(5),
-  includeMetrics: z.boolean().optional().default(true),
+  topic: z
+    .string()
+    .min(1, 'Topic is required')
+    .describe(
+      'Keyword or phrase to search for (e.g. "climate", "web dev"). Used to retrieve relevant posts and identify active community clusters.'
+    ),
+  maxResults: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(20)
+    .describe('Maximum number of communities to return (1–50, default 20).'),
+  minCommunitySize: z
+    .number()
+    .int()
+    .min(2)
+    .optional()
+    .default(5)
+    .describe(
+      'Minimum number of distinct members required for a cluster to be reported as a community (minimum 2, default 5).'
+    ),
+  includeMetrics: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'When true, includes a metrics object on each community with avgFollowerCount, totalPosts, and interconnectedness values (default true).'
+    ),
 });
 
 /**
@@ -33,10 +85,87 @@ export class FindSimilarUsersTool extends BaseTool {
   public readonly schema = {
     method: 'find_similar_users',
     description:
-      'Find users similar to a given user based on shared follow-graph connections (accounts ' +
-      'followed by the same people, and mutual followers). Ranking also factors in follower/' +
-      'following-ratio similarity. NOTE: content-topic similarity is NOT analyzed.',
+      'Find users similar to a given user based on shared follow-graph connections (second-degree follows and mutual followers) and follower/following-ratio similarity. ' +
+      'Content-topic similarity is NOT analyzed. ' +
+      'Works without authentication; richer with auth. ' +
+      'Use this instead of search_actors when you want accounts structurally similar to a known user rather than keyword matches. ' +
+      'Subject to per-tool rate limiting.',
     params: FindSimilarUsersSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the operation completed successfully.',
+        },
+        similarUsers: {
+          type: 'array',
+          description: 'List of similar users sorted by descending similarity score.',
+          items: {
+            type: 'object',
+            properties: {
+              did: { type: 'string', description: 'Decentralized identifier of the user.' },
+              handle: { type: 'string', description: 'Bluesky handle of the user.' },
+              displayName: { type: 'string', description: 'Display name of the user, if set.' },
+              description: { type: 'string', description: 'Profile bio of the user, if set.' },
+              avatar: { type: 'string', description: "URL of the user's avatar image, if set." },
+              followersCount: { type: 'number', description: 'Number of followers.' },
+              followsCount: { type: 'number', description: 'Number of accounts the user follows.' },
+              postsCount: { type: 'number', description: 'Total posts by this user.' },
+              similarityScore: {
+                type: 'number',
+                description: 'Computed similarity score (higher is more similar).',
+              },
+              similarityReasons: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Human-readable reasons contributing to the similarity score.',
+              },
+              metrics: {
+                type: 'object',
+                description: 'Optional metrics object; present when includeMetrics is true.',
+                properties: {
+                  mutualFollowers: {
+                    type: 'number',
+                    description: 'Number of mutual followers with the base user.',
+                  },
+                  followerRatioSimilarity: {
+                    type: 'number',
+                    description: 'Similarity of follower/following ratios (0–1).',
+                  },
+                },
+              },
+            },
+            required: [
+              'did',
+              'handle',
+              'followersCount',
+              'followsCount',
+              'postsCount',
+              'similarityScore',
+              'similarityReasons',
+            ],
+          },
+        },
+        baseUser: {
+          type: 'object',
+          description: 'Profile summary of the queried base user.',
+          properties: {
+            did: { type: 'string', description: 'DID of the base user.' },
+            handle: { type: 'string', description: 'Handle of the base user.' },
+            displayName: { type: 'string', description: 'Display name of the base user, if set.' },
+          },
+          required: ['did', 'handle'],
+        },
+        insights: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Summary observations about the results (e.g. average similarity score, average follower count).',
+        },
+      },
+      required: ['success', 'similarUsers', 'baseUser', 'insights'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -358,9 +487,98 @@ export class DiscoverCommunitiesTool extends BaseTool {
   public readonly schema = {
     method: 'discover_communities',
     description:
-      'Discover communities and groups of users around specific topics or interests. ' +
-      'Identifies clusters of users who frequently interact around a topic.',
+      'Discover communities and groups of users around specific topics or interests by searching recent posts and clustering authors who interact with each other. ' +
+      'Works without authentication; richer with auth. ' +
+      'Use this instead of find_similar_users when you want topic-based community clusters rather than accounts structurally similar to a specific user. ' +
+      'Subject to per-tool rate limiting.',
     params: DiscoverCommunitiesSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the operation completed successfully.',
+        },
+        communities: {
+          type: 'array',
+          description: 'List of discovered communities sorted by size and engagement (descending).',
+          items: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Auto-generated name for the community (e.g. "climate Community 1").',
+              },
+              topic: {
+                type: 'string',
+                description: 'The topic keyword used to discover this community.',
+              },
+              size: { type: 'number', description: 'Number of distinct members in the community.' },
+              coreMembers: {
+                type: 'array',
+                description:
+                  'Up to 10 most relevant members, sorted by relevance score descending.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    did: { type: 'string', description: 'DID of the member.' },
+                    handle: { type: 'string', description: 'Bluesky handle of the member.' },
+                    displayName: { type: 'string', description: 'Display name, if set.' },
+                    avatar: { type: 'string', description: 'Avatar URL, if set.' },
+                    followersCount: { type: 'number', description: 'Follower count.' },
+                    postsCount: {
+                      type: 'number',
+                      description: 'Posts contributed to the topic in this search.',
+                    },
+                    relevanceScore: {
+                      type: 'number',
+                      description: 'Relevance score based on engagement and post count.',
+                    },
+                  },
+                  required: ['did', 'handle', 'followersCount', 'postsCount', 'relevanceScore'],
+                },
+              },
+              activityLevel: {
+                type: 'string',
+                enum: ['high', 'medium', 'low'],
+                description:
+                  'Activity level based on average posts per member: high (>=3), medium (1.5–2.9), low (<1.5).',
+              },
+              description: {
+                type: 'string',
+                description: 'Auto-generated human-readable summary of the community.',
+              },
+              metrics: {
+                type: 'object',
+                description: 'Optional metrics object; present when includeMetrics is true.',
+                properties: {
+                  avgFollowerCount: {
+                    type: 'number',
+                    description: 'Average follower count across all members.',
+                  },
+                  totalPosts: {
+                    type: 'number',
+                    description: 'Total posts by all community members on this topic.',
+                  },
+                  interconnectedness: {
+                    type: 'number',
+                    description: 'Ratio of cross-member interactions to community size.',
+                  },
+                },
+              },
+            },
+            required: ['name', 'topic', 'size', 'coreMembers', 'activityLevel', 'description'],
+          },
+        },
+        insights: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Summary observations about the discovered communities (e.g. total members, largest community).',
+        },
+      },
+      required: ['success', 'communities', 'insights'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

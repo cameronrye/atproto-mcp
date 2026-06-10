@@ -62,7 +62,7 @@ export class GetUserConnectionsTool extends BaseTool {
   public readonly schema = {
     method: 'get_user_connections',
     description:
-      "Retrieve an account's followers or follows from AT Protocol. Works without authentication; richer with auth. Use direction to choose followers vs follows — replaces the former separate tools. Subject to per-tool rate limiting.",
+      "Retrieve an account's followers or follows from AT Protocol. Works without authentication; richer with auth. Use direction='followers' to get who follows the actor or direction='follows' to get who the actor follows; use get_user_profile or get_user_summary for aggregate counts instead. Subject to per-tool rate limiting.",
     params: GetUserConnectionsSchema,
     outputSchema: {
       type: 'object',
@@ -229,7 +229,7 @@ export class GetNotificationsTool extends BaseTool {
   public readonly schema = {
     method: 'get_notifications',
     description:
-      'Retrieve notifications from AT Protocol (likes, reposts, follows, mentions, replies). Requires authentication. Use countOnly: true to fetch just the unread badge number without retrieving the full list. Subject to per-tool rate limiting.',
+      'Retrieve notifications from AT Protocol (likes, reposts, follows, mentions, replies). Requires authentication (app password). Use countOnly: true to fetch only the unread badge count cheaply without loading the full list; use mark_notifications_seen to clear the unread state after processing. Subject to per-tool rate limiting.',
     params: GetNotificationsSchema,
     outputSchema: {
       type: 'object',
@@ -433,8 +433,22 @@ export class MarkNotificationsSeenTool extends BaseTool {
   public readonly schema = {
     method: 'mark_notifications_seen',
     description:
-      'Mark notifications as seen up to a timestamp (defaults to now) so they are not reprocessed. Requires authentication.',
+      'Mark notifications as seen up to a timestamp (defaults to now) so they are not reprocessed on subsequent get_notifications calls. Requires authentication (app password). Persists the seen cursor server-side; use get_notifications to retrieve new notifications after calling this. Subject to per-tool rate limiting.',
     params: MarkNotificationsSeenSchema,
+    outputSchema: {
+      type: 'object',
+      description: 'Result of marking notifications as seen.',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the operation succeeded.' },
+        message: { type: 'string', description: 'Human-readable confirmation message.' },
+        seenAt: {
+          type: 'string',
+          description:
+            'ISO 8601 timestamp that was submitted as the seen-up-to marker (the value that was persisted).',
+        },
+      },
+      required: ['success', 'message', 'seenAt'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

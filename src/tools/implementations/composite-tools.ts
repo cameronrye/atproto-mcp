@@ -38,10 +38,32 @@ function toAtpPost(post: any): IAtpPost {
  * Zod schema for get user summary parameters
  */
 const GetUserSummarySchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
-  includeRecentPosts: z.boolean().optional().default(true),
-  postLimit: z.number().int().min(1).max(50).optional().default(10),
-  includeEngagementStats: z.boolean().optional().default(true),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the target account.'),
+  includeRecentPosts: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Whether to include recent posts in the response. Default true.'),
+  postLimit: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(10)
+    .describe(
+      'Number of recent posts to fetch (1–50, default 10). Only used when includeRecentPosts or includeEngagementStats is true.'
+    ),
+  includeEngagementStats: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'Whether to compute engagement statistics (avg likes, reposts, replies) over the recent posts. Default true.'
+    ),
 });
 
 /**
@@ -63,8 +85,117 @@ export class GetUserSummaryTool extends BaseTool {
   public readonly schema = {
     method: 'get_user_summary',
     description:
-      'Get comprehensive user information in a single call. Includes profile, recent posts, and engagement statistics. Works without authentication but provides more data when authenticated.',
+      'Get comprehensive user information in a single call, combining profile, recent posts, and engagement statistics. Works without authentication; richer with auth. Use get_user_profile for just the profile or get_author_feed for posts alone; use this tool when you need both in one round-trip. Subject to per-tool rate limiting.',
     params: GetUserSummarySchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the summary was retrieved successfully.',
+        },
+        profile: {
+          type: 'object',
+          description:
+            "The user's full profile, including optional viewer context when authenticated.",
+          properties: {
+            did: { type: 'string', description: "The user's DID." },
+            handle: { type: 'string', description: "The user's handle." },
+            displayName: { type: 'string', description: "The user's display name." },
+            avatar: { type: 'string', description: 'URL to the avatar image.' },
+            description: { type: 'string', description: 'Profile bio.' },
+            followersCount: { type: 'number', description: 'Number of followers.' },
+            followsCount: { type: 'number', description: 'Number of accounts followed.' },
+            postsCount: { type: 'number', description: 'Total number of posts.' },
+            indexedAt: {
+              type: 'string',
+              description: 'ISO timestamp when the profile was first indexed.',
+            },
+            viewer: {
+              type: 'object',
+              description:
+                'Viewer relationship context (muted, blocking, following, etc.) — only present when authenticated.',
+              properties: {
+                muted: {
+                  type: 'boolean',
+                  description: 'Whether the authenticated user has muted this account.',
+                },
+                blockedBy: {
+                  type: 'boolean',
+                  description: 'Whether this account has blocked the authenticated user.',
+                },
+                blocking: {
+                  type: 'string',
+                  description:
+                    'AT-URI of the block record if the authenticated user is blocking this account.',
+                },
+                following: {
+                  type: 'string',
+                  description:
+                    'AT-URI of the follow record if the authenticated user follows this account.',
+                },
+                followedBy: {
+                  type: 'string',
+                  description:
+                    'AT-URI of the follow record if this account follows the authenticated user.',
+                },
+              },
+            },
+          },
+          required: ['did', 'handle'],
+        },
+        recentPosts: {
+          type: 'array',
+          description: 'Recent posts (present when includeRecentPosts is true).',
+          items: { type: 'object', description: 'Normalized post view.' },
+        },
+        engagementStats: {
+          type: 'object',
+          description:
+            'Engagement statistics computed over the fetched posts (present when includeEngagementStats is true).',
+          properties: {
+            totalPosts: { type: 'number', description: 'Number of posts analysed.' },
+            totalLikes: { type: 'number', description: 'Sum of likes across analysed posts.' },
+            totalReposts: { type: 'number', description: 'Sum of reposts across analysed posts.' },
+            totalReplies: { type: 'number', description: 'Sum of replies across analysed posts.' },
+            averageLikesPerPost: { type: 'number', description: 'Mean likes per post.' },
+            averageRepostsPerPost: { type: 'number', description: 'Mean reposts per post.' },
+            averageRepliesPerPost: { type: 'number', description: 'Mean replies per post.' },
+            mostLikedPost: { type: 'object', description: 'The post with the highest like count.' },
+            mostRepostedPost: {
+              type: 'object',
+              description: 'The post with the highest repost count.',
+            },
+          },
+          required: [
+            'totalPosts',
+            'totalLikes',
+            'totalReposts',
+            'totalReplies',
+            'averageLikesPerPost',
+            'averageRepostsPerPost',
+            'averageRepliesPerPost',
+          ],
+        },
+        summary: {
+          type: 'object',
+          description: 'Condensed key metrics for quick consumption.',
+          properties: {
+            handle: { type: 'string', description: "The user's handle." },
+            displayName: { type: 'string', description: "The user's display name." },
+            followersCount: { type: 'number', description: 'Follower count.' },
+            followsCount: { type: 'number', description: 'Following count.' },
+            postsCount: { type: 'number', description: 'Total post count.' },
+            isAuthenticated: {
+              type: 'boolean',
+              description: 'Whether the current session is authenticated.',
+            },
+          },
+          required: ['handle', 'followersCount', 'followsCount', 'postsCount', 'isAuthenticated'],
+        },
+      },
+      required: ['success', 'profile', 'summary'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
