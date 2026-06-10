@@ -126,8 +126,8 @@ per minute.
 ## Related Tools
 
 - **[upload_image](./upload-image.md)** - Upload images to AT Protocol
-- **[extract_media_from_post](./extract-media-from-post.md)** - Extract media
-  from posts
+- **[get_post_context](./get-post-context.md)** - Extract media from a post with
+  `includeMedia: true`
 - **[create_post](./create-post.md)** - Create posts with images
 
 ## See Also

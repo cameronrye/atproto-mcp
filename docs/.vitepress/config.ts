@@ -202,7 +202,6 @@ export default withMermaid(
             collapsed: true,
             items: [
               { text: 'Create Post', link: '/api/tools/create-post' },
-              { text: 'Create Rich Text Post', link: '/api/tools/create-rich-text-post' },
               { text: 'Create Thread', link: '/api/tools/create-thread' },
               { text: 'Reply to Post', link: '/api/tools/reply-to-post' },
               { text: 'Like Post', link: '/api/tools/like-post' },
@@ -219,8 +218,8 @@ export default withMermaid(
               { text: 'Unfollow User', link: '/api/tools/unfollow-user' },
               { text: 'Get User Profile', link: '/api/tools/get-user-profile' },
               { text: 'Update Profile', link: '/api/tools/update-profile' },
-              { text: 'Get Followers', link: '/api/tools/get-followers' },
-              { text: 'Get Follows', link: '/api/tools/get-follows' },
+              { text: 'Search Actors', link: '/api/tools/search-actors' },
+              { text: 'Get User Connections', link: '/api/tools/get-user-connections' },
               { text: 'Block User', link: '/api/tools/block-user' },
               { text: 'Unblock User', link: '/api/tools/unblock-user' },
               { text: 'Mute User', link: '/api/tools/mute-user' },
@@ -233,7 +232,7 @@ export default withMermaid(
             items: [
               { text: 'Search Posts', link: '/api/tools/search-posts' },
               { text: 'Get Timeline', link: '/api/tools/get-timeline' },
-              { text: 'Get Thread', link: '/api/tools/get-thread' },
+              { text: 'Get Author Feed', link: '/api/tools/get-author-feed' },
               { text: 'Get Custom Feed', link: '/api/tools/get-custom-feed' },
               { text: 'Get Notifications', link: '/api/tools/get-notifications' },
               { text: 'Delete Post', link: '/api/tools/delete-post' },
@@ -247,7 +246,6 @@ export default withMermaid(
               { text: 'Upload Video', link: '/api/tools/upload-video' },
               { text: 'Generate Link Preview', link: '/api/tools/generate-link-preview' },
               { text: 'Analyze Image', link: '/api/tools/analyze-image' },
-              { text: 'Extract Media from Post', link: '/api/tools/extract-media-from-post' },
             ],
           },
           {
@@ -273,20 +271,17 @@ export default withMermaid(
             text: 'Analytics',
             collapsed: true,
             items: [
-              { text: 'Analyze Engagement', link: '/api/tools/analyze-engagement' },
-              { text: 'Analyze Network', link: '/api/tools/analyze-network' },
+              { text: 'Analyze Account', link: '/api/tools/analyze-account' },
               { text: 'Find Influential Users', link: '/api/tools/find-influential-users' },
-              { text: 'Suggest Content Strategy', link: '/api/tools/suggest-content-strategy' },
             ],
           },
           {
             text: 'Discovery',
             collapsed: true,
             items: [
-              { text: 'Discover Trending', link: '/api/tools/discover-trending' },
+              { text: 'Discover', link: '/api/tools/discover' },
               { text: 'Discover Communities', link: '/api/tools/discover-communities' },
               { text: 'Find Similar Users', link: '/api/tools/find-similar-users' },
-              { text: 'Recommend Content', link: '/api/tools/recommend-content' },
             ],
           },
           {
@@ -300,11 +295,7 @@ export default withMermaid(
           {
             text: 'Batch Operations',
             collapsed: true,
-            items: [
-              { text: 'Batch Follow', link: '/api/tools/batch-follow' },
-              { text: 'Batch Like', link: '/api/tools/batch-like' },
-              { text: 'Batch Repost', link: '/api/tools/batch-repost' },
-            ],
+            items: [{ text: 'Batch Action', link: '/api/tools/batch-action' }],
           },
           {
             text: 'Resources',
@@ -318,20 +309,7 @@ export default withMermaid(
           {
             text: 'Experimental & Roadmap',
             collapsed: true,
-            items: [
-              { text: 'Overview', link: '/guide/experimental' },
-              { text: 'Start OAuth Flow', link: '/api/tools/start-oauth-flow' },
-              { text: 'Handle OAuth Callback', link: '/api/tools/handle-oauth-callback' },
-              { text: 'Refresh OAuth Tokens', link: '/api/tools/refresh-oauth-tokens' },
-              { text: 'Revoke OAuth Tokens', link: '/api/tools/revoke-oauth-tokens' },
-              { text: 'Start Streaming', link: '/api/tools/start-streaming' },
-              { text: 'Stop Streaming', link: '/api/tools/stop-streaming' },
-              { text: 'Get Streaming Status', link: '/api/tools/get-streaming-status' },
-              { text: 'Get Recent Events', link: '/api/tools/get-recent-events' },
-              { text: 'Monitor Keywords', link: '/api/tools/monitor-keywords' },
-              { text: 'Track Users', link: '/api/tools/track-users' },
-              { text: 'Generate Alt Text', link: '/api/tools/generate-alt-text' },
-            ],
+            items: [{ text: 'Overview', link: '/guide/experimental' }],
           },
           {
             text: 'Types',

@@ -39,10 +39,11 @@ Most tools require authentication. Without credentials, only the **public** and
   returns additional viewer-specific data when authenticated)
 
 Some tools provide enhanced data when authenticated but still run
-unauthenticated (returning public data), such as `get_followers`, `get_follows`,
-and `get_post_context`. Everything that writes (posting, liking, following,
-messaging, etc.) and anything that reads your own account state (timeline,
-notifications, conversations) requires authentication.
+unauthenticated (returning public data), such as `get_user_connections`,
+`get_author_feed`, `search_actors`, and `get_post_context`. Everything that
+writes (posting, liking, following, messaging, etc.) and anything that reads your
+own account state (timeline, notifications, conversations) requires
+authentication.
 
 ::: warning search_posts requires authentication
 
@@ -152,58 +153,17 @@ atproto-mcp --log-level debug
 - **Use different passwords** for different environments
 - **Revoke unused passwords** in Bluesky settings
 
-## OAuth Authentication (Experimental)
+## OAuth Authentication (Planned)
 
-::: warning Experimental — not implemented
+::: warning Planned — not yet functional
 
-OAuth is **not functional end-to-end**. `start_oauth_flow` builds a heuristic
-PKCE authorization URL, but the rest of the flow is a **dead end**:
-`handle_oauth_callback`, `refresh_oauth_tokens`, and `revoke_oauth_tokens`
-**always fail** with an error whose message states that OAuth token exchange is
-not implemented (the error's code is `AUTHENTICATION_FAILED`, reaching the
-client as a JSON-RPC `-32603` Internal Error). There is no token exchange, so
-OAuth cannot produce an authenticated session. Use
+OAuth login is on the roadmap but **not yet functional**, so it is not exposed
+as a configuration path or a tool. There is no token exchange, so OAuth cannot
+produce an authenticated session. Use
 **[app passwords](#app-password-authentication)** instead. See
 [Experimental & Roadmap](./experimental.md).
 
 :::
-
-### Configuration
-
-OAuth uses a client ID and client secret, supplied via `ATPROTO_CLIENT_ID` and
-`ATPROTO_CLIENT_SECRET` (the legacy names `OAUTH_CLIENT_ID` /
-`OAUTH_CLIENT_SECRET` are accepted as fallbacks). An optional redirect URI may
-be supplied via `ATPROTO_OAUTH_REDIRECT_URI` (or legacy `OAUTH_REDIRECT_URI`);
-if unset, the flow falls back to a hardcoded
-`http://localhost:3000/oauth/callback` default:
-
-```bash
-export ATPROTO_CLIENT_ID="your-client-id"
-export ATPROTO_CLIENT_SECRET="your-client-secret"
-export ATPROTO_OAUTH_REDIRECT_URI="http://localhost:3000/oauth/callback"
-atproto-mcp --auth oauth
-```
-
-::: tip
-
-Only the specific name `ATPROTO_REDIRECT_URI` is not read; supply a redirect URI
-via `ATPROTO_OAUTH_REDIRECT_URI` (or legacy `OAUTH_REDIRECT_URI`). If unset, the
-flow uses a hardcoded `http://localhost:3000/oauth/callback` default. The server
-still performs no Authorization-Server metadata discovery or PAR.
-
-:::
-
-### OAuth Tools (current behavior)
-
-| Tool                    | Current behavior                                                                                                    |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `start_oauth_flow`      | Builds a heuristic PKCE authorization URL. No metadata discovery / PAR. The flow cannot be completed.               |
-| `handle_oauth_callback` | Always fails: no token exchange; returns a JSON-RPC `-32603` error stating OAuth token exchange is not implemented. |
-| `refresh_oauth_tokens`  | Always fails: returns a JSON-RPC `-32603` error stating OAuth token exchange is not implemented.                    |
-| `revoke_oauth_tokens`   | Always fails: returns a JSON-RPC `-32603` error stating OAuth token exchange is not implemented.                    |
-
-Because the callback exchange is unimplemented, starting the flow leads nowhere.
-Track progress on the [Experimental & Roadmap](./experimental.md) page.
 
 ## Authentication Modes Comparison
 

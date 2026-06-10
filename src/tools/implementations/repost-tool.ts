@@ -11,12 +11,21 @@ import { type ATURI, type CID, type IRepostParams, ValidationError } from '../..
  * Zod schema for repost parameters
  */
 const RepostSchema = z.object({
-  uri: z.string().min(1, 'Post URI is required'),
-  cid: z.string().min(1, 'Post CID is required'),
+  uri: z
+    .string()
+    .min(1, 'Post URI is required')
+    .describe('AT-URI of the post to repost or quote (at://did/app.bsky.feed.post/rkey).'),
+  cid: z
+    .string()
+    .min(1, 'Post CID is required')
+    .describe('CID of the post to repost or quote; used for content integrity verification.'),
   // Coarse cap; the real 300-grapheme / 3000-byte limit is enforced in buildRichText.
   text: z
     .string()
     .max(3000, 'Quote text is too long (limit is 300 graphemes / 3000 bytes)')
+    .describe(
+      'Optional quote text (up to 300 graphemes / 3000 bytes). When provided the result is a quote post embedding the original; omit for a plain repost.'
+    )
     .optional(),
 });
 
@@ -31,8 +40,57 @@ export class RepostTool extends BaseTool {
   public readonly schema = {
     method: 'repost',
     description:
-      'Repost content on AT Protocol. Can be a simple repost or a quote post with additional text. Requires authentication.',
+      "Repost content on AT Protocol. Reposts the identified post to the authenticated user's feed; if optional quote text is supplied, creates a quote post (new post embedding the original) instead. Requires authentication (app password). Deduplicates plain reposts so retrying on timeout is safe; use unrepost to remove a plain repost. Subject to per-tool rate limiting.",
     params: RepostSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          type: 'string',
+          description: 'AT-URI of the newly created repost or quote-post record.',
+        },
+        cid: {
+          type: 'string',
+          description: 'CID of the newly created repost or quote-post record.',
+        },
+        success: {
+          type: 'boolean',
+          description: 'Whether the operation succeeded.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable status message.',
+        },
+        repostedPost: {
+          type: 'object',
+          description: 'The original post that was reposted or quoted.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the original post.' },
+            cid: { type: 'string', description: 'CID of the original post.' },
+          },
+          required: ['uri', 'cid'],
+        },
+        isQuotePost: {
+          type: 'boolean',
+          description:
+            'True when text was supplied and a quote post was created rather than a plain repost.',
+        },
+        alreadyReposted: {
+          type: 'boolean',
+          description:
+            'True when a plain repost already existed; the existing record URI/CID is returned.',
+        },
+      },
+      required: [
+        'uri',
+        'cid',
+        'success',
+        'message',
+        'repostedPost',
+        'isQuotePost',
+        'alreadyReposted',
+      ],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -236,10 +294,38 @@ export class RepostTool extends BaseTool {
 export class UnrepostTool extends BaseTool {
   public readonly schema = {
     method: 'unrepost',
-    description: 'Remove a repost on AT Protocol. Deletes the repost record.',
+    description:
+      'Remove a repost on AT Protocol. Deletes the repost record owned by the authenticated user, undoing a previous plain repost; this action cannot be undone without re-calling repost. Requires authentication (app password). Use repost to create a repost and this tool only to remove one. Subject to per-tool rate limiting.',
     params: z.object({
-      repostUri: z.string().min(1, 'Repost URI is required'),
+      repostUri: z
+        .string()
+        .min(1, 'Repost URI is required')
+        .describe(
+          'AT-URI of the repost record to delete (at://did/app.bsky.feed.repost/rkey). Must reference a repost record, not a post.'
+        ),
     }),
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the repost was successfully deleted.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable status message.',
+        },
+        deletedRepost: {
+          type: 'object',
+          description: 'The repost record that was deleted.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the deleted repost record.' },
+          },
+          required: ['uri'],
+        },
+      },
+      required: ['success', 'message', 'deletedRepost'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

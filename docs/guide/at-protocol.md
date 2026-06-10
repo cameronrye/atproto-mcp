@@ -73,13 +73,11 @@ Run without credentials and only the public tools work (notably
 [`get_user_profile`](../api/tools/get-user-profile.md)); most tools require
 authentication.
 
-### OAuth (experimental)
+### OAuth (planned)
 
 AT Protocol supports OAuth 2.0, and Bluesky has shipped it. In this server,
-OAuth is **experimental and incomplete**:
-[`start_oauth_flow`](../api/tools/start-oauth-flow.md) builds a PKCE
-authorization URL, but callback exchange and token refresh/revocation are not
-implemented and will throw. Use app passwords for working authentication. See
+OAuth login is **planned but not yet functional**, so it is not exposed as a
+tool — use app passwords for working authentication. See
 [Experimental & Roadmap](./experimental.md) for the current state.
 
 ## Rate limits

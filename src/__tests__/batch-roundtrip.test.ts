@@ -1,12 +1,12 @@
 /**
- * Perf regression test: batch_like / batch_repost already fetch each post via
+ * Perf regression test: batch_action with action=like / action=repost already fetch each post via
  * getPosts (for viewer state), and that response carries the post CID. They must
  * reuse it for the like/repost subject instead of issuing a second per-item
  * getRecord round-trip (getCidFromUri).
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { BatchLikeTool, BatchRepostTool } from '../tools/implementations/batch-operations-tools.js';
+import { BatchActionTool } from '../tools/implementations/batch-operations-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 const URI = 'at://did:plc:x/app.bsky.feed.post/p';
@@ -38,11 +38,11 @@ function mockClient(posts: unknown[]) {
 describe('batch tools reuse the getPosts CID (no redundant getRecord)', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('batch_like uses the post CID from getPosts and never calls getRecord', async () => {
+  it('batch_action like uses the post CID from getPosts and never calls getRecord', async () => {
     const { client, getPosts, getRecord, createRecord } = mockClient([
       { uri: URI, cid: 'postcid', viewer: {} },
     ]);
-    const result = await new BatchLikeTool(client).handler({ uris: [URI] });
+    const result = await new BatchActionTool(client).handler({ action: 'like', targets: [URI] });
 
     expect(getRecord).not.toHaveBeenCalled();
     expect(getPosts).toHaveBeenCalledTimes(1);
@@ -55,21 +55,21 @@ describe('batch tools reuse the getPosts CID (no redundant getRecord)', () => {
     expect(result.summary.succeeded).toBe(1);
   });
 
-  it('batch_like reports alreadyLiked from viewer.like without creating a record', async () => {
+  it('batch_action like reports alreadyLiked from viewer.like without creating a record', async () => {
     const { client, createRecord } = mockClient([
       { uri: URI, cid: 'postcid', viewer: { like: 'at://like/1' } },
     ]);
-    const result = await new BatchLikeTool(client).handler({ uris: [URI] });
+    const result = await new BatchActionTool(client).handler({ action: 'like', targets: [URI] });
 
     expect(createRecord).not.toHaveBeenCalled();
     expect(result.results[0]?.alreadyLiked).toBe(true);
   });
 
-  it('batch_repost uses the post CID from getPosts and never calls getRecord', async () => {
+  it('batch_action repost uses the post CID from getPosts and never calls getRecord', async () => {
     const { client, getRecord, createRecord } = mockClient([
       { uri: URI, cid: 'postcid', viewer: {} },
     ]);
-    await new BatchRepostTool(client).handler({ uris: [URI] });
+    await new BatchActionTool(client).handler({ action: 'repost', targets: [URI] });
 
     expect(getRecord).not.toHaveBeenCalled();
     expect(createRecord).toHaveBeenCalledWith(

@@ -7,24 +7,57 @@ import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 
 const CreateListSchema = z.object({
-  name: z.string().min(1, 'List name is required').max(64, 'List name cannot exceed 64 characters'),
-  description: z.string().max(300, 'Description cannot exceed 300 characters').optional(),
-  purpose: z.enum(['modlist', 'curatelist']).default('curatelist'),
+  name: z
+    .string()
+    .min(1, 'List name is required')
+    .max(64, 'List name cannot exceed 64 characters')
+    .describe('Display name for the list (1–64 characters).'),
+  description: z
+    .string()
+    .max(300, 'Description cannot exceed 300 characters')
+    .optional()
+    .describe('Optional plain-text description of the list (max 300 characters).'),
+  purpose: z
+    .enum(['modlist', 'curatelist'])
+    .default('curatelist')
+    .describe(
+      'List type: "curatelist" for a user-curated follow list, "modlist" for a moderation/block list. Defaults to "curatelist".'
+    ),
 });
 
 const AddToListSchema = z.object({
-  listUri: z.string().min(1, 'List URI is required'),
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
+  listUri: z
+    .string()
+    .min(1, 'List URI is required')
+    .describe('AT-URI of the target list (at://did/app.bsky.graph.list/rkey).'),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the user to add to the list.'),
 });
 
 const RemoveFromListSchema = z.object({
-  listUri: z.string().min(1, 'List URI is required'),
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
+  listUri: z
+    .string()
+    .min(1, 'List URI is required')
+    .describe('AT-URI of the target list (at://did/app.bsky.graph.list/rkey).'),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the user to remove from the list.'),
 });
 
 const GetListSchema = z.object({
-  listUri: z.string().min(1, 'List URI is required'),
-  limit: z.number().min(1).max(100).default(50),
+  listUri: z
+    .string()
+    .min(1, 'List URI is required')
+    .describe('AT-URI of the list to read (at://did/app.bsky.graph.list/rkey).'),
+  limit: z
+    .number()
+    .min(1)
+    .max(100)
+    .default(50)
+    .describe('Max list members to return per page (1–100, default 50).'),
   cursor: z
     .string()
     .optional()
@@ -33,15 +66,19 @@ const GetListSchema = z.object({
     ),
 });
 
-const GetThreadSchema = z.object({
-  uri: z.string().min(1, 'Post URI is required'),
-  depth: z.number().min(1).max(10).default(6),
-  parentHeight: z.number().min(0).max(10).default(80),
-});
-
 const GetCustomFeedSchema = z.object({
-  feedUri: z.string().min(1, 'Feed URI is required'),
-  limit: z.number().min(1).max(100).default(50),
+  feedUri: z
+    .string()
+    .min(1, 'Feed URI is required')
+    .describe(
+      'AT-URI of the custom algorithm feed generator (at://did/app.bsky.feed.generator/rkey).'
+    ),
+  limit: z
+    .number()
+    .min(1)
+    .max(100)
+    .default(50)
+    .describe('Max posts to return per page (1–100, default 50).'),
   cursor: z
     .string()
     .optional()
@@ -54,8 +91,29 @@ export class CreateListTool extends BaseTool {
   public readonly schema = {
     method: 'create_list',
     description:
-      'Create a new list for organizing users (curate list) or moderation purposes (mod list).',
+      "Create a new list for organizing users (curate list) or moderation purposes (mod list). Requires authentication (app password). Creates a permanent list record in the authenticated user's repository; use add_to_list / remove_from_list to manage its members and get_list to inspect them. Subject to per-tool rate limiting.",
     params: CreateListSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the list was created successfully.' },
+        message: { type: 'string', description: 'Human-readable result message.' },
+        list: {
+          type: 'object',
+          description: 'Metadata of the newly created list.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the new list record.' },
+            cid: { type: 'string', description: 'CID of the new list record.' },
+            name: { type: 'string', description: 'Display name of the list.' },
+            description: { type: 'string', description: 'Optional description of the list.' },
+            purpose: { type: 'string', description: 'List purpose: "curatelist" or "modlist".' },
+            createdAt: { type: 'string', description: 'ISO 8601 creation timestamp.' },
+          },
+          required: ['uri', 'cid', 'name', 'purpose', 'createdAt'],
+        },
+      },
+      required: ['success', 'message', 'list'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -131,8 +189,27 @@ export class CreateListTool extends BaseTool {
 export class AddToListTool extends BaseTool {
   public readonly schema = {
     method: 'add_to_list',
-    description: 'Add a user to an existing list.',
+    description:
+      "Add a user to an existing list. Requires authentication (app password). Creates a listitem record in the authenticated user's repository; the actor's handle is resolved to a DID before insertion. Use remove_from_list to undo the addition and get_list to verify membership. Subject to per-tool rate limiting.",
     params: AddToListSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the user was added successfully.' },
+        message: { type: 'string', description: 'Human-readable result message.' },
+        listItem: {
+          type: 'object',
+          description: 'Details of the newly created list-item record.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the new listitem record.' },
+            listUri: { type: 'string', description: 'AT-URI of the parent list.' },
+            actor: { type: 'string', description: 'Handle or DID of the user that was added.' },
+          },
+          required: ['uri', 'listUri', 'actor'],
+        },
+      },
+      required: ['success', 'message', 'listItem'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -201,8 +278,29 @@ export class AddToListTool extends BaseTool {
 export class RemoveFromListTool extends BaseTool {
   public readonly schema = {
     method: 'remove_from_list',
-    description: 'Remove a user from an existing list.',
+    description:
+      "Remove a user from an existing list. Requires authentication (app password). Deletes the listitem record from the authenticated user's repository; the actor's handle is resolved to a DID and the full list is paged through to locate the record. Use add_to_list to re-add a member or get_list to inspect current members. Subject to per-tool rate limiting.",
     params: RemoveFromListSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the user was removed (or was not in the list).',
+        },
+        message: { type: 'string', description: 'Human-readable result message.' },
+        removedFrom: {
+          type: 'object',
+          description: 'Identifies the list and actor involved in the operation.',
+          properties: {
+            listUri: { type: 'string', description: 'AT-URI of the list.' },
+            actor: { type: 'string', description: 'Handle or DID of the user that was removed.' },
+          },
+          required: ['listUri', 'actor'],
+        },
+      },
+      required: ['success', 'message', 'removedFrom'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -318,8 +416,67 @@ export class RemoveFromListTool extends BaseTool {
 export class GetListTool extends BaseTool {
   public readonly schema = {
     method: 'get_list',
-    description: 'Get the contents of a list, including all users in the list.',
+    description:
+      'Get the contents of a list, including all users in the list. Works without authentication; richer with auth. Returns list metadata plus a paginated array of member profiles; use the returned cursor to fetch subsequent pages. Use add_to_list / remove_from_list to modify membership. Subject to per-tool rate limiting.',
     params: GetListSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the list was retrieved successfully.' },
+        list: {
+          type: 'object',
+          description: 'Metadata about the list.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the list.' },
+            name: { type: 'string', description: 'Display name of the list.' },
+            description: { type: 'string', description: 'Optional plain-text description.' },
+            purpose: { type: 'string', description: 'List purpose: "curatelist" or "modlist".' },
+            creator: {
+              type: 'object',
+              description: 'Profile of the list creator.',
+              properties: {
+                did: { type: 'string', description: 'DID of the creator.' },
+                handle: { type: 'string', description: 'Handle of the creator.' },
+                displayName: {
+                  type: 'string',
+                  description: 'Optional display name of the creator.',
+                },
+              },
+              required: ['did', 'handle'],
+            },
+            itemCount: { type: 'number', description: 'Total number of members in the list.' },
+          },
+          required: ['uri', 'name', 'purpose', 'creator', 'itemCount'],
+        },
+        items: {
+          type: 'array',
+          description: 'Paginated list of member entries.',
+          items: {
+            type: 'object',
+            properties: {
+              uri: { type: 'string', description: 'AT-URI of the listitem record.' },
+              subject: {
+                type: 'object',
+                description: 'Profile of the list member.',
+                properties: {
+                  did: { type: 'string', description: 'DID of the member.' },
+                  handle: { type: 'string', description: 'Handle of the member.' },
+                  displayName: { type: 'string', description: 'Optional display name.' },
+                  avatar: { type: 'string', description: 'Optional avatar image URL.' },
+                },
+                required: ['did', 'handle'],
+              },
+            },
+            required: ['uri', 'subject'],
+          },
+        },
+        cursor: {
+          type: 'string',
+          description: 'Pagination cursor for the next page; absent when no more pages.',
+        },
+      },
+      required: ['success', 'list', 'items'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -413,114 +570,97 @@ export class GetListTool extends BaseTool {
   }
 }
 
-export class GetThreadTool extends BaseTool {
-  public readonly schema = {
-    method: 'get_thread',
-    description:
-      'Get a complete thread/conversation starting from a specific post, including replies and parent posts.',
-    params: GetThreadSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    // Fetching a public thread does not require authentication.
-    super(atpClient, 'GetThread', ToolAuthMode.ENHANCED);
-  }
-
-  protected async execute(params: { uri: string; depth?: number; parentHeight?: number }): Promise<{
-    success: boolean;
-    thread: {
-      post: {
-        uri: string;
-        cid: string;
-        author: {
-          did: string;
-          handle: string;
-          displayName?: string;
-          avatar?: string;
-        };
-        text: string;
-        createdAt: string;
-        replyCount: number;
-        repostCount: number;
-        likeCount: number;
-      };
-      parent?: any;
-      replies?: any[];
-    };
-  }> {
-    try {
-      this.logger.info('Getting thread', {
-        uri: params.uri,
-        depth: params.depth,
-        parentHeight: params.parentHeight,
-      });
-
-      this.validateAtUri(params.uri);
-
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.getPostThread({
-            uri: params.uri,
-            depth: params.depth || 6,
-            parentHeight: params.parentHeight || 80,
-          });
-        },
-        'getThread',
-        { uri: params.uri }
-      );
-
-      // Type-safe access to thread data
-      const thread = response.data.thread as any;
-      const hasParent = thread && 'parent' in thread && !!thread.parent;
-      const replyCount = thread && 'replies' in thread ? thread.replies?.length || 0 : 0;
-
-      this.logger.info('Thread retrieved successfully', {
-        uri: params.uri,
-        hasParent,
-        replyCount,
-      });
-
-      // Extract post data safely
-      const post = thread && 'post' in thread ? thread.post : null;
-      if (!post) {
-        throw new Error('Thread post data not found');
-      }
-
-      return {
-        success: true,
-        thread: {
-          post: {
-            uri: post.uri || '',
-            cid: post.cid || '',
-            author: {
-              did: post.author?.did || '',
-              handle: post.author?.handle || '',
-              displayName: post.author?.displayName,
-              avatar: post.author?.avatar,
-            },
-            text: post.record?.text || '',
-            createdAt: post.record?.createdAt || new Date().toISOString(),
-            replyCount: post.replyCount || 0,
-            repostCount: post.repostCount || 0,
-            likeCount: post.likeCount || 0,
-          },
-          parent: hasParent ? thread.parent : undefined,
-          replies: thread && 'replies' in thread ? thread.replies : [],
-        },
-      };
-    } catch (error) {
-      this.logger.error('Failed to get thread', error);
-      this.formatError(error);
-    }
-  }
-}
-
 export class GetCustomFeedTool extends BaseTool {
   public readonly schema = {
     method: 'get_custom_feed',
-    description: 'Get posts from a custom algorithm feed.',
+    description:
+      "Get posts from a custom algorithm feed. Works without authentication; richer with auth. Returns feed generator metadata and a paginated list of posts; use the returned cursor to fetch subsequent pages. Use get_timeline for the authenticated user's home feed instead. Subject to per-tool rate limiting.",
     params: GetCustomFeedSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the feed was retrieved successfully.' },
+        feed: {
+          type: 'object',
+          description: 'Metadata about the feed generator.',
+          properties: {
+            uri: { type: 'string', description: 'AT-URI of the feed generator.' },
+            displayName: { type: 'string', description: 'Optional display name of the feed.' },
+            description: { type: 'string', description: 'Optional description of the feed.' },
+            creator: {
+              type: 'object',
+              description:
+                'Optional profile of the feed creator (present when generator metadata is available).',
+              properties: {
+                did: { type: 'string', description: 'DID of the creator.' },
+                handle: { type: 'string', description: 'Handle of the creator.' },
+                displayName: {
+                  type: 'string',
+                  description: 'Optional display name of the creator.',
+                },
+              },
+              required: ['did', 'handle'],
+            },
+          },
+          required: ['uri'],
+        },
+        posts: {
+          type: 'array',
+          description: 'Paginated posts from the feed.',
+          items: {
+            type: 'object',
+            properties: {
+              uri: { type: 'string', description: 'AT-URI of the post.' },
+              cid: { type: 'string', description: 'CID of the post.' },
+              author: {
+                type: 'object',
+                description: 'Author of the post.',
+                properties: {
+                  did: { type: 'string', description: 'DID of the author.' },
+                  handle: { type: 'string', description: 'Handle of the author.' },
+                  displayName: { type: 'string', description: 'Optional display name.' },
+                  avatar: { type: 'string', description: 'Optional avatar image URL.' },
+                },
+                required: ['did', 'handle'],
+              },
+              text: { type: 'string', description: 'Plain text content of the post.' },
+              createdAt: {
+                type: 'string',
+                description: 'ISO 8601 timestamp when the post was created.',
+              },
+              replyCount: { type: 'number', description: 'Number of replies.' },
+              repostCount: { type: 'number', description: 'Number of reposts.' },
+              likeCount: { type: 'number', description: 'Number of likes.' },
+              isLiked: {
+                type: 'boolean',
+                description: 'Whether the authenticated user has liked this post.',
+              },
+              isReposted: {
+                type: 'boolean',
+                description: 'Whether the authenticated user has reposted this post.',
+              },
+            },
+            required: [
+              'uri',
+              'cid',
+              'author',
+              'text',
+              'createdAt',
+              'replyCount',
+              'repostCount',
+              'likeCount',
+              'isLiked',
+              'isReposted',
+            ],
+          },
+        },
+        cursor: {
+          type: 'string',
+          description: 'Pagination cursor for the next page; absent when no more pages.',
+        },
+      },
+      required: ['success', 'feed', 'posts'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

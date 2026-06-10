@@ -7,7 +7,7 @@ MCP Server.
 
 The server provides three types of MCP primitives:
 
-1. **Tools** (60) - Executable functions for AT Protocol operations
+1. **Tools** (43) - Executable functions for AT Protocol operations
 2. **Resources** (4) - Data sources for context
 3. **Prompts** (2) - Templates for common tasks
 
@@ -21,9 +21,12 @@ These tools work in unauthenticated mode against public AT Protocol data:
 
 - `get_user_profile` - Get public profile information (ENHANCED mode: provides
   additional viewer-specific data when authenticated)
-- `get_followers` - Get a user's follower list (ENHANCED mode: works without
-  authentication, richer viewer data when authenticated)
-- `get_follows` - Get a user's following list (ENHANCED mode: works without
+- `get_user_summary` - Get a profile with recent posts and engagement stats in
+  one call (ENHANCED mode)
+- `search_actors` - Find accounts by handle or display name (ENHANCED mode)
+- `get_author_feed` - List a specific user's posts (ENHANCED mode)
+- `get_user_connections` - Get a user's followers or follows via
+  `direction: 'followers' | 'follows'` (ENHANCED mode: works without
   authentication, richer viewer data when authenticated)
 
 **Note:** Most other tools require authentication. `search_posts`, in
@@ -32,25 +35,11 @@ to require auth). App passwords are the supported auth path — set
 `ATPROTO_IDENTIFIER` and `ATPROTO_PASSWORD` (generate an app password in Bluesky
 Settings). See [Authentication](./authentication.md).
 
-#### OAuth Management
+::: tip Planned
 
-OAuth is **experimental** and the flow is currently a dead end (callback
-exchange is not implemented). See [Experimental & Roadmap](./experimental.md).
-
-- `start_oauth_flow` - Build a PKCE authorization URL (experimental — see below)
-- `handle_oauth_callback` - **Not implemented** (always throws
-  `OAUTH_NOT_IMPLEMENTED`)
-- `refresh_oauth_tokens` - **Not implemented** (always throws
-  `OAUTH_NOT_IMPLEMENTED`)
-- `revoke_oauth_tokens` - **Not implemented** (always throws
-  `OAUTH_NOT_IMPLEMENTED`)
-
-::: warning Experimental
-
-`start_oauth_flow` only builds a heuristic PKCE authorization URL (no
-authorization-server metadata discovery or PAR). Because `handle_oauth_callback`
-is not implemented, the OAuth flow cannot be completed — use app-password
-authentication instead. See [Experimental & Roadmap](./experimental.md).
+OAuth login is on the roadmap but not yet functional, so it is not exposed as a
+tool. Use app-password authentication. See
+[Experimental & Roadmap](./experimental.md).
 
 :::
 
@@ -72,8 +61,9 @@ These tools require authentication to perform write operations:
 - `search_posts` - Search for posts across the network (requires authentication;
   the AT Protocol search API changed in 2025 to require auth)
 - `get_timeline` - Get personalized timeline
-- `get_notifications` - Get notifications
-- `get_thread` - View post threads
+- `get_notifications` - Get notifications (use `countOnly: true` for a cheap
+  unread badge count)
+- `mark_notifications_seen` - Mark notifications as seen up to a timestamp
 - `get_custom_feed` - Access custom feeds
 
 #### Content Management
@@ -82,7 +72,6 @@ These tools require authentication to perform write operations:
 - `update_profile` - Update your profile
 - `upload_image` - Upload images
 - `upload_video` - Upload videos
-- `create_rich_text_post` - Create posts with rich formatting
 - `generate_link_preview` - Generate link preview cards
 
 #### List Management
@@ -100,65 +89,36 @@ These tools require authentication to perform write operations:
 - `report_user` - Report users
 - `analyze_moderation_status` - Check moderation status of content
 
-#### Real-time Streaming & Intelligence
-
-::: danger Not implemented
-
-The 6 streaming tools below are registered and visible to MCP clients but are
-**not functional** — firehose decoding is gated off, so `start_streaming` opens
-no connection (returns `status: 'not_implemented'`) and the event-buffer tools
-always return an empty buffer. See [Experimental & Roadmap](./experimental.md).
-
-:::
-
-- `start_streaming` - **Not implemented** — returns `success: false`,
-  `status: 'not_implemented'`; opens no firehose connection
-- `stop_streaming` - **Not implemented** — no active stream to stop
-- `get_streaming_status` - **Not implemented** — reports streaming as inactive
-- `get_recent_events` - **Not implemented** — always returns an empty event
-  buffer
-- `monitor_keywords` - **Not implemented** — always returns an empty event
-  buffer
-- `track_users` - **Not implemented** — always returns an empty event buffer
-
 #### Batch Operations
 
-- `batch_follow` - Follow multiple users at once (up to 25)
-- `batch_like` - Like multiple posts at once (up to 25)
-- `batch_repost` - Repost multiple posts at once (up to 25)
+- `batch_action` - Apply one action across up to 25 targets in a single call via
+  `action: 'follow' | 'like' | 'repost'`
 
 #### Analytics & Insights
 
-- `analyze_engagement` - Analyze engagement patterns across posts (engagement
-  rate is engagement per hour since posting, a time-velocity measure)
-- `analyze_network` - Analyze user's network and connections
-- `suggest_content_strategy` - Get content strategy recommendations based on
-  performance
+- `analyze_account` - Analyze a single account along one dimension via
+  `dimension: 'engagement' | 'network' | 'strategy'` (engagement rate is
+  engagement per hour since posting, a time-velocity measure)
 - `find_influential_users` - Find influential users in a topic area
 
 #### Content Discovery
 
-- `discover_trending` - Surface trending topics by sampling the caller's own
-  home timeline (~100 posts), not the whole network
+- `discover` - Surface timeline content via `mode: 'trending' | 'recommended'`,
+  sampling the caller's own home timeline (~100 posts), not the whole network
 - `find_similar_users` - Find similar users by shared follows/followers (graph
   overlap only; does not analyze content or topics)
-- `recommend_content` - Get personalized content recommendations
 - `discover_communities` - Discover communities around topics
 
 #### Composite Operations
 
 - `get_user_summary` - Get complete user profile with stats and analysis
-- `get_post_context` - Get post with thread, author, and engagement data
+- `get_post_context` - Get post with thread, author, engagement, and media data
+  (replaces the former `get_thread` and `extract_media_from_post`)
 
 #### Rich Media
 
-- `generate_alt_text` - **Placeholder** — does not analyze image pixels; returns
-  alt-text writing guidance / a template only (no vision model). See
-  [Experimental & Roadmap](./experimental.md).
 - `analyze_image` - Report an image blob's declared size and MIME type (does not
   decode pixels, so no dimensions or aspect ratio)
-- `extract_media_from_post` - Extract media references from a post (passes
-  through the embed-declared aspect ratio, which may be undefined)
 
 ## Tool Usage Patterns
 

@@ -250,9 +250,10 @@ if (isATURI(input)) {
 
 ::: tip Tools are snake_case MCP tools
 
-The MCP tools exposed by this server use snake_case names (`get_followers`,
-`like_post`, `reply_to_post`, ...). The camelCase calls below are illustrative
-TypeScript using the branded types; they are not the MCP tool names.
+The MCP tools exposed by this server use snake_case names
+(`get_user_connections`, `like_post`, `reply_to_post`, ...). The camelCase calls
+below are illustrative TypeScript using the branded types; they are not the MCP
+tool names.
 
 :::
 

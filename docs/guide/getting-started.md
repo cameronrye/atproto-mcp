@@ -47,11 +47,11 @@ ignored).
 ### 2. Authentication
 
 The server runs unauthenticated, but only public/enhanced tools work in that
-mode (for example `get_user_profile`, `get_followers`, `get_follows`, and
-`analyze_image`). `search_posts` and all other tools require credentials, since
-the AT Protocol search API began requiring authentication in 2025. For full
-functionality, authenticate with an **app password** — this is the supported
-path.
+mode (for example `get_user_profile`, `get_user_connections`, `get_author_feed`,
+`search_actors`, and `analyze_image`). `search_posts` and all other tools require
+credentials, since the AT Protocol search API began requiring authentication in
+2025. For full functionality, authenticate with an **app password** — this is
+the supported path.
 
 #### App Passwords (Recommended)
 
@@ -67,23 +67,15 @@ atproto-mcp
 For the full authentication reference (verification, security tips, mode
 comparison), see the [Authentication guide](./authentication.md).
 
-#### OAuth (Experimental)
+#### OAuth (Planned)
 
-::: warning Experimental
+::: warning Planned
 
-OAuth support is **experimental and cannot complete a login today**.
-`start_oauth_flow` only builds an authorization URL; the callback exchange
-(`handle_oauth_callback`) and token refresh/revoke are not implemented, so the
-flow is a dead end. Use **app passwords** for working authentication. See
-[Experimental & Roadmap](./experimental.md).
+OAuth login is on the roadmap but **not yet functional**, so it is not exposed
+as a tool or configuration path. Use **app passwords** for working
+authentication. See [Experimental & Roadmap](./experimental.md).
 
 :::
-
-```bash
-export ATPROTO_CLIENT_ID="your-client-id"
-export ATPROTO_CLIENT_SECRET="your-client-secret"
-atproto-mcp --auth oauth
-```
 
 ### 3. Configure Your LLM Client
 

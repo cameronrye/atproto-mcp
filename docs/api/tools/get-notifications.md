@@ -28,17 +28,39 @@ Retrieve the authenticated user's notifications.
   parameter; it does **not** mark notifications as read or change server-side
   read state.
 
+### `countOnly` (optional)
+
+- **Type:** `boolean`
+- **Default:** `false`
+- **Description:** When `true`, return only the unread count and skip fetching
+  the notification list — a cheap badge-number path. The response contains just
+  `{ success, unreadCount }`; the `notifications`, `cursor`, `hasMore`, and
+  `seenAt` fields are omitted.
+
 This tool is read-only: it lists notifications but never mutates server-side
-read state.
+read state. To clear the unread state after processing, use the
+`mark_notifications_seen` tool.
 
 ## Response
 
 Tool results are returned as stringified JSON text. The shape below is
 illustrative.
 
+When `countOnly` is `true`, only `success` and `unreadCount` are returned:
+
 ```typescript
 {
   success: boolean;
+  unreadCount: number;
+}
+```
+
+Otherwise the full list is returned (`unreadCount` is always present):
+
+```typescript
+{
+  success: boolean;
+  unreadCount: number;  // Number of unread notifications
   notifications: Array<{
     uri: string;
     cid: string;
@@ -67,6 +89,23 @@ illustrative.
 ```json
 {
   "limit": 50
+}
+```
+
+### Get Only the Unread Count
+
+```json
+{
+  "countOnly": true
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "unreadCount": 7
 }
 ```
 

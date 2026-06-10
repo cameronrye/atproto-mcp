@@ -9,15 +9,14 @@ The AT Protocol MCP Server provides a comprehensive set of tools and resources
 for interacting with the AT Protocol ecosystem. This reference documentation
 covers:
 
-- **[Tools](#tools)** - 60 MCP tools for performing operations
+- **[Tools](#tools)** - 43 MCP tools for performing operations
 - **[Resources](#resources)** - 4 MCP resources for accessing data
 - **[Prompts](#prompts)** - 2 MCP prompts for guided content generation
 - **[Types](#types)** - TypeScript type definitions
 
-Some tools are registered and visible to MCP clients but are **not yet
-functional** (streaming, OAuth callback completion) or are
-**placeholders/experimental**. These are marked inline below and described in
-detail on the [Experimental & Roadmap](../guide/experimental.md) page.
+OAuth login and real-time firehose streaming are on the roadmap but not yet
+functional, so they are not exposed as tools. See the
+[Experimental & Roadmap](../guide/experimental.md) page for details.
 
 ## Tools
 
@@ -28,8 +27,10 @@ server. Each tool performs a specific operation and returns structured data.
 
 Essential tools for social networking operations:
 
-- **[create_post](./tools/create-post.md)** - Create new posts with rich text
-  support
+- **[create_post](./tools/create-post.md)** - Create posts with text, richtext
+  facets, replies, image/external embeds, and quote posts
+- **[create_thread](./tools/create-thread.md)** - Create multi-post threads in
+  one call
 - **[reply_to_post](./tools/reply-to-post.md)** - Reply to existing posts with
   threading
 - **[like_post](./tools/like-post.md)** - Like a post
@@ -45,6 +46,8 @@ Tools for managing user relationships and profiles:
 - **[unfollow_user](./tools/unfollow-user.md)** - Unfollow a user
 - **[get_user_profile](./tools/get-user-profile.md)** - Retrieve user profile
   information
+- **[search_actors](./tools/search-actors.md)** - Find accounts by handle or
+  display name
 
 ### Data Retrieval
 
@@ -52,10 +55,12 @@ Tools for searching and retrieving data:
 
 - **[search_posts](./tools/search-posts.md)** - Search for posts and content
 - **[get_timeline](./tools/get-timeline.md)** - Retrieve personalized timeline
-- **[get_followers](./tools/get-followers.md)** - Get follower lists
-- **[get_follows](./tools/get-follows.md)** - Get following lists
+- **[get_author_feed](./tools/get-author-feed.md)** - List a specific user's
+  posts
+- **[get_user_connections](./tools/get-user-connections.md)** - Get follower or
+  following lists via `direction: 'followers' | 'follows'`
 - **[get_notifications](./tools/get-notifications.md)** - Access notification
-  feeds
+  feeds (use `countOnly: true` for a cheap unread count)
 
 ### Content Management
 
@@ -65,26 +70,8 @@ Tools for managing content and media:
 - **[update_profile](./tools/update-profile.md)** - Modify profile settings
 - **[upload_image](./tools/upload-image.md)** - Upload image content
 - **[upload_video](./tools/upload-video.md)** - Upload video content
-- **[create_rich_text_post](./tools/create-rich-text-post.md)** - Create posts
-  with rich formatting
 - **[generate_link_preview](./tools/generate-link-preview.md)** - Generate link
   preview cards
-
-### OAuth Authentication
-
-Tools for OAuth authentication flows. App passwords are the supported auth path
-today (see [Authentication](#authentication)); the OAuth flow is incomplete.
-
-- **[start_oauth_flow](./tools/start-oauth-flow.md)** - Initiate OAuth
-  authentication _(EXPERIMENTAL: builds a heuristic PKCE authorization URL but
-  the callback exchange is unimplemented, so the flow is a dead end)_
-- **[handle_oauth_callback](./tools/handle-oauth-callback.md)** - Complete OAuth
-  flow _(NOT IMPLEMENTED: always throws `OAUTH_NOT_IMPLEMENTED`)_
-- **[refresh_oauth_tokens](./tools/refresh-oauth-tokens.md)** - Refresh
-  authentication tokens _(NOT IMPLEMENTED: always throws
-  `OAUTH_NOT_IMPLEMENTED`)_
-- **[revoke_oauth_tokens](./tools/revoke-oauth-tokens.md)** - Revoke OAuth
-  tokens _(NOT IMPLEMENTED: always throws `OAUTH_NOT_IMPLEMENTED`)_
 
 ### Moderation
 
@@ -96,26 +83,8 @@ Tools for content and user moderation:
 - **[unblock_user](./tools/unblock-user.md)** - Unblock a user
 - **[report_content](./tools/report-content.md)** - Report content
 - **[report_user](./tools/report-user.md)** - Report a user
-
-### Real-time Streaming & Intelligence
-
-Tools for real-time data streams. Firehose decoding is gated off, so these tools
-are registered but **not yet functional** — they open no socket and never return
-real events. See [Experimental & Roadmap](../guide/experimental.md).
-
-- **[start_streaming](./tools/start-streaming.md)** - Start real-time data
-  streaming with filtering _(NOT IMPLEMENTED: returns `success: false`,
-  `status: 'not_implemented'`)_
-- **[stop_streaming](./tools/stop-streaming.md)** - Stop streaming _(NOT
-  IMPLEMENTED)_
-- **[get_streaming_status](./tools/get-streaming-status.md)** - Check streaming
-  status _(NOT IMPLEMENTED)_
-- **[get_recent_events](./tools/get-recent-events.md)** - Retrieve recent stream
-  events _(NOT IMPLEMENTED: always returns an empty event buffer)_
-- **[monitor_keywords](./tools/monitor-keywords.md)** - Monitor firehose for
-  specific keywords _(NOT IMPLEMENTED: always returns an empty event buffer)_
-- **[track_users](./tools/track-users.md)** - Track activity from specific users
-  _(NOT IMPLEMENTED: always returns an empty event buffer)_
+- **[analyze_moderation_status](./tools/analyze-moderation-status.md)** - Check
+  moderation status of content
 
 ### Advanced Social Features
 
@@ -125,31 +94,22 @@ Tools for advanced social networking:
 - **[add_to_list](./tools/add-to-list.md)** - Add users to lists
 - **[remove_from_list](./tools/remove-from-list.md)** - Remove users from lists
 - **[get_list](./tools/get-list.md)** - Retrieve list information
-- **[get_thread](./tools/get-thread.md)** - View post threads
 - **[get_custom_feed](./tools/get-custom-feed.md)** - Access custom feeds
 
 ### Batch Operations
 
 Tools for performing multiple operations at once:
 
-- **[batch_follow](./tools/batch-follow.md)** - Follow multiple users at once
-  (up to 25)
-- **[batch_like](./tools/batch-like.md)** - Like multiple posts at once (up
-  to 25)
-- **[batch_repost](./tools/batch-repost.md)** - Repost multiple posts at once
-  (up to 25)
+- **[batch_action](./tools/batch-action.md)** - Apply one action (`follow`,
+  `like`, or `repost`) across up to 25 targets in a single call
 
 ### Analytics & Insights
 
 Tools for analyzing engagement and network patterns:
 
-- **[analyze_engagement](./tools/analyze-engagement.md)** - Analyze engagement
-  patterns across posts (engagement rate is engagement per hour since posting,
-  not per follower)
-- **[analyze_network](./tools/analyze-network.md)** - Analyze user's network and
-  connections
-- **[suggest_content_strategy](./tools/suggest-content-strategy.md)** - Get
-  content strategy recommendations based on performance
+- **[analyze_account](./tools/analyze-account.md)** - Analyze a single account
+  along one dimension (`engagement`, `network`, or `strategy`); engagement rate
+  is engagement per hour since posting, not per follower
 - **[find_influential_users](./tools/find-influential-users.md)** - Find
   influential users in a topic area
 
@@ -157,13 +117,12 @@ Tools for analyzing engagement and network patterns:
 
 Tools for discovering content and users:
 
-- **[discover_trending](./tools/discover-trending.md)** - Surface trending
-  topics and posts by sampling the caller's own home timeline (not network-wide)
+- **[discover](./tools/discover.md)** - Surface timeline content via
+  `mode: 'trending' | 'recommended'`, sampling the caller's own home timeline
+  (not network-wide)
 - **[find_similar_users](./tools/find-similar-users.md)** - Find users similar
   to a given user via shared follows/followers (graph-only; not content/topic
   similarity)
-- **[recommend_content](./tools/recommend-content.md)** - Get personalized
-  content recommendations
 - **[discover_communities](./tools/discover-communities.md)** - Discover
   communities around topics
 
@@ -173,30 +132,17 @@ Tools that combine multiple operations:
 
 - **[get_user_summary](./tools/get-user-summary.md)** - Get complete user
   profile with stats and analysis
-- **[get_post_context](./tools/get-post-context.md)** - Get post with thread,
-  author, and engagement data
-- **[create_thread](./tools/create-thread.md)** - Create multi-post threads in
-  one call
+- **[get_post_context](./tools/get-post-context.md)** - Get a post with thread,
+  author, engagement, and media data (replaces the former `get_thread` and
+  `extract_media_from_post`)
 
 ### Rich Media
 
 Tools for working with images and media:
 
-- **[generate_alt_text](./tools/generate-alt-text.md)** - Generate descriptive
-  alt text for images _(PLACEHOLDER: returns alt-text writing guidance/a
-  template; it does not analyze image pixels with a vision model)_
 - **[analyze_image](./tools/analyze-image.md)** - Report an image blob's
   declared size and MIME type (does not decode pixels, so no dimensions or
   aspect ratio)
-- **[extract_media_from_post](./tools/extract-media-from-post.md)** - Extract
-  all media from posts
-
-### Enhanced Moderation
-
-Additional moderation tools:
-
-- **[analyze_moderation_status](./tools/analyze-moderation-status.md)** - Check
-  moderation status of content
 
 ## Resources
 
@@ -248,37 +194,31 @@ export ATPROTO_IDENTIFIER="your-handle.bsky.social"
 export ATPROTO_PASSWORD="your-app-password"
 ```
 
-### OAuth (Experimental)
+### OAuth (Planned)
 
-OAuth configuration is accepted but the flow is **not complete** —
-`start_oauth_flow` only builds a heuristic PKCE URL, and the
-callback/refresh/revoke tools always throw `OAUTH_NOT_IMPLEMENTED`. See the
-[Authentication Guide](../guide/authentication.md) and
+OAuth login is on the roadmap but **not yet functional**, so it is not exposed
+as a configuration path or a tool. Use app passwords (above) for authentication.
+See the [Authentication Guide](../guide/authentication.md) and
 [Experimental & Roadmap](../guide/experimental.md).
-
-```bash
-export ATPROTO_CLIENT_ID="your-client-id"
-export ATPROTO_CLIENT_SECRET="your-client-secret"
-```
 
 ### Unauthenticated Mode
 
 The server runs without credentials, but only public/enhanced tools work. In
 practice this is limited to:
 
-- `get_user_profile` - Public profile lookup (returns additional viewer-specific
-  data when authenticated)
-- `get_followers` / `get_follows` - Follower/following lists (ENHANCED mode:
-  work without auth, enrich the underlying API call when authenticated)
-- `analyze_image`, `generate_alt_text`, and other PUBLIC/ENHANCED rich-media and
+- `get_user_profile` / `get_user_summary` - Public profile lookup (returns
+  additional viewer-specific data when authenticated)
+- `search_actors` - Find accounts by handle or display name
+- `get_author_feed` - List a user's posts
+- `get_user_connections` - Follower/following lists (ENHANCED mode: works
+  without auth, enriches the underlying API call when authenticated)
+- `get_post_context`, `analyze_image`, and other PUBLIC/ENHANCED rich-media and
   composite tools
 
-All other tools — including `search_posts`, `get_thread`, `get_timeline`, and
+All other tools — including `search_posts`, `get_timeline`, and
 `get_custom_feed` — require authentication. (`search_posts` previously worked
 unauthenticated, but the AT Protocol search API changed in 2025 to require
-auth.) The OAuth-completion tools (`handle_oauth_callback`,
-`refresh_oauth_tokens`, `revoke_oauth_tokens`) are **not functional** and never
-succeed regardless of authentication state.
+auth.)
 
 ## Error Handling
 

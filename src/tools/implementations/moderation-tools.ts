@@ -16,42 +16,114 @@ function toReasonNsid(reasonType: string): string {
 }
 
 const MuteUserSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the account to mute.'),
 });
 
 const UnmuteUserSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the account to unmute.'),
 });
 
 const BlockUserSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the account to block.'),
 });
 
 const UnblockUserSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the account to unblock.'),
 });
 
 const ReportContentSchema = z.object({
-  subject: z.object({
-    uri: z.string().min(1, 'Content URI is required'),
-    cid: z.string().min(1, 'Content CID is required'),
-  }),
-  reasonType: z.enum(['spam', 'violation', 'misleading', 'sexual', 'rude', 'other']),
-  reason: z.string().max(2000, 'Reason cannot exceed 2000 characters').optional(),
+  subject: z
+    .object({
+      uri: z
+        .string()
+        .min(1, 'Content URI is required')
+        .describe('AT-URI of the content to report (at://did/collection/rkey).'),
+      cid: z
+        .string()
+        .min(1, 'Content CID is required')
+        .describe('CID (Content Identifier) of the specific version of the record to report.'),
+    })
+    .describe('Strong reference identifying the specific content record to report.'),
+  reasonType: z
+    .enum(['spam', 'violation', 'misleading', 'sexual', 'rude', 'other'])
+    .describe(
+      'Category of the violation: "spam" for unsolicited bulk content, "violation" for ToS breach, "misleading" for misinformation, "sexual" for adult content, "rude" for harassment, "other" for anything else.'
+    ),
+  reason: z
+    .string()
+    .max(2000, 'Reason cannot exceed 2000 characters')
+    .optional()
+    .describe(
+      'Optional free-text explanation of the violation (max 2000 characters). Providing detail helps moderators act faster.'
+    ),
 });
 
 const ReportUserSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
-  reasonType: z.enum(['spam', 'violation', 'misleading', 'sexual', 'rude', 'other']),
-  reason: z.string().max(2000, 'Reason cannot exceed 2000 characters').optional(),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the account to report.'),
+  reasonType: z
+    .enum(['spam', 'violation', 'misleading', 'sexual', 'rude', 'other'])
+    .describe(
+      'Category of the violation: "spam" for unsolicited bulk content, "violation" for ToS breach, "misleading" for misinformation, "sexual" for adult content, "rude" for harassment, "other" for anything else.'
+    ),
+  reason: z
+    .string()
+    .max(2000, 'Reason cannot exceed 2000 characters')
+    .optional()
+    .describe(
+      'Optional free-text explanation of the violation (max 2000 characters). Providing detail helps moderators act faster.'
+    ),
 });
 
 export class MuteUserTool extends BaseTool {
   public readonly schema = {
     method: 'mute_user',
     description:
-      'Mute a user to hide their content from your feeds and notifications without them knowing.',
+      'Mute a user to hide their content from your feeds and notifications without them knowing. The muted account is not notified. Requires authentication (app password). Use mute_user for a soft, private suppression; use block_user when you need to prevent the target from seeing your content or interacting with you. Subject to per-tool rate limiting.',
     params: MuteUserSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the mute operation succeeded.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        mutedUser: {
+          type: 'object',
+          description: 'Details of the muted account.',
+          properties: {
+            actor: {
+              type: 'string',
+              description: 'Handle or DID supplied in the request.',
+            },
+            did: {
+              type: 'string',
+              description: 'Resolved DID of the muted account, if returned by the API.',
+            },
+          },
+          required: ['actor'],
+        },
+      },
+      required: ['success', 'message', 'mutedUser'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -100,8 +172,38 @@ export class MuteUserTool extends BaseTool {
 export class UnmuteUserTool extends BaseTool {
   public readonly schema = {
     method: 'unmute_user',
-    description: 'Unmute a previously muted user to restore their content in your feeds.',
+    description:
+      'Unmute a previously muted user to restore their content in your feeds. Reverses an earlier mute_user action without notifying the target. Requires authentication (app password). Use this instead of unblock_user when the account was suppressed via mute rather than block. Subject to per-tool rate limiting.',
     params: UnmuteUserSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the unmute operation succeeded.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        unmutedUser: {
+          type: 'object',
+          description: 'Details of the unmuted account.',
+          properties: {
+            actor: {
+              type: 'string',
+              description: 'Handle or DID supplied in the request.',
+            },
+            did: {
+              type: 'string',
+              description: 'Resolved DID of the unmuted account, if returned by the API.',
+            },
+          },
+          required: ['actor'],
+        },
+      },
+      required: ['success', 'message', 'unmutedUser'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -150,8 +252,42 @@ export class UnmuteUserTool extends BaseTool {
 export class BlockUserTool extends BaseTool {
   public readonly schema = {
     method: 'block_user',
-    description: 'Block a user to prevent them from seeing your content and interacting with you.',
+    description:
+      'Block a user to prevent them from seeing your content and interacting with you. Creates a block record in your repo; the action cannot be undone without calling unblock_user. Requires authentication (app password). Use block_user for mutual visibility restriction; use mute_user for a private, one-sided feed suppression that does not affect the target. Subject to per-tool rate limiting.',
     params: BlockUserSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the block operation succeeded.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        blockedUser: {
+          type: 'object',
+          description: 'Details of the blocked account.',
+          properties: {
+            actor: {
+              type: 'string',
+              description: 'Handle or DID supplied in the request.',
+            },
+            did: {
+              type: 'string',
+              description: 'Resolved DID of the blocked account.',
+            },
+            uri: {
+              type: 'string',
+              description: 'AT-URI of the newly created block record in your repo.',
+            },
+          },
+          required: ['actor'],
+        },
+      },
+      required: ['success', 'message', 'blockedUser'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -214,8 +350,34 @@ export class BlockUserTool extends BaseTool {
 export class UnblockUserTool extends BaseTool {
   public readonly schema = {
     method: 'unblock_user',
-    description: 'Unblock a previously blocked user to restore normal interactions.',
+    description:
+      'Unblock a previously blocked user to restore normal interactions. Deletes the block record from your repo; if the user was not blocked, the operation returns success=false without error. Requires authentication (app password). Use this instead of unmute_user when the account was restricted via block rather than mute. Subject to per-tool rate limiting.',
     params: UnblockUserSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'True if the block was removed; false if the account was not blocked.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        unblockedUser: {
+          type: 'object',
+          description: 'Details of the targeted account.',
+          properties: {
+            actor: {
+              type: 'string',
+              description: 'Handle or DID supplied in the request.',
+            },
+          },
+          required: ['actor'],
+        },
+      },
+      required: ['success', 'message', 'unblockedUser'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -299,8 +461,46 @@ export class UnblockUserTool extends BaseTool {
 export class ReportContentTool extends BaseTool {
   public readonly schema = {
     method: 'report_content',
-    description: 'Report content that violates community guidelines or terms of service.',
+    description:
+      'Report content that violates community guidelines or terms of service. Submits a moderation report to the network; moderators review it asynchronously and the report cannot be withdrawn once submitted. Requires authentication (app password). Use report_content when you have the AT-URI and CID of the specific post or record; use report_user when reporting an entire account rather than a single piece of content. Subject to per-tool rate limiting.',
     params: ReportContentSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the report was submitted successfully.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        reportId: {
+          type: 'string',
+          description: 'Numeric identifier of the newly created moderation report (as a string).',
+        },
+        reportDetails: {
+          type: 'object',
+          description: 'Echo of the submitted report parameters.',
+          properties: {
+            subject: {
+              type: 'string',
+              description: 'AT-URI of the reported content.',
+            },
+            reasonType: {
+              type: 'string',
+              description: 'The short reason category supplied in the request.',
+            },
+            reason: {
+              type: 'string',
+              description: 'Optional free-text explanation supplied in the request.',
+            },
+          },
+          required: ['subject', 'reasonType'],
+        },
+      },
+      required: ['success', 'message', 'reportId', 'reportDetails'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -375,8 +575,46 @@ export class ReportContentTool extends BaseTool {
 export class ReportUserTool extends BaseTool {
   public readonly schema = {
     method: 'report_user',
-    description: 'Report a user account that violates community guidelines or terms of service.',
+    description:
+      'Report a user account that violates community guidelines or terms of service. Submits a moderation report targeting the entire account; moderators review it asynchronously and the report cannot be withdrawn once submitted. Requires authentication (app password). Use report_user to flag an account; use report_content when the violation is limited to a specific post or record identified by AT-URI and CID. Subject to per-tool rate limiting.',
     params: ReportUserSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the report was submitted successfully.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        reportId: {
+          type: 'string',
+          description: 'Numeric identifier of the newly created moderation report (as a string).',
+        },
+        reportDetails: {
+          type: 'object',
+          description: 'Echo of the submitted report parameters.',
+          properties: {
+            actor: {
+              type: 'string',
+              description: 'Handle or DID of the reported account.',
+            },
+            reasonType: {
+              type: 'string',
+              description: 'The short reason category supplied in the request.',
+            },
+            reason: {
+              type: 'string',
+              description: 'Optional free-text explanation supplied in the request.',
+            },
+          },
+          required: ['actor', 'reasonType'],
+        },
+      },
+      required: ['success', 'message', 'reportId', 'reportDetails'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -449,8 +687,19 @@ export class ReportUserTool extends BaseTool {
  * Zod schema for analyze moderation status parameters
  */
 const AnalyzeModerationStatusSchema = z.object({
-  subject: z.string().min(1, 'Subject (DID or AT-URI) is required'),
-  includeLabels: z.boolean().optional().default(true),
+  subject: z
+    .string()
+    .min(1, 'Subject (DID or AT-URI) is required')
+    .describe(
+      'DID of a user account (e.g. did:plc:abc123) or AT-URI of a post (at://did/app.bsky.feed.post/rkey) to analyze.'
+    ),
+  includeLabels: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'Whether to fetch and include content labels in the response (default true). Set to false to skip label fetching for a faster call.'
+    ),
 });
 
 /**
@@ -470,8 +719,111 @@ export class AnalyzeModerationStatusTool extends BaseTool {
   public readonly schema = {
     method: 'analyze_moderation_status',
     description:
-      'Analyze moderation status of a post or user. Returns content labels, moderation decisions, and personal moderation state (blocks, mutes). Subject can be a DID (for users) or AT-URI (for posts).',
+      'Analyze moderation status of a post or user. Returns content labels, moderation decisions, and personal moderation state (blocks, mutes). Subject can be a DID (for users) or AT-URI (for posts). Works without authentication; richer with auth. Use this tool to evaluate safety before rendering content; use block_user or mute_user to act on the results. Subject to per-tool rate limiting.',
     params: AnalyzeModerationStatusSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the analysis completed successfully.',
+        },
+        subject: {
+          type: 'string',
+          description: 'The DID or AT-URI that was analyzed.',
+        },
+        subjectType: {
+          type: 'string',
+          enum: ['user', 'post'],
+          description: '"user" when subject is a DID; "post" when subject is an AT-URI.',
+        },
+        moderation: {
+          type: 'object',
+          description: 'Raw moderation state for the subject.',
+          properties: {
+            labels: {
+              type: 'array',
+              description:
+                'Content labels attached to the subject (present when includeLabels=true and labels exist).',
+              items: {
+                type: 'object',
+                properties: {
+                  src: {
+                    type: 'string',
+                    description: 'DID of the labeler that issued this label.',
+                  },
+                  uri: { type: 'string', description: 'AT-URI of the labeled record.' },
+                  val: { type: 'string', description: 'Label value (e.g. "nsfw", "spam").' },
+                  cts: {
+                    type: 'string',
+                    description: 'ISO-8601 timestamp when the label was created.',
+                  },
+                },
+                required: ['src', 'uri', 'val', 'cts'],
+              },
+            },
+            blocked: {
+              type: 'boolean',
+              description: 'True if you are blocking this account (user subjects only).',
+            },
+            muted: {
+              type: 'boolean',
+              description: 'True if you have muted this account (user subjects only).',
+            },
+            blockedBy: {
+              type: 'boolean',
+              description: 'True if this account is blocking you (user subjects only).',
+            },
+            blocking: {
+              type: 'string',
+              description: 'AT-URI of your block record for this account, if any.',
+            },
+            mutedByList: {
+              type: 'object',
+              description: 'Moderation list that caused the mute, if applicable.',
+              properties: {
+                uri: { type: 'string', description: 'AT-URI of the list.' },
+                name: { type: 'string', description: 'Display name of the list.' },
+              },
+              required: ['uri'],
+            },
+            blockingByList: {
+              type: 'object',
+              description: 'Moderation list that caused the block, if applicable.',
+              properties: {
+                uri: { type: 'string', description: 'AT-URI of the list.' },
+                name: { type: 'string', description: 'Display name of the list.' },
+              },
+              required: ['uri'],
+            },
+          },
+        },
+        analysis: {
+          type: 'object',
+          description: 'Derived safety analysis based on labels and moderation state.',
+          properties: {
+            hasContentWarnings: {
+              type: 'boolean',
+              description: 'True if any content warnings were detected.',
+            },
+            isNSFW: { type: 'boolean', description: 'True if NSFW-related labels were found.' },
+            isSpam: { type: 'boolean', description: 'True if spam labels were found.' },
+            requiresWarning: {
+              type: 'boolean',
+              description: 'True if a warning should be shown before displaying content.',
+            },
+            safetyLevel: {
+              type: 'string',
+              enum: ['safe', 'warning', 'restricted', 'blocked'],
+              description:
+                '"safe" = no issues; "warning" = minor labels or muted; "restricted" = spam/hate; "blocked" = mutual or list block.',
+            },
+          },
+          required: ['hasContentWarnings', 'isNSFW', 'isSpam', 'requiresWarning', 'safetyLevel'],
+        },
+      },
+      required: ['success', 'subject', 'subjectType', 'moderation', 'analysis'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -569,7 +921,9 @@ export class AnalyzeModerationStatusTool extends BaseTool {
         const post = threadData.post;
 
         moderation = {
-          blocked: post.author?.viewer?.blocking,
+          // Coerce to a boolean to match the declared outputSchema and the user
+          // path (viewer.blocking is an AT-URI string when present, else undefined).
+          blocked: !!post.author?.viewer?.blocking,
           muted: post.author?.viewer?.muted,
           blockedBy: post.author?.viewer?.blockedBy,
         };

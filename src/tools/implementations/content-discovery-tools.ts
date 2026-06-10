@@ -10,31 +10,72 @@ import type { AtpClient } from '../../utils/atp-client.js';
  * Zod schema for find similar users parameters
  */
 const FindSimilarUsersSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
-  maxResults: z.number().int().min(1).max(50).optional().default(20),
-  minFollowerCount: z.number().int().min(0).optional().default(0),
-  includeMetrics: z.boolean().optional().default(true),
-});
-
-/**
- * Zod schema for recommend content parameters
- */
-const RecommendContentSchema = z.object({
-  maxResults: z.number().int().min(1).max(100).optional().default(20),
-  minLikes: z.number().int().min(0).optional().default(5),
-  maxAge: z.number().int().min(1).max(168).optional().default(24), // hours
-  topics: z.array(z.string()).optional(),
-  excludeReposts: z.boolean().optional().default(false),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe(
+      'Handle (e.g. alice.bsky.social) or DID of the target account to find similar users for.'
+    ),
+  maxResults: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(20)
+    .describe('Maximum number of similar users to return (1–50, default 20).'),
+  minFollowerCount: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .default(0)
+    .describe(
+      'Minimum follower count a candidate must have to be included in results (default 0, meaning no minimum).'
+    ),
+  includeMetrics: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'When true, includes a metrics object on each result with mutualFollowers and followerRatioSimilarity values (default true).'
+    ),
 });
 
 /**
  * Zod schema for discover communities parameters
  */
 const DiscoverCommunitiesSchema = z.object({
-  topic: z.string().min(1, 'Topic is required'),
-  maxResults: z.number().int().min(1).max(50).optional().default(20),
-  minCommunitySize: z.number().int().min(2).optional().default(5),
-  includeMetrics: z.boolean().optional().default(true),
+  topic: z
+    .string()
+    .min(1, 'Topic is required')
+    .describe(
+      'Keyword or phrase to search for (e.g. "climate", "web dev"). Used to retrieve relevant posts and identify active community clusters.'
+    ),
+  maxResults: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(20)
+    .describe('Maximum number of communities to return (1–50, default 20).'),
+  minCommunitySize: z
+    .number()
+    .int()
+    .min(2)
+    .optional()
+    .default(5)
+    .describe(
+      'Minimum number of distinct members required for a cluster to be reported as a community (minimum 2, default 5).'
+    ),
+  includeMetrics: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'When true, includes a metrics object on each community with avgFollowerCount, totalPosts, and interconnectedness values (default true).'
+    ),
 });
 
 /**
@@ -44,10 +85,87 @@ export class FindSimilarUsersTool extends BaseTool {
   public readonly schema = {
     method: 'find_similar_users',
     description:
-      'Find users similar to a given user based on shared follow-graph connections (accounts ' +
-      'followed by the same people, and mutual followers). Ranking also factors in follower/' +
-      'following-ratio similarity. NOTE: content-topic similarity is NOT analyzed.',
+      'Find users similar to a given user based on shared follow-graph connections (second-degree follows and mutual followers) and follower/following-ratio similarity. ' +
+      'Content-topic similarity is NOT analyzed. ' +
+      'Works without authentication; richer with auth. ' +
+      'Use this instead of search_actors when you want accounts structurally similar to a known user rather than keyword matches. ' +
+      'Subject to per-tool rate limiting.',
     params: FindSimilarUsersSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the operation completed successfully.',
+        },
+        similarUsers: {
+          type: 'array',
+          description: 'List of similar users sorted by descending similarity score.',
+          items: {
+            type: 'object',
+            properties: {
+              did: { type: 'string', description: 'Decentralized identifier of the user.' },
+              handle: { type: 'string', description: 'Bluesky handle of the user.' },
+              displayName: { type: 'string', description: 'Display name of the user, if set.' },
+              description: { type: 'string', description: 'Profile bio of the user, if set.' },
+              avatar: { type: 'string', description: "URL of the user's avatar image, if set." },
+              followersCount: { type: 'number', description: 'Number of followers.' },
+              followsCount: { type: 'number', description: 'Number of accounts the user follows.' },
+              postsCount: { type: 'number', description: 'Total posts by this user.' },
+              similarityScore: {
+                type: 'number',
+                description: 'Computed similarity score (higher is more similar).',
+              },
+              similarityReasons: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Human-readable reasons contributing to the similarity score.',
+              },
+              metrics: {
+                type: 'object',
+                description: 'Optional metrics object; present when includeMetrics is true.',
+                properties: {
+                  mutualFollowers: {
+                    type: 'number',
+                    description: 'Number of mutual followers with the base user.',
+                  },
+                  followerRatioSimilarity: {
+                    type: 'number',
+                    description: 'Similarity of follower/following ratios (0–1).',
+                  },
+                },
+              },
+            },
+            required: [
+              'did',
+              'handle',
+              'followersCount',
+              'followsCount',
+              'postsCount',
+              'similarityScore',
+              'similarityReasons',
+            ],
+          },
+        },
+        baseUser: {
+          type: 'object',
+          description: 'Profile summary of the queried base user.',
+          properties: {
+            did: { type: 'string', description: 'DID of the base user.' },
+            handle: { type: 'string', description: 'Handle of the base user.' },
+            displayName: { type: 'string', description: 'Display name of the base user, if set.' },
+          },
+          required: ['did', 'handle'],
+        },
+        insights: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Summary observations about the results (e.g. average similarity score, average follower count).',
+        },
+      },
+      required: ['success', 'similarUsers', 'baseUser', 'insights'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -363,255 +481,104 @@ export class FindSimilarUsersTool extends BaseTool {
 }
 
 /**
- * Tool for recommending content based on user interests
- */
-export class RecommendContentTool extends BaseTool {
-  public readonly schema = {
-    method: 'recommend_content',
-    description:
-      'Recommend posts based on user interests and engagement history. ' +
-      'Analyzes your timeline, engagement patterns, and network to suggest relevant content.',
-    params: RecommendContentSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    super(atpClient, 'RecommendContent', ToolAuthMode.PRIVATE);
-  }
-
-  protected async execute(params: z.infer<typeof RecommendContentSchema>): Promise<{
-    success: boolean;
-    recommendations: Array<{
-      uri: string;
-      cid: string;
-      author: {
-        did: string;
-        handle: string;
-        displayName?: string;
-        avatar?: string;
-      };
-      text: string;
-      likeCount: number;
-      replyCount: number;
-      repostCount: number;
-      indexedAt: string;
-      recommendationScore: number;
-      recommendationReasons: string[];
-      topics?: string[];
-    }>;
-    insights: string[];
-  }> {
-    try {
-      this.logger.info('Generating content recommendations', {
-        maxResults: params.maxResults,
-        topics: params.topics,
-      });
-
-      const agent = this.atpClient.getAgent();
-
-      // Get user's timeline to understand their network
-      const timelineResponse = await this.executeAtpOperation(
-        async () => agent.getTimeline({ limit: 100 }),
-        'getTimeline',
-        { limit: 100 }
-      );
-
-      // The repost indicator lives on the feed item's `reason`
-      // (app.bsky.feed.defs#reasonRepost), not on the post record — preserve it so
-      // excludeReposts can actually filter reposts.
-      const timelinePosts = timelineResponse.data.feed.map((item: any) => ({
-        ...item.post,
-        __isRepost: item.reason?.$type === 'app.bsky.feed.defs#reasonRepost',
-      }));
-
-      // Get user's recent likes to understand preferences
-      const likedTopics = new Set<string>();
-      const likedAuthors = new Set<string>();
-
-      try {
-        await this.executeAtpOperation(
-          async () => agent.getProfile({ actor: agent.session?.did || '' }),
-          'getProfile',
-          {}
-        );
-
-        // Note: AT Protocol doesn't have a direct "get my likes" endpoint
-        // We'll infer from timeline engagement instead
-        for (const post of timelinePosts) {
-          if (post.viewer?.like) {
-            likedAuthors.add(post.author.did);
-            const topics = this.extractTopics([post]);
-            topics.forEach(t => likedTopics.add(t));
-          }
-        }
-      } catch (error) {
-        this.logger.warn('Could not analyze user preferences', error);
-      }
-
-      // Filter and score posts
-      const now = new Date();
-      const maxAgeMs = params.maxAge * 60 * 60 * 1000;
-      const recommendations = [];
-
-      for (const post of timelinePosts) {
-        const postData = post;
-
-        // Skip if already liked
-        if (postData.viewer?.like) continue;
-
-        // Skip reposts if requested (flag derived from the feed item's reason).
-        if (params.excludeReposts && postData.__isRepost) continue;
-
-        // Check age
-        const postAge = now.getTime() - new Date(postData.indexedAt).getTime();
-        if (postAge > maxAgeMs) continue;
-
-        // Check minimum likes
-        const likeCount = postData.likeCount || 0;
-        if (likeCount < params.minLikes) continue;
-
-        // Extract topics from post
-        const postTopics = Array.from(this.extractTopics([post]));
-
-        // Check topic filter. Match each requested topic against BOTH the post's
-        // hashtags and its text body — most Bluesky posts have no hashtags, so a
-        // hashtag-only filter dropped the majority of genuinely on-topic posts.
-        if (params.topics && params.topics.length > 0) {
-          const postText = (postData.record?.text || '').toLowerCase();
-          const hasMatchingTopic = params.topics.some(filter => {
-            const f = filter.toLowerCase();
-            return postTopics.some(topic => topic.includes(f)) || postText.includes(f);
-          });
-          if (!hasMatchingTopic) continue;
-        }
-
-        // Calculate recommendation score
-        let score = 0;
-        const reasons: string[] = [];
-
-        // Engagement score
-        const engagementScore =
-          likeCount * 1 + (postData.replyCount || 0) * 2 + (postData.repostCount || 0) * 1.5;
-        score += Math.min(engagementScore, 100);
-        if (likeCount >= params.minLikes * 2) {
-          reasons.push(`High engagement (${likeCount} likes)`);
-        }
-
-        // Author preference
-        if (likedAuthors.has(postData.author.did)) {
-          score += 30;
-          reasons.push('From an author you frequently engage with');
-        }
-
-        // Topic relevance
-        const topicMatches = postTopics.filter(t => likedTopics.has(t)).length;
-        if (topicMatches > 0) {
-          score += topicMatches * 20;
-          reasons.push(`Matches ${topicMatches} of your interests`);
-        }
-
-        // Recency bonus
-        const ageHours = postAge / (60 * 60 * 1000);
-        if (ageHours < 6) {
-          score += 10;
-          reasons.push('Recent post');
-        }
-
-        // Thread bonus (replies often have good discussions)
-        if (postData.replyCount && postData.replyCount > 3) {
-          score += 15;
-          reasons.push('Active discussion');
-        }
-
-        if (reasons.length === 0) {
-          reasons.push('Popular in your network');
-        }
-
-        recommendations.push({
-          uri: postData.uri,
-          cid: postData.cid,
-          author: {
-            did: postData.author.did,
-            handle: postData.author.handle,
-            displayName: postData.author.displayName,
-            avatar: postData.author.avatar,
-          },
-          text: postData.record?.text || '',
-          likeCount: postData.likeCount || 0,
-          replyCount: postData.replyCount || 0,
-          repostCount: postData.repostCount || 0,
-          indexedAt: postData.indexedAt,
-          recommendationScore: Math.round(score),
-          recommendationReasons: reasons,
-          topics: postTopics.length > 0 ? postTopics : undefined,
-        });
-      }
-
-      // Sort by recommendation score
-      recommendations.sort((a, b) => b.recommendationScore - a.recommendationScore);
-      const topRecommendations = recommendations.slice(0, params.maxResults);
-
-      // Generate insights
-      const insights: string[] = [];
-      if (topRecommendations.length > 0) {
-        insights.push(`Found ${topRecommendations.length} recommended posts from your network`);
-
-        const avgScore =
-          topRecommendations.reduce((sum, r) => sum + r.recommendationScore, 0) /
-          topRecommendations.length;
-        insights.push(`Average recommendation score: ${avgScore.toFixed(1)}`);
-
-        const topAuthors = new Set(topRecommendations.slice(0, 5).map(r => r.author.handle));
-        insights.push(`Top authors: ${Array.from(topAuthors).join(', ')}`);
-
-        const allTopics = new Set<string>();
-        topRecommendations.forEach(r => r.topics?.forEach(t => allTopics.add(t)));
-        if (allTopics.size > 0) {
-          insights.push(`Common topics: ${Array.from(allTopics).slice(0, 5).join(', ')}`);
-        }
-      } else {
-        insights.push('No recommendations found matching your criteria');
-        insights.push(
-          'Try adjusting filters (lower minLikes, increase maxAge, or remove topic filters)'
-        );
-      }
-
-      this.logger.info('Content recommendations generated', {
-        count: topRecommendations.length,
-      });
-
-      return {
-        success: true,
-        recommendations: topRecommendations,
-        insights,
-      };
-    } catch (error) {
-      this.logger.error('Failed to generate recommendations', error);
-      this.formatError(error);
-    }
-  }
-
-  private extractTopics(posts: any[]): Set<string> {
-    const topics = new Set<string>();
-    for (const post of posts) {
-      const text = post.record?.text || '';
-      // Extract hashtags
-      const hashtags = text.match(/#\w+/g) || [];
-      hashtags.forEach((tag: string) => topics.add(tag.toLowerCase()));
-    }
-    return topics;
-  }
-}
-
-/**
  * Tool for discovering communities around topics
  */
 export class DiscoverCommunitiesTool extends BaseTool {
   public readonly schema = {
     method: 'discover_communities',
     description:
-      'Discover communities and groups of users around specific topics or interests. ' +
-      'Identifies clusters of users who frequently interact around a topic.',
+      'Discover communities and groups of users around specific topics or interests by searching recent posts and clustering authors who interact with each other. ' +
+      'Works without authentication; richer with auth. ' +
+      'Use this instead of find_similar_users when you want topic-based community clusters rather than accounts structurally similar to a specific user. ' +
+      'Subject to per-tool rate limiting.',
     params: DiscoverCommunitiesSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the operation completed successfully.',
+        },
+        communities: {
+          type: 'array',
+          description: 'List of discovered communities sorted by size and engagement (descending).',
+          items: {
+            type: 'object',
+            properties: {
+              name: {
+                type: 'string',
+                description: 'Auto-generated name for the community (e.g. "climate Community 1").',
+              },
+              topic: {
+                type: 'string',
+                description: 'The topic keyword used to discover this community.',
+              },
+              size: { type: 'number', description: 'Number of distinct members in the community.' },
+              coreMembers: {
+                type: 'array',
+                description:
+                  'Up to 10 most relevant members, sorted by relevance score descending.',
+                items: {
+                  type: 'object',
+                  properties: {
+                    did: { type: 'string', description: 'DID of the member.' },
+                    handle: { type: 'string', description: 'Bluesky handle of the member.' },
+                    displayName: { type: 'string', description: 'Display name, if set.' },
+                    avatar: { type: 'string', description: 'Avatar URL, if set.' },
+                    followersCount: { type: 'number', description: 'Follower count.' },
+                    postsCount: {
+                      type: 'number',
+                      description: 'Posts contributed to the topic in this search.',
+                    },
+                    relevanceScore: {
+                      type: 'number',
+                      description: 'Relevance score based on engagement and post count.',
+                    },
+                  },
+                  required: ['did', 'handle', 'followersCount', 'postsCount', 'relevanceScore'],
+                },
+              },
+              activityLevel: {
+                type: 'string',
+                enum: ['high', 'medium', 'low'],
+                description:
+                  'Activity level based on average posts per member: high (>=3), medium (1.5–2.9), low (<1.5).',
+              },
+              description: {
+                type: 'string',
+                description: 'Auto-generated human-readable summary of the community.',
+              },
+              metrics: {
+                type: 'object',
+                description: 'Optional metrics object; present when includeMetrics is true.',
+                properties: {
+                  avgFollowerCount: {
+                    type: 'number',
+                    description: 'Average follower count across all members.',
+                  },
+                  totalPosts: {
+                    type: 'number',
+                    description: 'Total posts by all community members on this topic.',
+                  },
+                  interconnectedness: {
+                    type: 'number',
+                    description: 'Ratio of cross-member interactions to community size.',
+                  },
+                },
+              },
+            },
+            required: ['name', 'topic', 'size', 'coreMembers', 'activityLevel', 'description'],
+          },
+        },
+        insights: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Summary observations about the discovered communities (e.g. total members, largest community).',
+        },
+      },
+      required: ['success', 'communities', 'insights'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

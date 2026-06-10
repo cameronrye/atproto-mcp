@@ -20,25 +20,17 @@ export { GetUserProfileTool } from './get-user-profile-tool.js';
 
 // Data retrieval
 export { SearchPostsTool } from './search-posts-tool.js';
+export { SearchActorsTool } from './search-actors-tool.js';
+export { GetAuthorFeedTool } from './get-author-feed-tool.js';
 export { GetTimelineTool } from './timeline-tools.js';
 export {
-  GetFollowersTool,
-  GetFollowsTool,
+  GetUserConnectionsTool,
   GetNotificationsTool,
-  GetUnreadCountTool,
   MarkNotificationsSeenTool,
 } from './social-graph-tools.js';
 
 // Content management
 export { DeletePostTool, UpdateProfileTool } from './content-management-tools.js';
-
-// OAuth authentication
-export {
-  StartOAuthFlowTool,
-  HandleOAuthCallbackTool,
-  RefreshOAuthTokensTool,
-  RevokeOAuthTokensTool,
-} from './oauth-tools.js';
 
 // Content moderation
 export {
@@ -51,58 +43,33 @@ export {
   AnalyzeModerationStatusTool,
 } from './moderation-tools.js';
 
-// Real-time streaming
-export {
-  StartStreamingTool,
-  StopStreamingTool,
-  GetStreamingStatusTool,
-  GetRecentEventsTool,
-  MonitorKeywordsTool,
-  TrackUsersTool,
-} from './streaming-tools.js';
-
 // Advanced social features
 export {
   CreateListTool,
   AddToListTool,
   RemoveFromListTool,
   GetListTool,
-  GetThreadTool,
   GetCustomFeedTool,
 } from './advanced-social-tools.js';
 
 // Enhanced media support
-export {
-  UploadImageTool,
-  UploadVideoTool,
-  CreateRichTextPostTool,
-  GenerateLinkPreviewTool,
-} from './media-tools.js';
-export { GenerateAltTextTool } from './generate-alt-text-tool.js';
+export { UploadImageTool, UploadVideoTool, GenerateLinkPreviewTool } from './media-tools.js';
 
 // Analytics and insights
-export { AnalyzeEngagementTool } from './analyze-engagement-tool.js';
-export {
-  AnalyzeNetworkTool,
-  SuggestContentStrategyTool,
-  FindInfluentialUsersTool,
-} from './analytics-tools.js';
+export { AnalyzeAccountTool } from './analyze-account-tool.js';
+export { FindInfluentialUsersTool } from './analytics-tools.js';
 
 // Content discovery
-export {
-  FindSimilarUsersTool,
-  RecommendContentTool,
-  DiscoverCommunitiesTool,
-} from './content-discovery-tools.js';
+export { FindSimilarUsersTool, DiscoverCommunitiesTool } from './content-discovery-tools.js';
 
-// Content discovery
-export { DiscoverTrendingTool } from './discover-trending-tool.js';
+// Faceted timeline-driven discovery (trending + recommended)
+export { DiscoverTool } from './discover-tool.js';
 
 // Batch operations
-export { BatchFollowTool, BatchLikeTool, BatchRepostTool } from './batch-operations-tools.js';
+export { BatchActionTool } from './batch-operations-tools.js';
 
 // Composite operations
 export { GetUserSummaryTool, GetPostContextTool } from './composite-tools.js';
 
 // Rich media
-export { AnalyzeImageTool, ExtractMediaFromPostTool } from './rich-media-tools.js';
+export { AnalyzeImageTool } from './rich-media-tools.js';

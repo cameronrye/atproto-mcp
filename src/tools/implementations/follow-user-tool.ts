@@ -17,7 +17,10 @@ import {
  * Zod schema for follow user parameters
  */
 const FollowUserSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the account to follow.'),
 });
 
 /**
@@ -31,8 +34,45 @@ export class FollowUserTool extends BaseTool {
   public readonly schema = {
     method: 'follow_user',
     description:
-      'Follow a user on AT Protocol. Creates a follow record for the specified user. Requires authentication.',
+      'Follow a user on AT Protocol. Creates a follow record for the specified account; if the account is already followed the existing follow URI is returned without creating a duplicate. Requires authentication (app password). Use unfollow_user to reverse this action; for bulk relationship changes consider batch_action instead. Subject to per-tool rate limiting.',
     params: FollowUserSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        uri: {
+          type: 'string',
+          description: 'AT-URI of the follow record (at://did/app.bsky.graph.follow/rkey).',
+        },
+        cid: {
+          type: 'string',
+          description: 'CID of the follow record; empty string when the follow already existed.',
+        },
+        success: {
+          type: 'boolean',
+          description: 'Whether the follow is now in effect (true even if already followed).',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable outcome message.',
+        },
+        followedUser: {
+          type: 'object',
+          description: 'Identifying information for the account that was followed.',
+          properties: {
+            did: {
+              type: 'string',
+              description: 'Decentralised Identifier of the followed account.',
+            },
+            handle: {
+              type: 'string',
+              description: 'Human-readable handle of the followed account, if available.',
+            },
+          },
+          required: ['did'],
+        },
+      },
+      required: ['uri', 'cid', 'success', 'message', 'followedUser'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -174,10 +214,41 @@ export class FollowUserTool extends BaseTool {
 export class UnfollowUserTool extends BaseTool {
   public readonly schema = {
     method: 'unfollow_user',
-    description: 'Unfollow a user on AT Protocol. Deletes the follow record.',
+    description:
+      'Unfollow a user on AT Protocol. Deletes the follow record identified by its AT-URI, permanently removing the follow relationship; this action cannot be undone (a new follow_user call is required to re-follow). Requires authentication (app password). Use follow_user to obtain the follow URI before calling this tool; for bulk unfollows consider batch_action. Subject to per-tool rate limiting.',
     params: z.object({
-      followUri: z.string().min(1, 'Follow URI is required'),
+      followUri: z
+        .string()
+        .min(1, 'Follow URI is required')
+        .describe(
+          'AT-URI of the follow record to delete (at://did/app.bsky.graph.follow/rkey). Must reference an app.bsky.graph.follow collection record.'
+        ),
     }),
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'True when the follow record was successfully deleted.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable outcome message.',
+        },
+        deletedFollow: {
+          type: 'object',
+          description: 'Information about the deleted follow record.',
+          properties: {
+            uri: {
+              type: 'string',
+              description: 'AT-URI of the deleted follow record.',
+            },
+          },
+          required: ['uri'],
+        },
+      },
+      required: ['success', 'message', 'deletedFollow'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

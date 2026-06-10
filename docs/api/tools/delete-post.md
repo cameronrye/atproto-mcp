@@ -95,7 +95,7 @@ session. If it does not, the operation fails:
 ## Related Tools
 
 - **[create_post](./create-post.md)** - Create a post
-- **[get_thread](./get-thread.md)** - View post threads
+- **[get_post_context](./get-post-context.md)** - View post threads
 
 ## See Also
 

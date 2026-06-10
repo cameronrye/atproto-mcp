@@ -354,7 +354,7 @@ describe('Phase 2 Integration Tests', () => {
       expect(toolNames).toContain('block_user');
       expect(toolNames).toContain('report_content');
       expect(toolNames).toContain('report_user');
-      expect(tools.length).toBe(62); // includes get_unread_count + mark_notifications_seen
+      expect(tools.length).toBe(43); // search_actors + get_author_feed added in Phase 3
     });
 
     it('should have moderation tools with correct schemas', () => {
@@ -441,14 +441,14 @@ describe('Phase 2 Integration Tests', () => {
   });
 
   describe('Phase 2 Success Criteria', () => {
-    it('should have OAuth tools available', async () => {
+    it('should not have OAuth tools (removed as non-functional)', async () => {
       const handler = mockHandlers.get('tools/list');
       const result = await handler!();
       const tools = result.tools;
 
       const oauthTools = tools.filter((tool: any) => tool.name.includes('oauth'));
 
-      expect(oauthTools.length).toBeGreaterThan(0);
+      expect(oauthTools.length).toBe(0);
     });
 
     it('should have moderation tools available in factory', () => {
@@ -479,12 +479,12 @@ describe('Phase 2 Integration Tests', () => {
       const result = await handler!();
       const availableTools = result.tools;
 
-      // Available tools should include OAuth (4) + some public tools (2+)
-      expect(availableTools.length).toBeGreaterThanOrEqual(6);
+      // Available tools should include some public/enhanced tools
+      expect(availableTools.length).toBeGreaterThanOrEqual(2);
 
       // Test total tools created in factory
       const allTools = createTools(mockAtpClient);
-      expect(allTools.length).toBe(62); // includes get_unread_count + mark_notifications_seen
+      expect(allTools.length).toBe(43); // search_actors + get_author_feed added in Phase 3
     });
   });
 });

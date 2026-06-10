@@ -205,8 +205,8 @@ illustrative.
 
 - **[follow_user](./follow-user.md)** - Follow a user
 - **[unfollow_user](./unfollow-user.md)** - Unfollow a user
-- **[get_followers](./get-followers.md)** - Get a user's followers
-- **[get_follows](./get-follows.md)** - Get users a user follows
+- **[get_user_connections](./get-user-connections.md)** - Get a user's followers
+  or follows (`direction: 'followers' | 'follows'`)
 - **[mute_user](./mute-user.md)** - Mute a user
 - **[block_user](./block-user.md)** - Block a user
 

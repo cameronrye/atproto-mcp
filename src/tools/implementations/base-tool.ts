@@ -37,6 +37,7 @@ export abstract class BaseTool implements IMcpTool {
     method: string;
     description: string;
     params?: z.ZodSchema;
+    outputSchema?: Record<string, unknown>;
   };
 
   constructor(
@@ -240,22 +241,10 @@ export abstract class BaseTool implements IMcpTool {
   protected async buildRichText(
     text: string
   ): Promise<{ text: string; facets?: RichText['facets'] }> {
-    const rt = new RichText({ text });
+    // Enforce the AT Protocol post-text limits (300 graphemes / 3000 UTF-8 bytes).
+    this.assertPostTextWithinLimits(text);
 
-    // AT Protocol limits post text to 300 GRAPHEMES and 3000 UTF-8 BYTES. Enforce
-    // on graphemes (not String.length / UTF-16 code units) so an emoji-heavy post
-    // — e.g. 300 emoji = 600 code units but only 300 graphemes — is not falsely
-    // rejected, and so the 3000-byte cap is actually checked.
-    if (rt.graphemeLength > 300) {
-      throw new ValidationError(
-        `Post text is ${rt.graphemeLength} graphemes; the maximum is 300.`,
-        'text'
-      );
-    }
-    const byteLength = Buffer.byteLength(rt.text, 'utf8');
-    if (byteLength > 3000) {
-      throw new ValidationError(`Post text is ${byteLength} bytes; the maximum is 3000.`, 'text');
-    }
+    const rt = new RichText({ text });
 
     try {
       await rt.detectFacets(this.atpClient.getAgent());
@@ -267,6 +256,27 @@ export abstract class BaseTool implements IMcpTool {
     return rt.facets && rt.facets.length > 0
       ? { text: rt.text, facets: rt.facets }
       : { text: rt.text };
+  }
+
+  /**
+   * Enforce the AT Protocol post-text limits: 300 GRAPHEMES and 3000 UTF-8 BYTES.
+   * Counted on graphemes (not String.length / UTF-16 code units) so an emoji-heavy
+   * post is not falsely rejected and the byte cap is actually checked. Shared by
+   * buildRichText (auto-detect path) and the explicit-facets post path so both
+   * enforce the limit identically.
+   */
+  protected assertPostTextWithinLimits(text: string): void {
+    const rt = new RichText({ text });
+    if (rt.graphemeLength > 300) {
+      throw new ValidationError(
+        `Post text is ${rt.graphemeLength} graphemes; the maximum is 300.`,
+        'text'
+      );
+    }
+    const byteLength = Buffer.byteLength(rt.text, 'utf8');
+    if (byteLength > 3000) {
+      throw new ValidationError(`Post text is ${byteLength} bytes; the maximum is 3000.`, 'text');
+    }
   }
 
   /**

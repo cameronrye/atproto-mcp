@@ -13,6 +13,8 @@ import { AtpMcpServer } from '../index.js';
  * This is the test that catches the "only the last-registered tool is callable"
  * dispatch bug: the SDK keys request handlers by method name only, so registering
  * one handler per tool under method 'tools/call' collapses to a single handler.
+ * analyze_image is the LAST tool registered in createTools(), so it stands in for
+ * "the only surviving handler" the dispatch bug would otherwise collapse to.
  */
 describe('MCP tool dispatch (real Server + in-memory transport)', () => {
   let server: AtpMcpServer;
@@ -43,7 +45,7 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
     // A tool registered early, one in the middle, and the last one must all appear.
     expect(names).toContain('get_user_profile');
     expect(names).toContain('like_post');
-    expect(names).toContain('extract_media_from_post');
+    expect(names).toContain('analyze_image');
   });
 
   it('advertises MCP safety annotations: destructive writes, read-only reads, open-world', async () => {
@@ -70,9 +72,9 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
   it('routes tools/call to an early-registered tool (not just the last one)', async () => {
     await connect();
     // get_user_profile is registered near the top of createTools(). With the
-    // dispatch bug, only the LAST tool (extract_media_from_post) is reachable and
-    // this call is rejected by a literal-name schema mismatch instead of routing
-    // to get_user_profile. A correct router reaches the tool, whose own validation
+    // dispatch bug, only the LAST tool (analyze_image) is reachable and this call
+    // is rejected by a literal-name schema mismatch instead of routing to
+    // get_user_profile. A correct router reaches the tool, whose own validation
     // then complains about the missing required `actor` argument. Per the MCP
     // contract, that execution/validation error comes back as an isError result,
     // not a JSON-RPC rejection.
@@ -87,22 +89,28 @@ describe('MCP tool dispatch (real Server + in-memory transport)', () => {
     // fails validation (missing actor); the write tools are unavailable in
     // unauthenticated mode. Both surface as isError tool results. The point is that
     // every one is REACHED — pre-fix, every non-last tool was instead rejected with a
-    // Zod literal mismatch against the only surviving handler ("extract_media_from_post").
+    // Zod literal mismatch against the only surviving handler ("analyze_image").
     for (const name of ['get_user_profile', 'create_post', 'like_post', 'block_user']) {
       const res = await client.callTool({ name, arguments: {} });
       const text = JSON.stringify(res.content);
       expect(res.isError, `${name} should have produced a tool-error result`).toBe(true);
       expect(text, `${name} was rejected by the wrong (last-tool) handler`).not.toMatch(
-        /invalid_literal|expected.*extract_media_from_post/i
+        /invalid_literal|expected.*analyze_image/i
       );
     }
   });
 
   it('emits structuredContent alongside the text result for a successful call', async () => {
     await connect();
-    // get_streaming_status is PUBLIC and returns a status object with no network
-    // call, so it succeeds in unauthenticated mode.
-    const res = await client.callTool({ name: 'get_streaming_status', arguments: {} });
+    // analyze_image is PUBLIC and performs no network call — it only inspects the
+    // blob metadata supplied inline, so it succeeds in unauthenticated mode.
+    const res = await client.callTool({
+      name: 'analyze_image',
+      arguments: {
+        blob: { ref: { $link: 'bafkreitest' }, mimeType: 'image/jpeg', size: 102400 },
+        includeOptimizationSuggestions: false,
+      },
+    });
     expect(res.isError).toBeFalsy();
     expect(res.structuredContent).toBeDefined();
     expect(typeof res.structuredContent).toBe('object');

@@ -1,12 +1,12 @@
 /**
- * Regression test: recommend_content's `excludeReposts` flag must actually
- * exclude reposts. The repost indicator lives on the feed item's `reason`
- * (app.bsky.feed.defs#reasonRepost), not on the post record, so the previous
- * `record.repost` check was a silent no-op.
+ * Regression test: discover (mode='recommended')'s `excludeReposts` flag must
+ * actually exclude reposts. The repost indicator lives on the feed item's
+ * `reason` (app.bsky.feed.defs#reasonRepost), not on the post record, so the
+ * previous `record.repost` check was a silent no-op.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { RecommendContentTool } from '../tools/implementations/content-discovery-tools.js';
+import { DiscoverTool } from '../tools/implementations/discover-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 function feedItem(uri: string, opts: { repost?: boolean } = {}) {
@@ -47,25 +47,26 @@ function mockClient() {
   return { client };
 }
 
-describe('recommend_content excludeReposts', () => {
+describe('discover recommended excludeReposts', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('excludes reposted feed items when excludeReposts is true', async () => {
     const { client } = mockClient();
-    const tool = new RecommendContentTool(client);
+    const tool = new DiscoverTool(client);
 
-    const result = await tool.handler({ excludeReposts: true });
+    const result = await tool.handler({ mode: 'recommended', excludeReposts: true });
     const uris = result.recommendations.map((r: { uri: string }) => r.uri);
 
+    expect(result.mode).toBe('recommended');
     expect(uris).toContain('at://normal');
     expect(uris).not.toContain('at://repost');
   });
 
   it('includes reposted feed items when excludeReposts is false', async () => {
     const { client } = mockClient();
-    const tool = new RecommendContentTool(client);
+    const tool = new DiscoverTool(client);
 
-    const result = await tool.handler({ excludeReposts: false });
+    const result = await tool.handler({ mode: 'recommended', excludeReposts: false });
     const uris = result.recommendations.map((r: { uri: string }) => r.uri);
 
     expect(uris).toContain('at://normal');
@@ -73,7 +74,7 @@ describe('recommend_content excludeReposts', () => {
   });
 });
 
-describe('recommend_content topic filter', () => {
+describe('discover recommended topic filter', () => {
   beforeEach(() => vi.clearAllMocks());
 
   function clientWithText(text: string) {
@@ -109,9 +110,9 @@ describe('recommend_content topic filter', () => {
 
   it('matches a topic against the post text body, not only hashtags', async () => {
     // The post mentions "astronomy" in plain text with NO hashtag.
-    const tool = new RecommendContentTool(clientWithText('deep space astronomy is fascinating'));
+    const tool = new DiscoverTool(clientWithText('deep space astronomy is fascinating'));
 
-    const result = await tool.handler({ topics: ['astronomy'] });
+    const result = await tool.handler({ mode: 'recommended', topics: ['astronomy'] });
     const uris = result.recommendations.map((r: { uri: string }) => r.uri);
 
     expect(uris).toContain('at://topical');

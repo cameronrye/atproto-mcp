@@ -5,7 +5,6 @@
 import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import { ValidationError } from '../../types/index.js';
 import { readFile } from 'fs/promises';
 import { extname } from 'path';
 import { assertSafePath, safeFetch } from '../../utils/url-safety.js';
@@ -44,83 +43,116 @@ export function safeImageMime(contentType: string | null | undefined): string | 
 }
 
 const UploadImageSchema = z.object({
-  filePath: z.string().min(1, 'File path is required'),
-  altText: z.string().max(1000, 'Alt text cannot exceed 1000 characters').optional(),
+  filePath: z
+    .string()
+    .min(1, 'File path is required')
+    .describe(
+      'Absolute or relative path to the image file on disk. Must resolve within the allowed media directory (ATPROTO_MEDIA_DIR env var, defaults to cwd). Accepted extensions: .jpg, .jpeg, .png, .gif, .webp, .avif. Maximum file size 1 MB.'
+    ),
+  altText: z
+    .string()
+    .max(1000, 'Alt text cannot exceed 1000 characters')
+    .optional()
+    .describe(
+      'Accessible alt-text description of the image (max 1000 characters). Omit if no description is available.'
+    ),
 });
 
 const UploadVideoSchema = z.object({
-  filePath: z.string().min(1, 'File path is required'),
-  altText: z.string().max(1000, 'Alt text cannot exceed 1000 characters').optional(),
+  filePath: z
+    .string()
+    .min(1, 'File path is required')
+    .describe(
+      'Absolute or relative path to the video file on disk. Must resolve within the allowed media directory (ATPROTO_MEDIA_DIR env var, defaults to cwd). Accepted extensions: .mp4, .mov, .webm. Maximum file size 50 MB.'
+    ),
+  altText: z
+    .string()
+    .max(1000, 'Alt text cannot exceed 1000 characters')
+    .optional()
+    .describe(
+      'Accessible alt-text description of the video (max 1000 characters). Omit if no description is available.'
+    ),
   captions: z
     .array(
       z.object({
-        lang: z.string().min(2, 'Language code must be at least 2 characters'),
-        file: z.string().min(1, 'Caption file path is required'),
+        lang: z
+          .string()
+          .min(2, 'Language code must be at least 2 characters')
+          .describe('BCP-47 language code for the caption track (e.g. "en", "fr", "pt-BR").'),
+        file: z
+          .string()
+          .min(1, 'Caption file path is required')
+          .describe(
+            'Absolute or relative path to the WebVTT (.vtt) caption file for this language. Must resolve within the allowed media directory.'
+          ),
       })
     )
-    .optional(),
-});
-
-const CreateRichTextPostSchema = z.object({
-  text: z.string().min(1, 'Post text is required').max(300, 'Post cannot exceed 300 characters'),
-  facets: z
-    .array(
-      z.object({
-        index: z.object({
-          byteStart: z.number().min(0),
-          byteEnd: z.number().min(0),
-        }),
-        features: z.array(
-          z.object({
-            type: z.enum(['mention', 'link', 'hashtag']),
-            value: z.string(),
-          })
-        ),
-      })
-    )
-    .optional(),
-  embed: z
-    .object({
-      type: z.enum(['images', 'external', 'record']),
-      images: z
-        .array(
-          z.object({
-            // Local image file path (uploaded to obtain a valid blob reference).
-            filePath: z.string().min(1, 'Image file path is required'),
-            alt: z.string().max(1000),
-          })
-        )
-        .max(4, 'Cannot attach more than 4 images')
-        .optional(),
-      external: z
-        .object({
-          uri: z.string().url(),
-          title: z.string(),
-          description: z.string(),
-          // Optional local thumbnail image file path.
-          thumbFilePath: z.string().optional(),
-        })
-        .optional(),
-      record: z
-        .object({
-          uri: z.string(),
-          cid: z.string(),
-        })
-        .optional(),
-    })
-    .optional(),
+    .optional()
+    .describe(
+      'Optional list of caption tracks to attach to the video. Each entry pairs a language code with a WebVTT file path.'
+    ),
 });
 
 const GenerateLinkPreviewSchema = z.object({
-  url: z.string().url('Must be a valid URL'),
+  url: z
+    .string()
+    .url('Must be a valid URL')
+    .describe(
+      'Fully-qualified HTTP or HTTPS URL of the webpage to preview. SSRF-safe: private/internal IP ranges and non-HTTP schemes are rejected. The server fetches up to 2 MB of the page HTML and up to 1 MB for the og:image thumbnail.'
+    ),
 });
 
 export class UploadImageTool extends BaseTool {
   public readonly schema = {
     method: 'upload_image',
     description:
-      'Upload an image file to AT Protocol for use in posts. Supports JPEG, PNG, GIF, WebP, and AVIF formats.',
+      'Upload an image file to AT Protocol for use in posts. Reads a local image file (JPEG, PNG, GIF, WebP, or AVIF; max 1 MB) and uploads it as an AT Protocol blob, returning a blob reference and alt text ready to embed in a create_post or create_thread call. Requires authentication (app password). Use upload_video instead for video files. Subject to per-tool rate limiting.',
     params: UploadImageSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the upload succeeded.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable status message.',
+        },
+        image: {
+          type: 'object',
+          description: 'Uploaded image blob reference and metadata, ready to embed in a post.',
+          properties: {
+            blob: {
+              type: 'object',
+              description: 'AT Protocol blob descriptor.',
+              properties: {
+                type: { type: 'string', description: 'Always "blob".' },
+                ref: {
+                  type: 'string',
+                  description: 'CID reference string (bafkrei…) of the uploaded blob.',
+                },
+                mimeType: {
+                  type: 'string',
+                  description: 'MIME type of the uploaded image (e.g. "image/jpeg").',
+                },
+                size: {
+                  type: 'number',
+                  description: 'Size of the uploaded blob in bytes.',
+                },
+              },
+              required: ['type', 'ref', 'mimeType', 'size'],
+            },
+            alt: {
+              type: 'string',
+              description: 'Alt text for the image (empty string if none was provided).',
+            },
+          },
+          required: ['blob', 'alt'],
+        },
+      },
+      required: ['success', 'message', 'image'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -221,8 +253,72 @@ export class UploadVideoTool extends BaseTool {
   public readonly schema = {
     method: 'upload_video',
     description:
-      'Upload a video file to AT Protocol for use in posts. Supports MP4, MOV, and WebM formats.',
+      'Upload a video file to AT Protocol for use in posts. Reads a local video file (MP4, MOV, or WebM; max 50 MB) and optionally attaches WebVTT caption tracks, then uploads the video and captions as AT Protocol blobs and returns blob references ready to embed in a create_post or create_thread call. Requires authentication (app password). Use upload_image instead for still images. Subject to per-tool rate limiting.',
     params: UploadVideoSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the upload succeeded.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable status message.',
+        },
+        video: {
+          type: 'object',
+          description: 'Uploaded video blob reference and metadata, ready to embed in a post.',
+          properties: {
+            blob: {
+              type: 'object',
+              description: 'AT Protocol blob descriptor for the video.',
+              properties: {
+                type: { type: 'string', description: 'Always "blob".' },
+                ref: {
+                  type: 'string',
+                  description: 'CID reference string (bafkrei…) of the uploaded video blob.',
+                },
+                mimeType: {
+                  type: 'string',
+                  description: 'MIME type of the uploaded video (e.g. "video/mp4").',
+                },
+                size: {
+                  type: 'number',
+                  description: 'Size of the uploaded video blob in bytes.',
+                },
+              },
+              required: ['type', 'ref', 'mimeType', 'size'],
+            },
+            alt: {
+              type: 'string',
+              description: 'Alt text for the video (empty string if none was provided).',
+            },
+            captions: {
+              type: 'array',
+              description:
+                'Processed caption tracks. Each entry pairs a BCP-47 language code with the uploaded caption blob CID.',
+              items: {
+                type: 'object',
+                properties: {
+                  lang: {
+                    type: 'string',
+                    description: 'BCP-47 language code for the caption track.',
+                  },
+                  file: {
+                    type: 'string',
+                    description: 'CID reference string of the uploaded caption blob.',
+                  },
+                },
+                required: ['lang', 'file'],
+              },
+            },
+          },
+          required: ['blob', 'alt'],
+        },
+      },
+      required: ['success', 'message', 'video'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -353,217 +449,76 @@ export class UploadVideoTool extends BaseTool {
   }
 }
 
-export class CreateRichTextPostTool extends BaseTool {
-  public readonly schema = {
-    method: 'create_rich_text_post',
-    description:
-      'Create a post with rich text formatting, including mentions, links, hashtags, and media embeds.',
-    params: CreateRichTextPostSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    super(atpClient, 'CreateRichTextPost');
-  }
-
-  protected async execute(params: {
-    text: string;
-    facets?: Array<{
-      index: { byteStart: number; byteEnd: number };
-      features: Array<{ type: string; value: string }>;
-    }>;
-    embed?: {
-      type: string;
-      images?: Array<{ filePath: string; alt: string }>;
-      external?: { uri: string; title: string; description: string; thumbFilePath?: string };
-      record?: { uri: string; cid: string };
-    };
-  }): Promise<{
-    success: boolean;
-    message: string;
-    post: {
-      uri: string;
-      cid: string;
-      text: string;
-      facets?: any[];
-      embed?: any;
-      createdAt: string;
-    };
-  }> {
-    try {
-      this.logger.info('Creating rich text post', {
-        textLength: params.text.length,
-        hasFacets: !!params.facets?.length,
-        hasEmbed: !!params.embed,
-      });
-
-      // Build the post record
-      const postRecord: any = {
-        text: params.text,
-        createdAt: new Date().toISOString(),
-      };
-
-      // Add facets if provided. Caller-supplied facets are UNTRUSTED: validate the
-      // byte range against the text's UTF-8 length (a bad range silently links the
-      // wrong substring or is rejected by the PDS), and resolve mention handles to
-      // DIDs (a mention facet must carry a DID, not a handle).
-      if (params.facets && params.facets.length > 0) {
-        const textByteLength = Buffer.byteLength(params.text, 'utf8');
-        const builtFacets = [];
-        for (const facet of params.facets) {
-          const { byteStart, byteEnd } = facet.index;
-          if (byteStart >= byteEnd || byteEnd > textByteLength) {
-            throw new ValidationError(
-              `Invalid facet byte range [${byteStart}, ${byteEnd}); must satisfy ` +
-                `byteStart < byteEnd <= ${textByteLength} (the text's UTF-8 byte length).`,
-              'facets'
-            );
-          }
-          const features = [];
-          for (const feature of facet.features) {
-            switch (feature.type) {
-              case 'mention': {
-                const did = feature.value.startsWith('did:')
-                  ? feature.value
-                  : await this.resolveDid(feature.value);
-                features.push({ $type: 'app.bsky.richtext.facet#mention', did });
-                break;
-              }
-              case 'link':
-                features.push({ $type: 'app.bsky.richtext.facet#link', uri: feature.value });
-                break;
-              case 'hashtag':
-                features.push({ $type: 'app.bsky.richtext.facet#tag', tag: feature.value });
-                break;
-              default:
-                features.push(feature);
-            }
-          }
-          builtFacets.push({ index: facet.index, features });
-        }
-        postRecord.facets = builtFacets;
-      }
-
-      // Add embed if provided. Image/thumbnail blobs MUST be real uploaded
-      // BlobRef objects (from agent.uploadBlob) — a bare string is not a valid
-      // blob reference and the server would reject it.
-      if (params.embed) {
-        switch (params.embed.type) {
-          case 'images':
-            if (params.embed.images && params.embed.images.length > 0) {
-              const images = [];
-              for (const img of params.embed.images) {
-                const blob = await this.uploadImageFile(img.filePath);
-                images.push({ image: blob, alt: img.alt });
-              }
-              postRecord.embed = {
-                $type: 'app.bsky.embed.images',
-                images,
-              };
-            }
-            break;
-          case 'external':
-            if (params.embed.external) {
-              const external: Record<string, unknown> = {
-                uri: params.embed.external.uri,
-                title: params.embed.external.title,
-                description: params.embed.external.description,
-              };
-              if (params.embed.external.thumbFilePath) {
-                external['thumb'] = await this.uploadImageFile(params.embed.external.thumbFilePath);
-              }
-              postRecord.embed = {
-                $type: 'app.bsky.embed.external',
-                external,
-              };
-            }
-            break;
-          case 'record':
-            if (params.embed.record) {
-              postRecord.embed = {
-                $type: 'app.bsky.embed.record',
-                record: {
-                  uri: params.embed.record.uri,
-                  cid: params.embed.record.cid,
-                },
-              };
-            }
-            break;
-        }
-      }
-
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.post(postRecord);
-        },
-        'createRichTextPost',
-        { textLength: params.text.length, hasEmbed: !!params.embed }
-      );
-
-      this.logger.info('Rich text post created successfully', {
-        uri: response.uri,
-        cid: response.cid,
-      });
-
-      return {
-        success: true,
-        message: 'Rich text post created successfully',
-        post: {
-          uri: response.uri,
-          cid: response.cid,
-          text: params.text,
-          facets: postRecord.facets,
-          embed: postRecord.embed,
-          createdAt: postRecord.createdAt,
-        },
-      };
-    } catch (error) {
-      this.logger.error('Failed to create rich text post', error);
-      this.formatError(error);
-    }
-  }
-
-  /**
-   * Upload a local image file and return its AT Protocol BlobRef, suitable for
-   * embedding in a post record.
-   */
-  private async uploadImageFile(filePath: string): Promise<unknown> {
-    const safePath = assertSafePath(filePath, mediaBaseDir());
-    const data = await readFile(safePath);
-    const ext = extname(safePath).toLowerCase();
-    const mimeTypeMap: Record<string, string> = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.webp': 'image/webp',
-      '.avif': 'image/avif',
-    };
-    const mimeType = mimeTypeMap[ext];
-    if (!mimeType) {
-      throw new Error(`Unsupported image format: ${ext}`);
-    }
-    if (data.length > 1024 * 1024) {
-      throw new Error('Image file size cannot exceed 1MB');
-    }
-    const response = await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        return await agent.uploadBlob(data, { encoding: mimeType });
-      },
-      'uploadEmbedImage',
-      { filePath: safePath, size: data.length }
-    );
-    // response.data.blob is the BlobRef the embed needs.
-    return response.data.blob;
-  }
-}
-
 export class GenerateLinkPreviewTool extends BaseTool {
   public readonly schema = {
     method: 'generate_link_preview',
-    description: 'Generate a link preview with title, description, and thumbnail for a given URL.',
+    description:
+      'Generate a link preview with title, description, and thumbnail for a given URL. Fetches the target page, extracts Open Graph / meta tags, optionally downloads and uploads the og:image thumbnail as an AT Protocol blob, and returns a preview object ready to attach as an external embed to a create_post or create_thread call. Requires authentication (app password). Use this tool before create_post when you want a rich URL card; use upload_image or upload_video for local media instead. Subject to per-tool rate limiting.',
     params: GenerateLinkPreviewSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the preview was generated successfully.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable status message.',
+        },
+        preview: {
+          type: 'object',
+          description: 'Link preview data suitable for use as an AT Protocol external embed.',
+          properties: {
+            uri: {
+              type: 'string',
+              description: 'The original URL that was previewed.',
+            },
+            title: {
+              type: 'string',
+              description:
+                'Page title extracted from <title> or og:title (truncated to 300 characters).',
+            },
+            description: {
+              type: 'string',
+              description:
+                'Page description from meta description or og:description (truncated to 1000 characters).',
+            },
+            thumb: {
+              type: 'object',
+              description:
+                'Uploaded thumbnail blob reference, present only when an og:image was found and successfully downloaded.',
+              properties: {
+                blob: {
+                  type: 'object',
+                  description: 'AT Protocol blob descriptor for the thumbnail image.',
+                  properties: {
+                    type: { type: 'string', description: 'Always "blob".' },
+                    ref: {
+                      type: 'string',
+                      description:
+                        'CID reference string (bafkrei…) of the uploaded thumbnail blob.',
+                    },
+                    mimeType: {
+                      type: 'string',
+                      description: 'MIME type of the thumbnail image (e.g. "image/jpeg").',
+                    },
+                    size: {
+                      type: 'number',
+                      description: 'Size of the thumbnail blob in bytes.',
+                    },
+                  },
+                  required: ['type', 'ref', 'mimeType', 'size'],
+                },
+              },
+              required: ['blob'],
+            },
+          },
+          required: ['uri', 'title', 'description'],
+        },
+      },
+      required: ['success', 'message', 'preview'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

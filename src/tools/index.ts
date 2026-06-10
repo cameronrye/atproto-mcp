@@ -9,59 +9,40 @@ import type { AtpClient } from '../utils/atp-client.js';
 import { Logger } from '../utils/logger.js';
 import {
   AddToListTool,
-  AnalyzeEngagementTool,
+  AnalyzeAccountTool,
   AnalyzeImageTool,
   AnalyzeModerationStatusTool,
-  AnalyzeNetworkTool,
-  BatchFollowTool,
-  BatchLikeTool,
-  BatchRepostTool,
+  BatchActionTool,
   BlockUserTool,
   CreateListTool,
   CreatePostTool,
-  CreateRichTextPostTool,
   CreateThreadTool,
   DeletePostTool,
   DiscoverCommunitiesTool,
-  DiscoverTrendingTool,
-  ExtractMediaFromPostTool,
+  DiscoverTool,
   FindInfluentialUsersTool,
   FindSimilarUsersTool,
   FollowUserTool,
-  GenerateAltTextTool,
   GenerateLinkPreviewTool,
+  GetAuthorFeedTool,
   GetCustomFeedTool,
-  GetFollowersTool,
-  GetFollowsTool,
   GetListTool,
   GetNotificationsTool,
   GetPostContextTool,
-  GetRecentEventsTool,
-  GetStreamingStatusTool,
-  GetThreadTool,
   GetTimelineTool,
-  GetUnreadCountTool,
+  GetUserConnectionsTool,
   GetUserProfileTool,
   GetUserSummaryTool,
-  HandleOAuthCallbackTool,
   LikePostTool,
   MarkNotificationsSeenTool,
-  MonitorKeywordsTool,
   MuteUserTool,
-  RecommendContentTool,
-  RefreshOAuthTokensTool,
   RemoveFromListTool,
   ReplyToPostTool,
   ReportContentTool,
   ReportUserTool,
   RepostTool,
-  RevokeOAuthTokensTool,
+  SearchActorsTool,
   SearchPostsTool,
-  StartOAuthFlowTool,
-  StartStreamingTool,
-  StopStreamingTool,
-  SuggestContentStrategyTool,
-  TrackUsersTool,
   UnblockUserTool,
   UnfollowUserTool,
   UnlikePostTool,
@@ -81,6 +62,11 @@ export interface IMcpTool {
     description: string;
     params?: z.ZodSchema;
     annotations?: IToolAnnotations;
+    // Optional JSON Schema describing the tool's result, advertised in tools/list.
+    // Purely descriptive: the server builds tools/call responses manually (it does
+    // not use the SDK's high-level registerTool), so this does NOT trigger any SDK
+    // structuredContent validation.
+    outputSchema?: Record<string, unknown>;
   };
   handler: (params: any) => Promise<any>;
 }
@@ -120,22 +106,16 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
 
     // Data retrieval
     () => new SearchPostsTool(atpClient),
+    () => new SearchActorsTool(atpClient),
+    () => new GetAuthorFeedTool(atpClient),
     () => new GetTimelineTool(atpClient),
-    () => new GetFollowersTool(atpClient),
-    () => new GetFollowsTool(atpClient),
+    () => new GetUserConnectionsTool(atpClient),
     () => new GetNotificationsTool(atpClient),
-    () => new GetUnreadCountTool(atpClient),
     () => new MarkNotificationsSeenTool(atpClient),
 
     // Content management
     () => new DeletePostTool(atpClient),
     () => new UpdateProfileTool(atpClient),
-
-    // OAuth authentication
-    () => new StartOAuthFlowTool(atpClient),
-    () => new HandleOAuthCallbackTool(atpClient),
-    () => new RefreshOAuthTokensTool(atpClient),
-    () => new RevokeOAuthTokensTool(atpClient),
 
     // Content moderation
     () => new MuteUserTool(atpClient),
@@ -146,45 +126,29 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new ReportUserTool(atpClient),
     () => new AnalyzeModerationStatusTool(atpClient),
 
-    // Real-time streaming
-    () => new StartStreamingTool(atpClient),
-    () => new StopStreamingTool(atpClient),
-    () => new GetStreamingStatusTool(atpClient),
-    () => new GetRecentEventsTool(atpClient),
-    () => new MonitorKeywordsTool(atpClient),
-    () => new TrackUsersTool(atpClient),
-
     // Advanced social features
     () => new CreateListTool(atpClient),
     () => new AddToListTool(atpClient),
     () => new RemoveFromListTool(atpClient),
     () => new GetListTool(atpClient),
-    () => new GetThreadTool(atpClient),
     () => new GetCustomFeedTool(atpClient),
 
     // Enhanced media support
     () => new UploadImageTool(atpClient),
     () => new UploadVideoTool(atpClient),
-    () => new CreateRichTextPostTool(atpClient),
     () => new GenerateLinkPreviewTool(atpClient),
-    () => new GenerateAltTextTool(atpClient),
 
     // Analytics and insights
-    () => new AnalyzeEngagementTool(atpClient),
-    () => new AnalyzeNetworkTool(atpClient),
-    () => new SuggestContentStrategyTool(atpClient),
+    () => new AnalyzeAccountTool(atpClient),
     () => new FindInfluentialUsersTool(atpClient),
 
     // Content discovery
-    () => new DiscoverTrendingTool(atpClient),
+    () => new DiscoverTool(atpClient),
     () => new FindSimilarUsersTool(atpClient),
-    () => new RecommendContentTool(atpClient),
     () => new DiscoverCommunitiesTool(atpClient),
 
     // Batch operations
-    () => new BatchFollowTool(atpClient),
-    () => new BatchLikeTool(atpClient),
-    () => new BatchRepostTool(atpClient),
+    () => new BatchActionTool(atpClient),
 
     // Composite operations
     () => new GetUserSummaryTool(atpClient),
@@ -192,7 +156,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
 
     // Rich media
     () => new AnalyzeImageTool(atpClient),
-    () => new ExtractMediaFromPostTool(atpClient),
   ];
 
   // Construct each tool defensively: a single failing constructor must not wipe

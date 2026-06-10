@@ -17,8 +17,8 @@ data a tool surfaces; exact field names, presence, and structure may differ.
 ::: info Basics covered elsewhere
 
 The simplest forms of `create_post`, `like_post`, `follow_user`, `search_posts`,
-and `get_thread` are introduced in [Basic Usage](./basic-usage.md). This page
-focuses on the richer variants, workflows, and social-graph operations.
+and `get_post_context` are introduced in [Basic Usage](./basic-usage.md). This
+page focuses on the richer variants, workflows, and social-graph operations.
 
 :::
 
@@ -190,7 +190,7 @@ being replied to.
 "Show me the full conversation thread for this post"
 ```
 
-**Tool Call:** `get_thread`
+**Tool Call:** `get_post_context`
 
 **Parameters (JSON):**
 
@@ -664,13 +664,14 @@ field):
 "Show me alice.bsky.social's followers"
 ```
 
-**Tool Call:** `get_followers`
+**Tool Call:** `get_user_connections`
 
 **Parameters (JSON):**
 
 ```json
 {
   "actor": "alice.bsky.social",
+  "direction": "followers",
   "limit": 100
 }
 ```
@@ -680,12 +681,9 @@ field):
 ```json
 {
   "success": true,
-  "subject": {
-    "did": "did:plc:alice123",
-    "handle": "alice.bsky.social",
-    "displayName": "Alice Smith"
-  },
-  "followers": [
+  "actor": "alice.bsky.social",
+  "direction": "followers",
+  "connections": [
     {
       "did": "did:plc:bob456",
       "handle": "bob.bsky.social",
@@ -708,13 +706,14 @@ with `displayName` and `avatar`).
 "Who does alice.bsky.social follow?"
 ```
 
-**Tool Call:** `get_follows`
+**Tool Call:** `get_user_connections`
 
 **Parameters (JSON):**
 
 ```json
 {
   "actor": "alice.bsky.social",
+  "direction": "follows",
   "limit": 100
 }
 ```
@@ -724,11 +723,9 @@ with `displayName` and `avatar`).
 ```json
 {
   "success": true,
-  "subject": {
-    "did": "did:plc:alice123",
-    "handle": "alice.bsky.social"
-  },
-  "follows": [
+  "actor": "alice.bsky.social",
+  "direction": "follows",
+  "connections": [
     {
       "did": "did:plc:charlie789",
       "handle": "charlie.bsky.social",
@@ -748,33 +745,35 @@ with `displayName` and `avatar`).
 
 **Step 1: Get Followers**
 
-**Tool Call:** `get_followers`
+**Tool Call:** `get_user_connections` with `direction: "followers"`
 
 **Parameters (JSON):**
 
 ```json
 {
   "actor": "alice.bsky.social",
+  "direction": "followers",
   "limit": 100
 }
 ```
 
 **Step 2: Get Following**
 
-**Tool Call:** `get_follows`
+**Tool Call:** `get_user_connections` with `direction: "follows"`
 
 **Parameters (JSON):**
 
 ```json
 {
   "actor": "alice.bsky.social",
+  "direction": "follows",
   "limit": 100
 }
 ```
 
 **Step 3: Analysis**
 
-The LLM compares the two lists to find users who appear in both `followers` and
+The LLM compares the two `connections` lists to find users who appear in both
 `follows` arrays (matching by `did`).
 
 ## Best Practices

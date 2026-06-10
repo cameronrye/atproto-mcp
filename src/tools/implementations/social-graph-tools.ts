@@ -1,24 +1,50 @@
 /**
- * Social Graph Tools - Retrieve followers, follows, and notifications from AT Protocol
+ * Social Graph Tools - Retrieve connections and notifications from AT Protocol
  */
 
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type {
-  DID,
-  IAtpProfile,
-  IGetFollowersParams,
-  IGetFollowsParams,
-  IGetNotificationsParams,
-} from '../../types/index.js';
+import type { DID, IAtpProfile, IGetNotificationsParams } from '../../types/index.js';
 
 /**
- * Zod schema for get followers parameters
+ * Shared profile-transform helper — maps a raw AppView ProfileView entry to the
+ * documented IAtpProfile + indexedAt shape. ProfileView does NOT carry follower /
+ * follow / post counts (only ProfileViewDetailed does), so those fields are
+ * omitted rather than emitted as always-undefined values.
  */
-const GetFollowersSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
-  limit: z.number().int().min(1).max(100).optional().default(50),
+function mapProfile(entry: any): IAtpProfile & { indexedAt?: string } {
+  return {
+    did: entry.did as DID,
+    handle: entry.handle,
+    displayName: entry.displayName,
+    description: entry.description,
+    avatar: entry.avatar,
+    banner: entry.banner,
+    indexedAt: entry.indexedAt,
+  };
+}
+
+/**
+ * Zod schema for get_user_connections parameters
+ */
+const GetUserConnectionsSchema = z.object({
+  actor: z
+    .string()
+    .min(1)
+    .describe('Handle (e.g. alice.bsky.social) or DID of the account whose connections to list.'),
+  direction: z
+    .enum(['followers', 'follows'])
+    .describe(
+      "Which side of the follow graph to return: 'followers' = accounts that follow the actor; 'follows' = accounts the actor follows."
+    ),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Max accounts per page (1–100, default 50).'),
   cursor: z
     .string()
     .optional()
@@ -28,205 +54,173 @@ const GetFollowersSchema = z.object({
 });
 
 /**
- * Zod schema for get follows parameters
+ * Merged tool replacing the former get_followers and get_follows tools.
+ * Use the direction param to choose which side of the follow graph to query.
+ * Works without authentication; richer viewer state is returned when authenticated.
  */
-const GetFollowsSchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
-  limit: z.number().int().min(1).max(100).optional().default(50),
-  cursor: z
-    .string()
-    .optional()
-    .describe(
-      'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
-    ),
-});
+export class GetUserConnectionsTool extends BaseTool {
+  public readonly schema = {
+    method: 'get_user_connections',
+    description:
+      "Retrieve an account's followers or follows from AT Protocol. Works without authentication; richer with auth. Use direction='followers' to get who follows the actor or direction='follows' to get who the actor follows; use get_user_profile or get_user_summary for aggregate counts instead. Subject to per-tool rate limiting.",
+    params: GetUserConnectionsSchema,
+    outputSchema: {
+      type: 'object',
+      description: 'Paginated list of connected accounts.',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the request succeeded.' },
+        actor: { type: 'string', description: 'The actor whose connections were fetched.' },
+        direction: {
+          type: 'string',
+          enum: ['followers', 'follows'],
+          description: 'The direction of the follow graph that was queried.',
+        },
+        connections: {
+          type: 'array',
+          description: 'The matched accounts for this page.',
+          items: {
+            type: 'object',
+            properties: {
+              did: { type: 'string', description: 'Decentralized identifier.' },
+              handle: { type: 'string', description: 'AT Protocol handle.' },
+              displayName: { type: 'string', description: 'Display name, if set.' },
+              description: { type: 'string', description: 'Bio / profile description.' },
+              avatar: { type: 'string', description: 'URL of the avatar image.' },
+              banner: { type: 'string', description: 'URL of the banner image.' },
+              indexedAt: {
+                type: 'string',
+                description: 'ISO 8601 timestamp when the record was indexed.',
+              },
+            },
+            required: ['did', 'handle'],
+          },
+        },
+        cursor: {
+          type: 'string',
+          description: 'Opaque cursor for the next page; absent when there are no more results.',
+        },
+      },
+      required: ['success', 'actor', 'direction', 'connections'],
+    },
+  };
+
+  constructor(atpClient: AtpClient) {
+    // Public AppView data; works unauthenticated, richer (viewer state) with auth.
+    super(atpClient, 'GetUserConnections', ToolAuthMode.ENHANCED);
+  }
+
+  protected async execute(params: {
+    actor: string;
+    direction: 'followers' | 'follows';
+    limit?: number;
+    cursor?: string;
+  }): Promise<{
+    success: boolean;
+    actor: string;
+    direction: 'followers' | 'follows';
+    connections: Array<IAtpProfile & { indexedAt?: string }>;
+    cursor?: string;
+  }> {
+    try {
+      this.logger.info('Retrieving user connections', {
+        actor: params.actor,
+        direction: params.direction,
+        limit: params.limit,
+        hasCursor: !!params.cursor,
+      });
+
+      this.validateActor(params.actor);
+
+      const limit = params.limit || 50;
+
+      let rawItems: any[];
+      let cursor: string | undefined;
+
+      if (params.direction === 'followers') {
+        const response = await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.getFollowers({
+              actor: params.actor,
+              limit,
+              cursor: params.cursor,
+            });
+          },
+          'getFollowers',
+          { actor: params.actor, limit }
+        );
+        rawItems = response.data.followers;
+        cursor = response.data.cursor;
+      } else {
+        const response = await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.getFollows({
+              actor: params.actor,
+              limit,
+              cursor: params.cursor,
+            });
+          },
+          'getFollows',
+          { actor: params.actor, limit }
+        );
+        rawItems = response.data.follows;
+        cursor = response.data.cursor;
+      }
+
+      const connections = rawItems.map(mapProfile);
+
+      this.logger.info('User connections retrieved successfully', {
+        actor: params.actor,
+        direction: params.direction,
+        count: connections.length,
+        hasMore: !!cursor,
+      });
+
+      return {
+        success: true,
+        actor: params.actor,
+        direction: params.direction,
+        connections,
+        cursor,
+      };
+    } catch (error) {
+      this.logger.error('Failed to retrieve user connections', error);
+      this.formatError(error);
+    }
+  }
+}
 
 /**
  * Zod schema for get notifications parameters
  */
 const GetNotificationsSchema = z.object({
-  limit: z.number().int().min(1).max(100).optional().default(50),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('Max notifications per page (1–100, default 50).'),
   cursor: z
     .string()
     .optional()
     .describe(
       'Opaque pagination cursor from the previous response cursor field; omit for the first page.'
     ),
-  seenAt: z.string().optional(),
+  seenAt: z
+    .string()
+    .optional()
+    .describe(
+      'ISO 8601 timestamp; only return notifications that occurred after this time. Optional filter.'
+    ),
+  countOnly: z
+    .boolean()
+    .optional()
+    .describe(
+      'When true, return only the unread count and skip fetching the notification list (cheap badge-number path).'
+    ),
 });
-
-/**
- * Tool for retrieving user followers from AT Protocol
- */
-export class GetFollowersTool extends BaseTool {
-  public readonly schema = {
-    method: 'get_followers',
-    description:
-      'Retrieve followers of a user from AT Protocol. Returns a list of users who follow the specified actor.',
-    params: GetFollowersSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    // Public AppView data; works unauthenticated, richer (viewer state) with auth.
-    super(atpClient, 'GetFollowers', ToolAuthMode.ENHANCED);
-  }
-
-  protected async execute(params: IGetFollowersParams): Promise<{
-    success: boolean;
-    followers: Array<IAtpProfile & { indexedAt?: string }>;
-    cursor?: string;
-    hasMore: boolean;
-    actor: string;
-  }> {
-    try {
-      this.logger.info('Retrieving followers', {
-        actor: params.actor,
-        limit: params.limit,
-        hasCursor: !!params.cursor,
-      });
-
-      // Validate the actor identifier
-      this.validateActor(params.actor);
-
-      // Get followers using AT Protocol
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.getFollowers({
-            actor: params.actor,
-            limit: params.limit || 50,
-            cursor: params.cursor,
-          });
-        },
-        'getFollowers',
-        {
-          actor: params.actor,
-          limit: params.limit,
-        }
-      );
-
-      // Transform followers to our interface. Note: getFollowers returns
-      // ProfileView entries, which do NOT carry followersCount/followsCount/
-      // postsCount (only ProfileViewDetailed does), so we omit those rather than
-      // emit always-undefined fields that imply the data is available.
-      const followers = response.data.followers.map((follower: any) => ({
-        did: follower.did as DID,
-        handle: follower.handle,
-        displayName: follower.displayName,
-        description: follower.description,
-        avatar: follower.avatar,
-        banner: follower.banner,
-        indexedAt: follower.indexedAt,
-      }));
-
-      const hasMore = !!response.data.cursor;
-      const cursor = response.data.cursor;
-
-      this.logger.info('Followers retrieved successfully', {
-        actor: params.actor,
-        followersCount: followers.length,
-        hasMore,
-      });
-
-      return {
-        success: true,
-        followers,
-        cursor,
-        hasMore,
-        actor: params.actor,
-      };
-    } catch (error) {
-      this.logger.error('Failed to retrieve followers', error);
-      this.formatError(error);
-    }
-  }
-}
-
-/**
- * Tool for retrieving users that a user follows from AT Protocol
- */
-export class GetFollowsTool extends BaseTool {
-  public readonly schema = {
-    method: 'get_follows',
-    description:
-      'Retrieve users that an actor follows from AT Protocol. Returns a list of users followed by the specified actor.',
-    params: GetFollowsSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    // Public AppView data; works unauthenticated, richer (viewer state) with auth.
-    super(atpClient, 'GetFollows', ToolAuthMode.ENHANCED);
-  }
-
-  protected async execute(params: IGetFollowsParams): Promise<{
-    success: boolean;
-    follows: Array<IAtpProfile & { indexedAt?: string }>;
-    cursor?: string;
-    hasMore: boolean;
-    actor: string;
-  }> {
-    try {
-      this.logger.info('Retrieving follows', {
-        actor: params.actor,
-        limit: params.limit,
-        hasCursor: !!params.cursor,
-      });
-
-      // Validate the actor identifier
-      this.validateActor(params.actor);
-
-      // Get follows using AT Protocol
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.getFollows({
-            actor: params.actor,
-            limit: params.limit || 50,
-            cursor: params.cursor,
-          });
-        },
-        'getFollows',
-        {
-          actor: params.actor,
-          limit: params.limit,
-        }
-      );
-
-      // Transform follows to our interface. getFollows returns ProfileView
-      // entries without follower/follow/post counts (see GetFollowersTool), so
-      // those fields are omitted rather than emitted as always-undefined.
-      const follows = response.data.follows.map((follow: any) => ({
-        did: follow.did as DID,
-        handle: follow.handle,
-        displayName: follow.displayName,
-        description: follow.description,
-        avatar: follow.avatar,
-        banner: follow.banner,
-        indexedAt: follow.indexedAt,
-      }));
-
-      const hasMore = !!response.data.cursor;
-      const cursor = response.data.cursor;
-
-      this.logger.info('Follows retrieved successfully', {
-        actor: params.actor,
-        followsCount: follows.length,
-        hasMore,
-      });
-
-      return {
-        success: true,
-        follows,
-        cursor,
-        hasMore,
-        actor: params.actor,
-      };
-    } catch (error) {
-      this.logger.error('Failed to retrieve follows', error);
-      this.formatError(error);
-    }
-  }
-}
 
 /**
  * Tool for retrieving notifications from AT Protocol
@@ -235,31 +229,113 @@ export class GetNotificationsTool extends BaseTool {
   public readonly schema = {
     method: 'get_notifications',
     description:
-      'Retrieve notifications from AT Protocol. Returns likes, reposts, follows, mentions, and replies.',
+      'Retrieve notifications from AT Protocol (likes, reposts, follows, mentions, replies). Requires authentication (app password). Use countOnly: true to fetch only the unread badge count cheaply without loading the full list; use mark_notifications_seen to clear the unread state after processing. Subject to per-tool rate limiting.',
     params: GetNotificationsSchema,
+    outputSchema: {
+      type: 'object',
+      description:
+        'Notification result. When countOnly is true only unreadCount is present; otherwise the full list is returned.',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the request succeeded.' },
+        unreadCount: {
+          type: 'number',
+          description: 'Number of unread notifications (always present).',
+        },
+        notifications: {
+          type: 'array',
+          description: 'Notification entries. Present only when countOnly is false/absent.',
+          items: {
+            type: 'object',
+            properties: {
+              uri: { type: 'string', description: 'AT URI of the notification record.' },
+              cid: { type: 'string', description: 'CID of the notification record.' },
+              author: {
+                type: 'object',
+                description: 'Author of the action that triggered the notification.',
+                properties: {
+                  did: { type: 'string' },
+                  handle: { type: 'string' },
+                  displayName: { type: 'string' },
+                  avatar: { type: 'string' },
+                  followersCount: { type: 'number' },
+                  followsCount: { type: 'number' },
+                  postsCount: { type: 'number' },
+                },
+                required: ['did', 'handle'],
+              },
+              reason: {
+                type: 'string',
+                enum: ['like', 'repost', 'follow', 'mention', 'reply', 'quote'],
+                description: 'Why this notification was generated.',
+              },
+              record: { type: 'object', description: 'Raw lexicon record payload.' },
+              isRead: { type: 'boolean', description: 'Whether the notification has been read.' },
+              indexedAt: {
+                type: 'string',
+                description: 'ISO 8601 timestamp when indexed.',
+              },
+              labels: { type: 'array', description: 'Moderation labels, if any.' },
+            },
+            required: ['uri', 'cid', 'author', 'reason', 'isRead', 'indexedAt'],
+          },
+        },
+        cursor: {
+          type: 'string',
+          description:
+            'Opaque cursor for the next page. Present only when countOnly is false/absent.',
+        },
+        hasMore: {
+          type: 'boolean',
+          description:
+            'True when a next page is available. Present only when countOnly is false/absent.',
+        },
+        seenAt: {
+          type: 'string',
+          description:
+            'The timestamp up to which notifications have been seen. Present only when countOnly is false/absent.',
+        },
+      },
+      required: ['success', 'unreadCount'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
     super(atpClient, 'GetNotifications');
   }
 
-  protected async execute(params: IGetNotificationsParams): Promise<{
-    success: boolean;
-    notifications: Array<{
-      uri: string;
-      cid: string;
-      author: IAtpProfile;
-      reason: 'like' | 'repost' | 'follow' | 'mention' | 'reply' | 'quote';
-      record: any;
-      isRead: boolean;
-      indexedAt: string;
-      labels?: any[];
-    }>;
-    cursor?: string;
-    hasMore: boolean;
-    seenAt?: string;
-  }> {
+  protected async execute(params: IGetNotificationsParams & { countOnly?: boolean }): Promise<
+    | { success: boolean; unreadCount: number }
+    | {
+        success: boolean;
+        unreadCount: number;
+        notifications: Array<{
+          uri: string;
+          cid: string;
+          author: IAtpProfile;
+          reason: 'like' | 'repost' | 'follow' | 'mention' | 'reply' | 'quote';
+          record: any;
+          isRead: boolean;
+          indexedAt: string;
+          labels?: any[];
+        }>;
+        cursor?: string;
+        hasMore: boolean;
+        seenAt?: string;
+      }
+  > {
     try {
+      if (params.countOnly) {
+        // Cheap path: only fetch the unread count without loading the full list.
+        this.logger.info('Retrieving unread notification count (countOnly)');
+
+        const response = await this.executeAtpOperation(async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.countUnreadNotifications();
+        }, 'countUnreadNotifications');
+
+        return { success: true, unreadCount: response.data.count };
+      }
+
       this.logger.info('Retrieving notifications', {
         limit: params.limit,
         hasCursor: !!params.cursor,
@@ -281,6 +357,19 @@ export class GetNotificationsTool extends BaseTool {
           limit: params.limit,
         }
       );
+
+      // Fetch unread count to include in full response.
+      let unreadCount = 0;
+      try {
+        const countResponse = await this.executeAtpOperation(async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.countUnreadNotifications();
+        }, 'countUnreadNotifications');
+        unreadCount = countResponse.data.count;
+      } catch {
+        // Non-fatal: count failure should not prevent notification list from returning.
+        unreadCount = response.data.notifications.filter((n: any) => !n.isRead).length;
+      }
 
       // Transform notifications to our interface
       const notifications = response.data.notifications.map((notification: any) => ({
@@ -309,11 +398,12 @@ export class GetNotificationsTool extends BaseTool {
       this.logger.info('Notifications retrieved successfully', {
         notificationsCount: notifications.length,
         hasMore,
-        unreadCount: notifications.filter(n => !n.isRead).length,
+        unreadCount,
       });
 
       return {
         success: true,
+        unreadCount,
         notifications,
         cursor,
         hasMore,
@@ -343,8 +433,22 @@ export class MarkNotificationsSeenTool extends BaseTool {
   public readonly schema = {
     method: 'mark_notifications_seen',
     description:
-      'Mark notifications as seen up to a timestamp (defaults to now) so they are not reprocessed. Requires authentication.',
+      'Mark notifications as seen up to a timestamp (defaults to now) so they are not reprocessed on subsequent get_notifications calls. Requires authentication (app password). Persists the seen cursor server-side; use get_notifications to retrieve new notifications after calling this. Subject to per-tool rate limiting.',
     params: MarkNotificationsSeenSchema,
+    outputSchema: {
+      type: 'object',
+      description: 'Result of marking notifications as seen.',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the operation succeeded.' },
+        message: { type: 'string', description: 'Human-readable confirmation message.' },
+        seenAt: {
+          type: 'string',
+          description:
+            'ISO 8601 timestamp that was submitted as the seen-up-to marker (the value that was persisted).',
+        },
+      },
+      required: ['success', 'message', 'seenAt'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -370,35 +474,6 @@ export class MarkNotificationsSeenTool extends BaseTool {
       return { success: true, message: 'Notifications marked as seen', seenAt: timestamp };
     } catch (error) {
       this.logger.error('Failed to mark notifications as seen', error);
-      this.formatError(error);
-    }
-  }
-}
-
-/**
- * Get the count of unread notifications — a cheap poll for "is there anything new"
- * that does not require fetching the full notification list. Requires authentication.
- */
-export class GetUnreadCountTool extends BaseTool {
-  public readonly schema = {
-    method: 'get_unread_count',
-    description: 'Get the number of unread notifications. Requires authentication.',
-    params: z.object({}),
-  };
-
-  constructor(atpClient: AtpClient) {
-    super(atpClient, 'GetUnreadCount', ToolAuthMode.PRIVATE);
-  }
-
-  protected async execute(): Promise<{ success: boolean; count: number }> {
-    try {
-      const response = await this.executeAtpOperation(async () => {
-        const agent = this.atpClient.getAgent();
-        return await agent.countUnreadNotifications();
-      }, 'countUnreadNotifications');
-      return { success: true, count: response.data.count };
-    } catch (error) {
-      this.logger.error('Failed to get unread notification count', error);
       this.formatError(error);
     }
   }

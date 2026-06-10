@@ -175,9 +175,8 @@ thumbnail is omitted.
 
 ## Related Tools
 
-- **[create_post](./create-post.md)** - Create posts with link embeds
-- **[create_rich_text_post](./create-rich-text-post.md)** - Create posts with
-  rich formatting
+- **[create_post](./create-post.md)** - Create posts with link embeds and rich
+  formatting
 
 ## See Also
 

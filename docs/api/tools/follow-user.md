@@ -133,8 +133,9 @@ per-tool limiter):
 
 ### Bulk Operations
 
-To follow many users in one call, use **[batch_follow](./batch-follow.md)**
-instead of looping over this tool.
+To follow many users in one call, use
+**[batch_action](./batch-action.md)** with `action: "follow"` instead of looping
+over this tool.
 
 ## Rate Limiting
 
@@ -151,8 +152,8 @@ limiter.
 
 - **[unfollow_user](./unfollow-user.md)** - Unfollow a user
 - **[get_user_profile](./get-user-profile.md)** - Get user profile information
-- **[get_followers](./get-followers.md)** - Get a user's followers
-- **[get_follows](./get-follows.md)** - Get users a user follows
+- **[get_user_connections](./get-user-connections.md)** - Get a user's followers
+  or follows (`direction: 'followers' | 'follows'`)
 
 ## See Also
 

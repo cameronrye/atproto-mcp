@@ -251,7 +251,7 @@ subject to Bluesky's platform-level rate limits.
 ## Related Tools
 
 - **[get_timeline](./get-timeline.md)** - Get personalized timeline
-- **[get_thread](./get-thread.md)** - View post threads
+- **[get_post_context](./get-post-context.md)** - View post threads
 - **[get_custom_feed](./get-custom-feed.md)** - Access custom feeds
 
 ## See Also

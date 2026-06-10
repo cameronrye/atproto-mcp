@@ -27,9 +27,11 @@ Available operations without authentication:
 
 - `get_user_profile` — view public profiles (returns additional data when
   authenticated)
-- `get_followers` / `get_follows` — view social graphs (richer viewer-state data
-  when authenticated)
-- `analyze_image` / `generate_alt_text` — vision-based media tools
+- `get_user_connections` — view social graphs via
+  `direction: 'followers' | 'follows'` (richer viewer-state data when
+  authenticated)
+- `search_actors` / `get_author_feed` — find accounts and list a user's posts
+- `analyze_image` — report an image blob's declared size and MIME type
 - `get_post_context`, `find_similar_users`, and other public/enhanced discovery
   tools
 

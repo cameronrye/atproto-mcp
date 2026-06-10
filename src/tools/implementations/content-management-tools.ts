@@ -16,17 +16,40 @@ import {
  * Zod schema for delete post parameters
  */
 const DeletePostSchema = z.object({
-  uri: z.string().min(1, 'Post URI is required'),
+  uri: z
+    .string()
+    .min(1, 'Post URI is required')
+    .describe(
+      'AT-URI of the post to delete (at://did/app.bsky.feed.post/rkey). Must belong to the authenticated user.'
+    ),
 });
 
 /**
  * Zod schema for update profile parameters
  */
 const UpdateProfileSchema = z.object({
-  displayName: z.string().max(64, 'Display name cannot exceed 64 characters').optional(),
-  description: z.string().max(256, 'Description cannot exceed 256 characters').optional(),
-  avatar: z.any().optional(), // Blob type
-  banner: z.any().optional(), // Blob type
+  displayName: z
+    .string()
+    .max(64, 'Display name cannot exceed 64 characters')
+    .optional()
+    .describe('New display name for the profile (max 64 characters). Omit to leave unchanged.'),
+  description: z
+    .string()
+    .max(256, 'Description cannot exceed 256 characters')
+    .optional()
+    .describe('New bio/description for the profile (max 256 characters). Omit to leave unchanged.'),
+  avatar: z
+    .any()
+    .optional()
+    .describe(
+      'New avatar image as a Blob object. Omit to keep the existing avatar. Use upload_image to obtain a blob first.'
+    ),
+  banner: z
+    .any()
+    .optional()
+    .describe(
+      'New banner/header image as a Blob object. Omit to keep the existing banner. Use upload_image to obtain a blob first.'
+    ),
 });
 
 /**
@@ -36,8 +59,33 @@ export class DeletePostTool extends BaseTool {
   public readonly schema = {
     method: 'delete_post',
     description:
-      "Delete a post on AT Protocol. Permanently removes the post from the user's repository.",
+      "Delete a post on AT Protocol. Permanently removes the post from the authenticated user's repository; this action cannot be undone. Use this instead of create_post/reply_to_post when you need to remove existing content. Requires authentication (app password). Subject to per-tool rate limiting.",
     params: DeletePostSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the post was successfully deleted.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        deletedPost: {
+          type: 'object',
+          description: 'Information about the deleted post.',
+          properties: {
+            uri: {
+              type: 'string',
+              description: 'AT-URI of the deleted post.',
+            },
+          },
+          required: ['uri'],
+        },
+      },
+      required: ['success', 'message', 'deletedPost'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -152,8 +200,50 @@ export class UpdateProfileTool extends BaseTool {
   public readonly schema = {
     method: 'update_profile',
     description:
-      'Update user profile on AT Protocol. Can modify display name, description, avatar, and banner.',
+      'Update user profile on AT Protocol. Modifies the display name, description, avatar, and/or banner of the authenticated account; unspecified fields are preserved from the existing profile. Use upload_image to prepare blob values for avatar or banner before calling this tool. Requires authentication (app password). Subject to per-tool rate limiting.',
     params: UpdateProfileSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the profile was successfully updated.',
+        },
+        message: {
+          type: 'string',
+          description: 'Human-readable result message.',
+        },
+        updatedFields: {
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Names of the profile fields that were actually changed (e.g. ["displayName", "description"]).',
+        },
+        profile: {
+          type: 'object',
+          description: 'The new values of the updated profile fields.',
+          properties: {
+            displayName: {
+              type: 'string',
+              description: 'Updated display name, if it was changed.',
+            },
+            description: {
+              type: 'string',
+              description: 'Updated bio/description, if it was changed.',
+            },
+            avatar: {
+              type: 'string',
+              description: 'Set to "updated" when a new avatar was uploaded.',
+            },
+            banner: {
+              type: 'string',
+              description: 'Set to "updated" when a new banner was uploaded.',
+            },
+          },
+        },
+      },
+      required: ['success', 'message', 'updatedFields', 'profile'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

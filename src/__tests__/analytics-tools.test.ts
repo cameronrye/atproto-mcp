@@ -3,11 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  AnalyzeNetworkTool,
-  SuggestContentStrategyTool,
-  FindInfluentialUsersTool,
-} from '../tools/implementations/analytics-tools.js';
+import { AnalyzeAccountTool } from '../tools/implementations/analyze-account-tool.js';
+import { FindInfluentialUsersTool } from '../tools/implementations/analytics-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 // Mock AtpClient
@@ -197,17 +194,18 @@ const createMockAtpClient = () => {
   } as unknown as AtpClient;
 };
 
-describe('AnalyzeNetworkTool', () => {
-  let tool: AnalyzeNetworkTool;
+describe("analyze_account dimension:'network'", () => {
+  let tool: AnalyzeAccountTool;
   let mockClient: AtpClient;
 
   beforeEach(() => {
     mockClient = createMockAtpClient();
-    tool = new AnalyzeNetworkTool(mockClient);
+    tool = new AnalyzeAccountTool(mockClient);
   });
 
   it('should analyze network successfully', async () => {
     const result = await tool.handler({
+      dimension: 'network',
       actor: 'test.bsky.social',
       includeFollowers: true,
       includeFollows: true,
@@ -215,6 +213,7 @@ describe('AnalyzeNetworkTool', () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.dimension).toBe('network');
     expect(result.network).toBeDefined();
     expect(result.network.followersCount).toBe(1000);
     expect(result.network.followsCount).toBe(500);
@@ -224,6 +223,7 @@ describe('AnalyzeNetworkTool', () => {
 
   it('should determine network type correctly', async () => {
     const result = await tool.handler({
+      dimension: 'network',
       actor: 'test.bsky.social',
       includeFollowers: false,
       includeFollows: false,
@@ -236,22 +236,24 @@ describe('AnalyzeNetworkTool', () => {
   });
 });
 
-describe('SuggestContentStrategyTool', () => {
-  let tool: SuggestContentStrategyTool;
+describe("analyze_account dimension:'strategy'", () => {
+  let tool: AnalyzeAccountTool;
   let mockClient: AtpClient;
 
   beforeEach(() => {
     mockClient = createMockAtpClient();
-    tool = new SuggestContentStrategyTool(mockClient);
+    tool = new AnalyzeAccountTool(mockClient);
   });
 
   it('should suggest content strategy based on engagement', async () => {
     const result = await tool.handler({
+      dimension: 'strategy',
       actor: 'test.bsky.social',
       analyzePosts: 20,
     });
 
     expect(result.success).toBe(true);
+    expect(result.dimension).toBe('strategy');
     expect(result.recommendations).toBeDefined();
     expect(result.recommendations.optimizationTips).toBeDefined();
     expect(Array.isArray(result.recommendations.optimizationTips)).toBe(true);
@@ -260,6 +262,7 @@ describe('SuggestContentStrategyTool', () => {
 
   it('should analyze engagement metrics', async () => {
     const result = await tool.handler({
+      dimension: 'strategy',
       actor: 'test.bsky.social',
       analyzePosts: 10,
     });

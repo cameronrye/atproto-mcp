@@ -106,11 +106,10 @@ const config: IAtpConfig = {
 };
 ```
 
-::: warning Experimental
+::: warning Planned
 
-OAuth is experimental. `start_oauth_flow` only builds a heuristic PKCE URL, and
-the callback-exchange tools are not implemented, so the OAuth path is currently
-a dead end. Use app passwords for working authentication. See
+OAuth login is on the roadmap but not yet functional, so it is not exposed as a
+tool or configuration path. Use app passwords for working authentication. See
 [Experimental & Roadmap](../../guide/experimental.md).
 
 :::

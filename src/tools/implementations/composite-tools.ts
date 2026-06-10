@@ -38,10 +38,32 @@ function toAtpPost(post: any): IAtpPost {
  * Zod schema for get user summary parameters
  */
 const GetUserSummarySchema = z.object({
-  actor: z.string().min(1, 'Actor (DID or handle) is required'),
-  includeRecentPosts: z.boolean().optional().default(true),
-  postLimit: z.number().int().min(1).max(50).optional().default(10),
-  includeEngagementStats: z.boolean().optional().default(true),
+  actor: z
+    .string()
+    .min(1, 'Actor (DID or handle) is required')
+    .describe('Handle (e.g. alice.bsky.social) or DID of the target account.'),
+  includeRecentPosts: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Whether to include recent posts in the response. Default true.'),
+  postLimit: z
+    .number()
+    .int()
+    .min(1)
+    .max(50)
+    .optional()
+    .default(10)
+    .describe(
+      'Number of recent posts to fetch (1–50, default 10). Only used when includeRecentPosts or includeEngagementStats is true.'
+    ),
+  includeEngagementStats: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'Whether to compute engagement statistics (avg likes, reposts, replies) over the recent posts. Default true.'
+    ),
 });
 
 /**
@@ -63,8 +85,117 @@ export class GetUserSummaryTool extends BaseTool {
   public readonly schema = {
     method: 'get_user_summary',
     description:
-      'Get comprehensive user information in a single call. Includes profile, recent posts, and engagement statistics. Works without authentication but provides more data when authenticated.',
+      'Get comprehensive user information in a single call, combining profile, recent posts, and engagement statistics. Works without authentication; richer with auth. Use get_user_profile for just the profile or get_author_feed for posts alone; use this tool when you need both in one round-trip. Subject to per-tool rate limiting.',
     params: GetUserSummarySchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description: 'Whether the summary was retrieved successfully.',
+        },
+        profile: {
+          type: 'object',
+          description:
+            "The user's full profile, including optional viewer context when authenticated.",
+          properties: {
+            did: { type: 'string', description: "The user's DID." },
+            handle: { type: 'string', description: "The user's handle." },
+            displayName: { type: 'string', description: "The user's display name." },
+            avatar: { type: 'string', description: 'URL to the avatar image.' },
+            description: { type: 'string', description: 'Profile bio.' },
+            followersCount: { type: 'number', description: 'Number of followers.' },
+            followsCount: { type: 'number', description: 'Number of accounts followed.' },
+            postsCount: { type: 'number', description: 'Total number of posts.' },
+            indexedAt: {
+              type: 'string',
+              description: 'ISO timestamp when the profile was first indexed.',
+            },
+            viewer: {
+              type: 'object',
+              description:
+                'Viewer relationship context (muted, blocking, following, etc.) — only present when authenticated.',
+              properties: {
+                muted: {
+                  type: 'boolean',
+                  description: 'Whether the authenticated user has muted this account.',
+                },
+                blockedBy: {
+                  type: 'boolean',
+                  description: 'Whether this account has blocked the authenticated user.',
+                },
+                blocking: {
+                  type: 'string',
+                  description:
+                    'AT-URI of the block record if the authenticated user is blocking this account.',
+                },
+                following: {
+                  type: 'string',
+                  description:
+                    'AT-URI of the follow record if the authenticated user follows this account.',
+                },
+                followedBy: {
+                  type: 'string',
+                  description:
+                    'AT-URI of the follow record if this account follows the authenticated user.',
+                },
+              },
+            },
+          },
+          required: ['did', 'handle'],
+        },
+        recentPosts: {
+          type: 'array',
+          description: 'Recent posts (present when includeRecentPosts is true).',
+          items: { type: 'object', description: 'Normalized post view.' },
+        },
+        engagementStats: {
+          type: 'object',
+          description:
+            'Engagement statistics computed over the fetched posts (present when includeEngagementStats is true).',
+          properties: {
+            totalPosts: { type: 'number', description: 'Number of posts analysed.' },
+            totalLikes: { type: 'number', description: 'Sum of likes across analysed posts.' },
+            totalReposts: { type: 'number', description: 'Sum of reposts across analysed posts.' },
+            totalReplies: { type: 'number', description: 'Sum of replies across analysed posts.' },
+            averageLikesPerPost: { type: 'number', description: 'Mean likes per post.' },
+            averageRepostsPerPost: { type: 'number', description: 'Mean reposts per post.' },
+            averageRepliesPerPost: { type: 'number', description: 'Mean replies per post.' },
+            mostLikedPost: { type: 'object', description: 'The post with the highest like count.' },
+            mostRepostedPost: {
+              type: 'object',
+              description: 'The post with the highest repost count.',
+            },
+          },
+          required: [
+            'totalPosts',
+            'totalLikes',
+            'totalReposts',
+            'totalReplies',
+            'averageLikesPerPost',
+            'averageRepostsPerPost',
+            'averageRepliesPerPost',
+          ],
+        },
+        summary: {
+          type: 'object',
+          description: 'Condensed key metrics for quick consumption.',
+          properties: {
+            handle: { type: 'string', description: "The user's handle." },
+            displayName: { type: 'string', description: "The user's display name." },
+            followersCount: { type: 'number', description: 'Follower count.' },
+            followsCount: { type: 'number', description: 'Following count.' },
+            postsCount: { type: 'number', description: 'Total post count.' },
+            isAuthenticated: {
+              type: 'boolean',
+              description: 'Whether the current session is authenticated.',
+            },
+          },
+          required: ['handle', 'followersCount', 'followsCount', 'postsCount', 'isAuthenticated'],
+        },
+      },
+      required: ['success', 'profile', 'summary'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -214,10 +345,45 @@ export class GetUserSummaryTool extends BaseTool {
  * Zod schema for get post context parameters
  */
 const GetPostContextSchema = z.object({
-  uri: z.string().min(1, 'Post URI is required'),
-  includeThread: z.boolean().optional().default(true),
-  includeAuthorProfile: z.boolean().optional().default(true),
-  includeEngagement: z.boolean().optional().default(true),
+  uri: z.string().min(1, 'Post URI is required').describe('AT-URI of the post to read (at://...).'),
+  includeThread: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe('Include thread context (parent chain, root, and replies). Default true.'),
+  includeAuthorProfile: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe("Include the post author's full profile. Default true."),
+  includeEngagement: z
+    .boolean()
+    .optional()
+    .default(true)
+    .describe(
+      'Include computed engagement metrics (likes, reposts, replies, rate, age). Default true.'
+    ),
+  depth: z
+    .number()
+    .int()
+    .min(0)
+    .max(10)
+    .optional()
+    .describe('How many levels of replies to fetch (0–10, default 6).'),
+  parentHeight: z
+    .number()
+    .int()
+    .min(0)
+    .max(80)
+    .optional()
+    .describe('How many parent posts up the chain to fetch (0–80, default 80).'),
+  includeMedia: z
+    .boolean()
+    .optional()
+    .default(false)
+    .describe(
+      'Extract media embeds (images, videos, external links, quote posts) from the post. Default false.'
+    ),
 });
 
 /**
@@ -239,8 +405,91 @@ export class GetPostContextTool extends BaseTool {
   public readonly schema = {
     method: 'get_post_context',
     description:
-      'Get comprehensive post information in a single call. Includes the post, thread context, author profile, and engagement metrics. Works without authentication but provides more data when authenticated.',
+      'Get comprehensive post information in a single call. Single post reader: use include* ' +
+      'flags for thread, author, engagement, and media. Replaces the former get_thread and ' +
+      'extract_media_from_post tools. Works without authentication; richer with auth. Subject ' +
+      'to per-tool rate limiting.',
     params: GetPostContextSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', description: 'Whether the post context was retrieved.' },
+        post: {
+          type: 'object',
+          description: 'The requested post (normalized post view).',
+        },
+        thread: {
+          type: 'object',
+          description:
+            'Thread context (present when includeThread is true): the immediate parent, the ' +
+            'true thread root, the direct replies, and the parent-chain depth.',
+          properties: {
+            parent: { type: 'object', description: 'The immediate parent post, if any.' },
+            root: { type: 'object', description: 'The topmost ancestor (true thread root).' },
+            replies: {
+              type: 'array',
+              description: 'Direct replies to the post.',
+              items: { type: 'object' },
+            },
+            depth: {
+              type: 'number',
+              description: 'Number of ancestors between the post and the thread root.',
+            },
+          },
+        },
+        authorProfile: {
+          type: 'object',
+          description:
+            "The post author's full profile (present when includeAuthorProfile is true).",
+        },
+        engagement: {
+          type: 'object',
+          description: 'Computed engagement metrics (present when includeEngagement is true).',
+          properties: {
+            likeCount: { type: 'number', description: 'Number of likes.' },
+            repostCount: { type: 'number', description: 'Number of reposts.' },
+            replyCount: { type: 'number', description: 'Number of replies.' },
+            totalEngagement: {
+              type: 'number',
+              description: 'Sum of likes, reposts, and replies.',
+            },
+            engagementRate: {
+              type: 'number',
+              description: 'Total engagement per hour since the post was created.',
+            },
+            ageHours: { type: 'number', description: 'Age of the post in hours.' },
+          },
+        },
+        media: {
+          type: 'object',
+          description: 'Media embeds extracted from the post (present when includeMedia is true).',
+          properties: {
+            images: {
+              type: 'array',
+              description: 'Image embeds with alt text and aspect ratio.',
+              items: { type: 'object' },
+            },
+            videos: {
+              type: 'array',
+              description: 'Video embeds with alt text and aspect ratio.',
+              items: { type: 'object' },
+            },
+            externalLinks: {
+              type: 'array',
+              description: 'External link cards (uri, title, description, thumb).',
+              items: { type: 'object' },
+            },
+            quotePosts: {
+              type: 'array',
+              description: 'Quoted posts referenced by record embeds (uri, cid).',
+              items: { type: 'object' },
+            },
+          },
+          required: ['images', 'videos', 'externalLinks', 'quotePosts'],
+        },
+      },
+      required: ['success', 'post'],
+    },
   };
 
   constructor(atpClient: AtpClient) {
@@ -252,6 +501,9 @@ export class GetPostContextTool extends BaseTool {
     includeThread?: boolean;
     includeAuthorProfile?: boolean;
     includeEngagement?: boolean;
+    depth?: number;
+    parentHeight?: number;
+    includeMedia?: boolean;
   }): Promise<{
     success: boolean;
     post: IAtpPost;
@@ -270,6 +522,12 @@ export class GetPostContextTool extends BaseTool {
       engagementRate: number;
       ageHours: number;
     };
+    media?: {
+      images: any[];
+      videos: any[];
+      externalLinks: any[];
+      quotePosts: any[];
+    };
   }> {
     try {
       this.logger.info('Getting post context', {
@@ -277,16 +535,25 @@ export class GetPostContextTool extends BaseTool {
         includeThread: params.includeThread,
         includeAuthorProfile: params.includeAuthorProfile,
         includeEngagement: params.includeEngagement,
+        includeMedia: params.includeMedia,
+        depth: params.depth,
+        parentHeight: params.parentHeight,
       });
 
       // Validate the URI
       this.validateAtUri(params.uri);
 
-      // Get the post and thread
+      // Get the post and thread. depth/parentHeight control how much of the
+      // conversation getPostThread returns; fall back to the former get_thread
+      // defaults (6 / 80) when the caller omits them.
       const threadResponse = await this.executeAtpOperation(
         async () => {
           const agent = this.atpClient.getAgent();
-          return await agent.getPostThread({ uri: params.uri });
+          return await agent.getPostThread({
+            uri: params.uri,
+            depth: params.depth ?? 6,
+            parentHeight: params.parentHeight ?? 80,
+          });
         },
         'getPostThread',
         { uri: params.uri }
@@ -368,11 +635,22 @@ export class GetPostContextTool extends BaseTool {
         };
       }
 
+      // Extract media embeds if requested (ported from the former
+      // extract_media_from_post tool). Operates on the raw thread post view so
+      // the embed `#view` shapes are available.
+      let media:
+        | { images: any[]; videos: any[]; externalLinks: any[]; quotePosts: any[] }
+        | undefined;
+      if (params.includeMedia) {
+        media = extractMediaFromPost(threadData.post);
+      }
+
       this.logger.info('Post context retrieved successfully', {
         uri: params.uri,
         hasThread: !!thread,
         hasAuthorProfile: !!authorProfile,
         hasEngagement: !!engagement,
+        hasMedia: !!media,
       });
 
       return {
@@ -381,10 +659,126 @@ export class GetPostContextTool extends BaseTool {
         ...(thread && { thread }),
         ...(authorProfile && { authorProfile }),
         ...(engagement && { engagement }),
+        ...(media && { media }),
       };
     } catch (error) {
       this.logger.error('Failed to get post context', error);
       this.formatError(error);
     }
   }
+}
+
+/**
+ * Extract media embeds from a single post view's `embed` field. Ported from the
+ * former ExtractMediaFromPostTool so get_post_context is the single post reader.
+ *
+ * Handles the AppView `#view` embed shapes: images, video, external link cards,
+ * record (quote post), and recordWithMedia (quote post + attached media).
+ */
+function extractMediaFromPost(post: any): {
+  images: any[];
+  videos: any[];
+  externalLinks: any[];
+  quotePosts: any[];
+} {
+  const images: any[] = [];
+  const videos: any[] = [];
+  const externalLinks: any[] = [];
+  const quotePosts: any[] = [];
+
+  const embed = post?.embed;
+  if (!embed) {
+    return { images, videos, externalLinks, quotePosts };
+  }
+
+  const embedType = embed.$type;
+
+  // Images embed
+  if (embedType === 'app.bsky.embed.images#view') {
+    for (const image of embed.images || []) {
+      images.push({
+        uri: image.fullsize,
+        alt: image.alt,
+        aspectRatio: image.aspectRatio,
+        thumb: image.thumb,
+      });
+    }
+  }
+
+  // Video embed
+  if (embedType === 'app.bsky.embed.video#view') {
+    videos.push({
+      uri: embed.playlist,
+      alt: embed.alt,
+      aspectRatio: embed.aspectRatio,
+      thumbnail: embed.thumbnail,
+    });
+  }
+
+  // External link embed
+  if (embedType === 'app.bsky.embed.external#view') {
+    externalLinks.push({
+      uri: embed.external.uri,
+      title: embed.external.title,
+      description: embed.external.description,
+      thumb: embed.external.thumb,
+    });
+  }
+
+  // Quote post embed
+  if (embedType === 'app.bsky.embed.record#view') {
+    if (embed.record?.uri && embed.record?.cid) {
+      quotePosts.push({
+        uri: embed.record.uri,
+        cid: embed.record.cid,
+      });
+    }
+  }
+
+  // Record with media (quote post with attached images/video/external)
+  if (embedType === 'app.bsky.embed.recordWithMedia#view') {
+    // Extract the quote post
+    if (embed.record?.record?.uri && embed.record?.record?.cid) {
+      quotePosts.push({
+        uri: embed.record.record.uri,
+        cid: embed.record.record.cid,
+      });
+    }
+
+    // Extract the attached media
+    if (embed.media) {
+      const mediaType = embed.media.$type;
+
+      if (mediaType === 'app.bsky.embed.images#view') {
+        for (const image of embed.media.images || []) {
+          images.push({
+            uri: image.fullsize,
+            alt: image.alt,
+            aspectRatio: image.aspectRatio,
+            thumb: image.thumb,
+          });
+        }
+      }
+
+      if (mediaType === 'app.bsky.embed.video#view') {
+        videos.push({
+          uri: embed.media.playlist,
+          alt: embed.media.alt,
+          aspectRatio: embed.media.aspectRatio,
+          thumbnail: embed.media.thumbnail,
+        });
+      }
+
+      if (mediaType === 'app.bsky.embed.external#view') {
+        externalLinks.push({
+          uri: embed.media.external.uri,
+          title: embed.media.external.title,
+          description: embed.media.external.description,
+          thumb: embed.media.external.thumb,
+        });
+      }
+    }
+  }
+
+  return { images, videos, externalLinks, quotePosts };
 }

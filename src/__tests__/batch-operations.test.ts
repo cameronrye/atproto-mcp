@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import {
-  BatchFollowTool,
-  BatchLikeTool,
-  BatchRepostTool,
-} from '../tools/implementations/batch-operations-tools.js';
+import { BatchActionTool } from '../tools/implementations/batch-operations-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 // Mock AtpClient
@@ -30,7 +26,7 @@ const createMockAtpClient = () => {
         },
       },
     })),
-    // batch_like/batch_repost fetch the post view (CID + viewer state) in one call.
+    // batch action=like/repost fetch the post view (CID + viewer state) in one call.
     getPosts: vi.fn().mockImplementation(async ({ uris }: { uris: string[] }) => ({
       data: { posts: uris.map((uri: string) => ({ uri, cid: 'cid123', viewer: {} })) },
     })),
@@ -104,21 +100,23 @@ const createMockAtpClient = () => {
   } as unknown as AtpClient;
 };
 
-describe('BatchFollowTool', () => {
-  let tool: BatchFollowTool;
+describe('BatchActionTool — action=follow', () => {
+  let tool: BatchActionTool;
   let mockClient: AtpClient;
 
   beforeEach(() => {
     mockClient = createMockAtpClient();
-    tool = new BatchFollowTool(mockClient);
+    tool = new BatchActionTool(mockClient);
   });
 
   it('should follow multiple users successfully', async () => {
     const result = await tool.handler({
-      actors: ['user1.bsky.social', 'user2.bsky.social', 'user3.bsky.social'],
+      action: 'follow',
+      targets: ['user1.bsky.social', 'user2.bsky.social', 'user3.bsky.social'],
     });
 
     expect(result.success).toBe(true);
+    expect(result.action).toBe('follow');
     expect(result.results).toHaveLength(3);
     expect(result.summary.succeeded).toBe(3);
     expect(result.summary.failed).toBe(0);
@@ -145,34 +143,37 @@ describe('BatchFollowTool', () => {
       });
 
     const result = await tool.handler({
-      actors: ['user1.bsky.social', 'invalid.user', 'user3.bsky.social'],
+      action: 'follow',
+      targets: ['user1.bsky.social', 'invalid.user', 'user3.bsky.social'],
     });
 
     // A batch with any failed item reports top-level success: false (callers
     // read summary/results for per-item detail).
     expect(result.success).toBe(false);
+    expect(result.action).toBe('follow');
     expect(result.summary.succeeded).toBe(2);
     expect(result.summary.failed).toBe(1);
     expect(result.results.filter((r: any) => !r.success)).toHaveLength(1);
   });
 
-  it('should require at least one user', async () => {
-    await expect(tool.handler({ actors: [] })).rejects.toThrow();
+  it('should require at least one target', async () => {
+    await expect(tool.handler({ action: 'follow', targets: [] })).rejects.toThrow();
   });
 });
 
-describe('BatchLikeTool', () => {
-  let tool: BatchLikeTool;
+describe('BatchActionTool — action=like', () => {
+  let tool: BatchActionTool;
   let mockClient: AtpClient;
 
   beforeEach(() => {
     mockClient = createMockAtpClient();
-    tool = new BatchLikeTool(mockClient);
+    tool = new BatchActionTool(mockClient);
   });
 
   it('should like multiple posts successfully', async () => {
     const result = await tool.handler({
-      uris: [
+      action: 'like',
+      targets: [
         'at://did:plc:user1/app.bsky.feed.post/1',
         'at://did:plc:user2/app.bsky.feed.post/2',
         'at://did:plc:user3/app.bsky.feed.post/3',
@@ -180,6 +181,7 @@ describe('BatchLikeTool', () => {
     });
 
     expect(result.success).toBe(true);
+    expect(result.action).toBe('like');
     expect(result.results).toHaveLength(3);
     expect(result.summary.succeeded).toBe(3);
     expect(result.summary.failed).toBe(0);
@@ -198,33 +200,40 @@ describe('BatchLikeTool', () => {
       .mockResolvedValueOnce({ data: { posts: [] } });
 
     const result = await tool.handler({
-      uris: [
+      action: 'like',
+      targets: [
         'at://did:plc:user1/app.bsky.feed.post/1',
         'at://did:plc:invalid/app.bsky.feed.post/999',
       ],
     });
 
     expect(result.success).toBe(false);
+    expect(result.action).toBe('like');
     expect(result.summary.succeeded).toBe(1);
     expect(result.summary.failed).toBe(1);
   });
 });
 
-describe('BatchRepostTool', () => {
-  let tool: BatchRepostTool;
+describe('BatchActionTool — action=repost', () => {
+  let tool: BatchActionTool;
   let mockClient: AtpClient;
 
   beforeEach(() => {
     mockClient = createMockAtpClient();
-    tool = new BatchRepostTool(mockClient);
+    tool = new BatchActionTool(mockClient);
   });
 
   it('should repost multiple posts successfully', async () => {
     const result = await tool.handler({
-      uris: ['at://did:plc:user1/app.bsky.feed.post/1', 'at://did:plc:user2/app.bsky.feed.post/2'],
+      action: 'repost',
+      targets: [
+        'at://did:plc:user1/app.bsky.feed.post/1',
+        'at://did:plc:user2/app.bsky.feed.post/2',
+      ],
     });
 
     expect(result.success).toBe(true);
+    expect(result.action).toBe('repost');
     expect(result.results).toHaveLength(2);
     expect(result.summary.succeeded).toBe(2);
     expect(result.summary.failed).toBe(0);
@@ -232,10 +241,15 @@ describe('BatchRepostTool', () => {
 
   it('should process multiple reposts successfully', async () => {
     const result = await tool.handler({
-      uris: ['at://did:plc:user1/app.bsky.feed.post/1', 'at://did:plc:user2/app.bsky.feed.post/2'],
+      action: 'repost',
+      targets: [
+        'at://did:plc:user1/app.bsky.feed.post/1',
+        'at://did:plc:user2/app.bsky.feed.post/2',
+      ],
     });
 
     expect(result.success).toBe(true);
+    expect(result.action).toBe('repost');
     expect(result.results).toHaveLength(2);
     expect(result.summary.succeeded).toBe(2);
     expect(result.summary.failed).toBe(0);

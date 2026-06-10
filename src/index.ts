@@ -18,7 +18,6 @@ import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
 import { type IMcpTool, type IToolAnnotations, createTools } from './tools/index.js';
-import { StartStreamingTool } from './tools/implementations/streaming-tools.js';
 import { type BaseResource, createResources } from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
 import { type IPerformanceMetrics, PerformanceMonitor } from './utils/performance.js';
@@ -30,33 +29,25 @@ import { type ISecurityConfig, SecurityManager } from './utils/security.js';
  * which encodes auth requirement, not destructiveness.
  */
 const READ_ONLY_TOOLS = new Set<string>([
-  'analyze_engagement',
+  'analyze_account',
   'analyze_image',
   'analyze_moderation_status',
-  'analyze_network',
+  'discover',
   'discover_communities',
-  'discover_trending',
-  'extract_media_from_post',
   'find_influential_users',
   'find_similar_users',
-  'generate_alt_text',
   'generate_link_preview',
+  'get_author_feed',
   'get_custom_feed',
-  'get_followers',
-  'get_follows',
   'get_list',
   'get_notifications',
   'get_post_context',
-  'get_recent_events',
-  'get_streaming_status',
-  'get_thread',
   'get_timeline',
-  'get_unread_count',
+  'get_user_connections',
   'get_user_profile',
   'get_user_summary',
-  'recommend_content',
+  'search_actors',
   'search_posts',
-  'suggest_content_strategy',
 ]);
 
 /**
@@ -71,7 +62,6 @@ const DESTRUCTIVE_TOOLS = new Set<string>([
   'remove_from_list',
   'report_content',
   'report_user',
-  'revoke_oauth_tokens',
   'unfollow_user',
   'unlike_post',
   'unrepost',
@@ -211,6 +201,11 @@ export class AtpMcpServer {
           inputSchema: tool.schema.params
             ? this.zodToJsonSchema(tool.schema.params)
             : { type: 'object', properties: {} },
+          // Advertise an output schema when the tool declares one. This is purely
+          // descriptive metadata in the tools/list payload; because tools/call
+          // responses are built by this custom handler (not the SDK's high-level
+          // registerTool), it does not trigger structuredContent validation.
+          ...(tool.schema.outputSchema ? { outputSchema: tool.schema.outputSchema } : {}),
           annotations: computeToolAnnotations(tool.schema.method, tool.schema.annotations),
         })),
       })
@@ -616,10 +611,6 @@ export class AtpMcpServer {
 
       // Release security manager background timers (rate-limiter cleanup).
       this.securityManager.destroy();
-
-      // Disconnect the shared firehose client (if a streaming tool opened one)
-      // so its socket and heartbeat timer do not outlive the server.
-      await StartStreamingTool.shutdown();
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
     }

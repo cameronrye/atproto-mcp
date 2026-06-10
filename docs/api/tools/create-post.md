@@ -1,7 +1,10 @@
 # create_post
 
 Create a new post on AT Protocol with support for text, replies, images,
-external links, and language tags.
+external links, quote posts, richtext facets, and language tags. This is the
+single rich post-creation tool (it replaces the former `create_rich_text_post`):
+mentions, links, and #hashtags in the text are auto-detected into richtext facets
+unless you supply `facets` explicitly.
 
 ## Authentication
 
@@ -30,7 +33,9 @@ This tool requires authentication using either app passwords or OAuth.
 ### `embed` (optional)
 
 - **Type:** `object`
-- **Description:** Embedded content (images or external links)
+- **Description:** Optional media embed: images OR an external link card (at most
+  one). Mutually exclusive with `quote` — a post may carry images, an external
+  link, OR a quote (record), never a combination.
 - **Properties:**
   - `images` (optional): Array of image objects (max 4)
     - `alt` (required): `string` - Alt text for accessibility (max 1000
@@ -41,6 +46,35 @@ This tool requires authentication using either app passwords or OAuth.
     - `title` (required): `string` - Link title (max 300 characters)
     - `description` (required): `string` - Link description (max 1000
       characters)
+
+### `facets` (optional)
+
+- **Type:** `object[]`
+- **Description:** Explicit richtext facets (byte-range annotations). Omit to let
+  the server auto-detect mentions, links, and #hashtags from the text. Supplying
+  `facets` disables auto-detection (applying both would double-annotate the
+  text).
+- **Properties (per facet):**
+  - `index` (required): `object` - UTF-8 byte range of the annotated span
+    - `byteStart` (required): `number` - Start byte offset (UTF-8), inclusive
+    - `byteEnd` (required): `number` - End byte offset (UTF-8), exclusive
+  - `features` (required): Array of feature objects applied to the span
+    - `type` (required): `"mention"` | `"link"` | `"hashtag"`
+    - `value` (required): `string` - For a mention, a handle or DID; for a link,
+      the URL; for a hashtag, the tag without the leading `#`
+
+> Caller-supplied facets are validated: each byte range must satisfy
+> `byteStart < byteEnd <= textByteLength` (the text's UTF-8 byte length), and
+> mention handles are resolved to DIDs.
+
+### `quote` (optional)
+
+- **Type:** `object`
+- **Description:** Quote another post (record embed). Mutually exclusive with
+  `embed.images` and `embed.external`.
+- **Properties:**
+  - `uri` (required): `string` - AT-URI of the post to quote
+  - `cid` (required): `string` - CID (content hash) of the quoted post
 
 ### `langs` (optional)
 
@@ -139,6 +173,35 @@ Returns an object with the following properties:
 }
 ```
 
+### Quote Post
+
+```json
+{
+  "text": "This is a great take 👇",
+  "quote": {
+    "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+    "cid": "bafyreiabc123..."
+  }
+}
+```
+
+### Post with Explicit Richtext Facets
+
+Link the text "AT Protocol" (bytes 11-22) to a URL instead of relying on
+auto-detection:
+
+```json
+{
+  "text": "Read about AT Protocol today!",
+  "facets": [
+    {
+      "index": { "byteStart": 11, "byteEnd": 22 },
+      "features": [{ "type": "link", "value": "https://atproto.com" }]
+    }
+  ]
+}
+```
+
 ## Error Handling
 
 ### Common Errors
@@ -175,6 +238,18 @@ Returns an object with the following properties:
 ```json
 {
   "error": "Invalid AT Protocol URI format",
+  "code": "VALIDATION_ERROR"
+}
+```
+
+#### Multiple Embeds Combined
+
+A post can include only one embed: images, an external link, or a quote
+(record) — not a combination.
+
+```json
+{
+  "error": "A post can include only one embed: images, an external link, or a quote (record) — not a combination. Provide only one.",
   "code": "VALIDATION_ERROR"
 }
 ```
@@ -252,8 +327,8 @@ derived from the response's `retry-after` header.
 
 - **[reply_to_post](./reply-to-post.md)** - Simplified tool specifically for
   replies
-- **[create_rich_text_post](./create-rich-text-post.md)** - Create posts with
-  rich text formatting
+- **[create_thread](./create-thread.md)** - Publish a multi-post chain in one
+  call
 - **[upload_image](./upload-image.md)** - Upload images separately before
   posting
 - **[generate_link_preview](./generate-link-preview.md)** - Generate link

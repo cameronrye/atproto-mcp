@@ -142,8 +142,8 @@ performs one post search per request.
   users in a topic area
 - **[find_similar_users](./find-similar-users.md)** - Find users similar to a
   given user
-- **[discover_trending](./discover-trending.md)** - Surface hashtags and posts
-  from your timeline
+- **[discover](./discover.md)** - Surface trending or recommended posts from your
+  timeline (`mode: 'trending' | 'recommended'`)
 - **[search_posts](./search-posts.md)** - Search for posts on specific topics
 
 ## See Also

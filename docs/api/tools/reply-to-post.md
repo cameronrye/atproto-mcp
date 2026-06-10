@@ -135,7 +135,7 @@ codebase):
 ## Related Tools
 
 - **[create_post](./create-post.md)** - Create standalone posts
-- **[get_thread](./get-thread.md)** - View entire thread context
+- **[get_post_context](./get-post-context.md)** - View entire thread context
 
 ## See Also
 

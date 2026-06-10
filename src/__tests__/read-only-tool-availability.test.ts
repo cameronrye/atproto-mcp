@@ -5,16 +5,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  GetListTool,
-  GetThreadTool,
-  GetCustomFeedTool,
-} from '../tools/implementations/advanced-social-tools.js';
+import { GetListTool, GetCustomFeedTool } from '../tools/implementations/advanced-social-tools.js';
 import { AnalyzeModerationStatusTool } from '../tools/implementations/moderation-tools.js';
-import {
-  GetStreamingStatusTool,
-  GetRecentEventsTool,
-} from '../tools/implementations/streaming-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 const unauthClient = {
@@ -27,27 +19,12 @@ describe('read-only tools are available unauthenticated', () => {
     expect(new GetListTool(unauthClient).isAvailable()).toBe(true);
   });
 
-  it('get_thread is available without authentication', () => {
-    expect(new GetThreadTool(unauthClient).isAvailable()).toBe(true);
-  });
-
   it('get_custom_feed is available without authentication', () => {
     expect(new GetCustomFeedTool(unauthClient).isAvailable()).toBe(true);
   });
 
   it('analyze_moderation_status is available without authentication', () => {
     expect(new AnalyzeModerationStatusTool(unauthClient).isAvailable()).toBe(true);
-  });
-
-  it('get_streaming_status is available without authentication', () => {
-    // The firehose is a public stream; a status/query tool must not demand auth,
-    // otherwise an unauthenticated client gets a misleading "requires
-    // authentication" instead of the honest streaming state.
-    expect(new GetStreamingStatusTool(unauthClient).isAvailable()).toBe(true);
-  });
-
-  it('get_recent_events is available without authentication', () => {
-    expect(new GetRecentEventsTool(unauthClient).isAvailable()).toBe(true);
   });
 });
 

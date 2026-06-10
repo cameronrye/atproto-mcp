@@ -18,7 +18,10 @@ const CreateThreadSchema = z.object({
           .string()
           .min(1, 'Post text cannot be empty')
           // Coarse cap; the real 300-grapheme / 3000-byte limit is enforced in buildRichText.
-          .max(3000, 'Post text is too long (limit is 300 graphemes / 3000 bytes)'),
+          .max(3000, 'Post text is too long (limit is 300 graphemes / 3000 bytes)')
+          .describe(
+            'Text content of this post (1–300 graphemes / 3000 bytes). Mentions (@handle), URLs, and hashtags are auto-linked via richtext facets.'
+          ),
         langs: z
           .array(
             z
@@ -27,12 +30,21 @@ const CreateThreadSchema = z.object({
                 /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
                 'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
               )
+              .describe(
+                'BCP-47 language tag for this post (e.g. "en", "en-US", "pt-BR"). Overrides the thread-level langs for this post only.'
+              )
           )
-          .optional(),
+          .optional()
+          .describe(
+            'Per-post language tags (BCP-47). When set, overrides the thread-level langs field for this individual post.'
+          ),
       })
     )
     .min(2, 'Thread must contain at least 2 posts')
-    .max(25, 'Thread cannot exceed 25 posts'),
+    .max(25, 'Thread cannot exceed 25 posts')
+    .describe(
+      'Ordered array of posts to publish as a thread (2–25 items). Each post is automatically chained as a reply to the previous one.'
+    ),
   langs: z
     .array(
       z
@@ -41,8 +53,12 @@ const CreateThreadSchema = z.object({
           /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})*$/,
           'Language codes must be valid BCP-47 tags (e.g. en, en-US, pt-BR)'
         )
+        .describe('BCP-47 language tag (e.g. "en", "en-US", "pt-BR").')
     )
-    .optional(),
+    .optional()
+    .describe(
+      'Default language tags (BCP-47) applied to every post in the thread. Individual posts can override this with their own langs field.'
+    ),
 });
 
 /**
@@ -60,8 +76,79 @@ export class CreateThreadTool extends BaseTool {
   public readonly schema = {
     method: 'create_thread',
     description:
-      'Create a multi-post thread on AT Protocol. Posts are automatically chained together with proper reply structure. Useful for longer-form content that exceeds the 300-character limit. Requires authentication.',
+      'Create a thread of 2–25 posts in a single operation, automatically chaining each post as a reply to the previous one so readers see them as a continuous conversation. Use this instead of repeated create_post calls when content spans multiple posts; use create_post for a single standalone post or reply_to_post to append to an existing thread. Requires authentication (app password). If publishing fails mid-thread, already-published posts are returned with a failedAtPosition indicator so you can delete or resume them. Subject to per-tool rate limiting.',
     params: CreateThreadSchema,
+    outputSchema: {
+      type: 'object',
+      properties: {
+        success: {
+          type: 'boolean',
+          description:
+            'True when all posts were published; false when only some posts were created before a failure.',
+        },
+        message: {
+          type: 'string',
+          description:
+            'Human-readable summary of the outcome, including partial-failure details when applicable.',
+        },
+        thread: {
+          type: 'array',
+          description: 'Ordered list of every post that was successfully published.',
+          items: {
+            type: 'object',
+            properties: {
+              uri: {
+                type: 'string',
+                description: 'AT-URI of the published post (at://did/app.bsky.feed.post/rkey).',
+              },
+              cid: {
+                type: 'string',
+                description: 'Content identifier (CID) of the published post record.',
+              },
+              text: {
+                type: 'string',
+                description: 'Original text content of this post.',
+              },
+              position: {
+                type: 'number',
+                description: '1-based index of this post within the thread.',
+              },
+              isRoot: {
+                type: 'boolean',
+                description: 'True only for the first post (the thread root).',
+              },
+            },
+            required: ['uri', 'cid', 'text', 'position', 'isRoot'],
+          },
+        },
+        rootPost: {
+          type: 'object',
+          description: 'URI and CID of the root (first) post, which anchors the entire thread.',
+          properties: {
+            uri: {
+              type: 'string',
+              description: 'AT-URI of the root post.',
+            },
+            cid: {
+              type: 'string',
+              description: 'CID of the root post record.',
+            },
+          },
+          required: ['uri', 'cid'],
+        },
+        totalPosts: {
+          type: 'number',
+          description:
+            'Number of posts actually published (may be less than requested if an error occurred mid-thread).',
+        },
+        failedAtPosition: {
+          type: 'number',
+          description:
+            '1-based position of the post that failed; present only when success is false.',
+        },
+      },
+      required: ['success', 'message', 'thread', 'rootPost', 'totalPosts'],
+    },
   };
 
   constructor(atpClient: AtpClient) {

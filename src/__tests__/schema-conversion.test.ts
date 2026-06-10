@@ -5,6 +5,8 @@
 import { describe, it, expect } from 'vitest';
 import { z } from 'zod';
 import { AtpMcpServer } from '../index.js';
+import { createTools } from '../tools/index.js';
+import type { AtpClient } from '../utils/atp-client.js';
 
 // Helper to access private method for testing
 function getZodToJsonSchema(server: AtpMcpServer) {
@@ -340,5 +342,78 @@ describe('Zod to JSON Schema Conversion', () => {
       });
       expect(result.$schema).toBeUndefined(); // stripped from MCP inputSchema output
     });
+  });
+});
+
+/**
+ * Glama "Tool Definition Quality" coverage guard.
+ *
+ * Glama scores the fraction of tool parameters that carry a JSON-Schema
+ * `description` (only a literal zod `.describe()` produces one — validation
+ * messages in `.min()/.max()/.regex()` do NOT). These tests fail the build if a
+ * new tool/param ships without a description or a tool ships without an
+ * outputSchema, so the 100% coverage we established cannot silently regress.
+ */
+describe('Tool definition quality (Glama coverage)', () => {
+  let server: AtpMcpServer;
+  let zodToJsonSchema: (schema: z.ZodSchema) => any;
+
+  beforeAll(() => {
+    server = new AtpMcpServer();
+    zodToJsonSchema = getZodToJsonSchema(server);
+  });
+
+  // A construction-only stub: tool constructors only store the client, so this
+  // is sufficient to enumerate the full registered toolset.
+  const tools = () => createTools({} as unknown as AtpClient);
+
+  it('constructs the full toolset (no constructor silently skipped)', () => {
+    expect(tools().length).toBeGreaterThanOrEqual(40);
+  });
+
+  it('every tool parameter has a non-empty description', () => {
+    const offenders: string[] = [];
+
+    const walk = (method: string, path: string, node: any): void => {
+      if (!node || typeof node !== 'object') return;
+      if (node.properties) {
+        for (const [key, prop] of Object.entries<any>(node.properties)) {
+          const p = path ? `${path}.${key}` : key;
+          // Skip genuinely free-form values (z.any(): no type/enum/properties/items)
+          // — there is nothing structural to describe.
+          const isFreeform =
+            prop &&
+            typeof prop === 'object' &&
+            !prop.type &&
+            !prop.enum &&
+            !prop.properties &&
+            !prop.items &&
+            !prop.anyOf;
+          if (
+            !isFreeform &&
+            (typeof prop.description !== 'string' || prop.description.length === 0)
+          ) {
+            offenders.push(`${method}.${p}`);
+          }
+          walk(method, p, prop);
+        }
+      }
+      if (node.items) walk(method, `${path}[]`, node.items);
+    };
+
+    for (const tool of tools()) {
+      if (!tool.schema.params) continue;
+      walk(tool.schema.method, '', zodToJsonSchema(tool.schema.params));
+    }
+
+    expect(offenders, `params missing .describe(): ${offenders.join(', ')}`).toEqual([]);
+  });
+
+  it('every tool declares an outputSchema', () => {
+    const missing = tools()
+      .filter(tool => !tool.schema.outputSchema)
+      .map(tool => tool.schema.method);
+
+    expect(missing, `tools missing outputSchema: ${missing.join(', ')}`).toEqual([]);
   });
 });

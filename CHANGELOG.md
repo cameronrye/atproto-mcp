@@ -11,10 +11,61 @@ and this project adheres to
 
 ### Planned
 
+- OAuth token exchange (the `oauth-client` scaffolding is in place)
+- Firehose frame decoding to enable real-time streaming
 - Direct messaging support
 - Group/community features
 - Custom feed generator integration
 - Multi-account management
+
+## [0.4.0] - 2026-06-09
+
+This release reshapes the tool API for clarity and reliability: it removes tools
+that never worked, consolidates overlapping tools, and completes the
+machine-readable schema and documentation for every remaining tool. The tool
+count goes from 62 to 43, and all 43 are functional, single-purpose, and fully
+documented.
+
+### Removed (BREAKING)
+
+- **OAuth tools** — `start_oauth_flow`, `handle_oauth_callback`,
+  `refresh_oauth_tokens`, `revoke_oauth_tokens`. Token exchange was never
+  implemented, so these always returned an error. Use app-password
+  authentication (`ATPROTO_IDENTIFIER` / `ATPROTO_PASSWORD`). The underlying
+  `oauth-client` module is retained for future work.
+- **Real-time streaming tools** — `start_streaming`, `stop_streaming`,
+  `get_streaming_status`, `get_recent_events`, `monitor_keywords`,
+  `track_users`. Firehose frame decoding was never implemented, so the event
+  buffer was always empty. The `FirehoseClient` infrastructure is retained.
+- **`generate_alt_text`** — no vision model was wired in; it returned writing
+  guidance rather than a description of the image.
+
+### Changed (BREAKING)
+
+Redundant tools were consolidated. Migration mapping:
+
+- `create_rich_text_post` → **`create_post`** (now accepts optional `facets` and
+  a `quote` embed).
+- `get_followers` + `get_follows` → **`get_user_connections`**
+  (`direction: 'followers' | 'follows'`).
+- `get_unread_count` → **`get_notifications`** (`countOnly: true`).
+- `get_thread` + `extract_media_from_post` → **`get_post_context`** (`depth`,
+  `parentHeight`, `includeMedia`).
+- `analyze_engagement` + `analyze_network` + `suggest_content_strategy` →
+  **`analyze_account`** (`dimension: 'engagement' | 'network' | 'strategy'`).
+- `discover_trending` + `recommend_content` → **`discover`**
+  (`mode: 'trending' | 'recommended'`).
+- `batch_follow` + `batch_like` + `batch_repost` → **`batch_action`**
+  (`action: 'follow' | 'like' | 'repost'`).
+
+### Added
+
+- **`search_actors`** — find accounts by handle or display name.
+- **`get_author_feed`** — list a specific user's posts.
+- Every tool now advertises a JSON Schema `outputSchema` in `tools/list`, and
+  every tool parameter carries a description. A test enforces 100% coverage so
+  this cannot regress.
+- `glama.json` to claim the Glama server listing.
 
 ## [0.3.0] - 2026-06-07
 
