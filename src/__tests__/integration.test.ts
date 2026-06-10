@@ -354,7 +354,7 @@ describe('Phase 2 Integration Tests', () => {
       expect(toolNames).toContain('block_user');
       expect(toolNames).toContain('report_content');
       expect(toolNames).toContain('report_user');
-      expect(tools.length).toBe(42); // search_actors added in Phase 3
+      expect(tools.length).toBe(43); // search_actors + get_author_feed added in Phase 3
     });
 
     it('should have moderation tools with correct schemas', () => {
@@ -484,7 +484,7 @@ describe('Phase 2 Integration Tests', () => {
 
       // Test total tools created in factory
       const allTools = createTools(mockAtpClient);
-      expect(allTools.length).toBe(42); // search_actors added in Phase 3
+      expect(allTools.length).toBe(43); // search_actors + get_author_feed added in Phase 3
     });
   });
 });

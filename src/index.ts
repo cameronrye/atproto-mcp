@@ -37,6 +37,7 @@ const READ_ONLY_TOOLS = new Set<string>([
   'find_influential_users',
   'find_similar_users',
   'generate_link_preview',
+  'get_author_feed',
   'get_custom_feed',
   'get_list',
   'get_notifications',

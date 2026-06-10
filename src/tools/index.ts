@@ -24,6 +24,7 @@ import {
   FindSimilarUsersTool,
   FollowUserTool,
   GenerateLinkPreviewTool,
+  GetAuthorFeedTool,
   GetCustomFeedTool,
   GetListTool,
   GetNotificationsTool,
@@ -106,6 +107,7 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     // Data retrieval
     () => new SearchPostsTool(atpClient),
     () => new SearchActorsTool(atpClient),
+    () => new GetAuthorFeedTool(atpClient),
     () => new GetTimelineTool(atpClient),
     () => new GetUserConnectionsTool(atpClient),
     () => new GetNotificationsTool(atpClient),
