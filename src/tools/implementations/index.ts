@@ -20,6 +20,7 @@ export { GetUserProfileTool } from './get-user-profile-tool.js';
 
 // Data retrieval
 export { SearchPostsTool } from './search-posts-tool.js';
+export { SearchActorsTool } from './search-actors-tool.js';
 export { GetTimelineTool } from './timeline-tools.js';
 export {
   GetUserConnectionsTool,

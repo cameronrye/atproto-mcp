@@ -40,6 +40,7 @@ import {
   ReportContentTool,
   ReportUserTool,
   RepostTool,
+  SearchActorsTool,
   SearchPostsTool,
   UnblockUserTool,
   UnfollowUserTool,
@@ -104,6 +105,7 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
 
     // Data retrieval
     () => new SearchPostsTool(atpClient),
+    () => new SearchActorsTool(atpClient),
     () => new GetTimelineTool(atpClient),
     () => new GetUserConnectionsTool(atpClient),
     () => new GetNotificationsTool(atpClient),

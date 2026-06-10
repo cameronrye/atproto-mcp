@@ -45,6 +45,7 @@ const READ_ONLY_TOOLS = new Set<string>([
   'get_user_connections',
   'get_user_profile',
   'get_user_summary',
+  'search_actors',
   'search_posts',
 ]);
 
