@@ -72,19 +72,34 @@ export class GetAuthorFeedTool extends BaseTool {
                 },
                 required: ['did', 'handle'],
               },
-              text: { type: 'string', description: 'Text content of the post.' },
-              createdAt: {
-                type: 'string',
-                description: 'ISO 8601 timestamp when the post was created.',
+              record: {
+                type: 'object',
+                description: 'The raw post record.',
+                properties: {
+                  text: { type: 'string', description: 'Plain text content of the post.' },
+                  createdAt: { type: 'string', description: 'ISO 8601 creation timestamp.' },
+                  langs: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'BCP-47 language tags declared by the author.',
+                  },
+                  tags: {
+                    type: 'array',
+                    items: { type: 'string' },
+                    description: 'Hashtags attached to the post.',
+                  },
+                },
+                required: ['text', 'createdAt'],
               },
-              replyCount: {
-                type: 'number',
-                description: 'Number of replies.',
-              },
+              replyCount: { type: 'number', description: 'Number of replies.' },
               repostCount: { type: 'number', description: 'Number of reposts.' },
               likeCount: { type: 'number', description: 'Number of likes.' },
+              indexedAt: {
+                type: 'string',
+                description: 'ISO 8601 timestamp when the post was indexed.',
+              },
             },
-            required: ['uri', 'cid', 'author', 'text', 'createdAt'],
+            required: ['uri', 'cid', 'author', 'record', 'indexedAt'],
           },
         },
         cursor: {

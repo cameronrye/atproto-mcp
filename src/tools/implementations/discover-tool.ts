@@ -20,40 +20,76 @@ import type { AtpClient } from '../../utils/atp-client.js';
 /**
  * Zod schema for discover parameters.
  *
- * Only the four documented fields are advertised. The schema uses `.passthrough()`
- * so each ported mode's internal knobs (e.g. includeHashtags, excludeReposts,
- * topics) still reach the ported methods unchanged while validation of the public
- * surface stays clean; each old tool's defaults are applied inside the ported
- * method.
+ * `mode` and `limit` are shared. The remaining fields are mode-specific advanced
+ * knobs (documented as such) and are fully validated — each old tool's default is
+ * applied inside the ported method when the knob is omitted.
  */
-const DiscoverSchema = z
-  .object({
-    mode: z
-      .enum(['trending', 'recommended'])
-      .describe(
-        "What to surface from your timeline: 'trending' = trending topics/hashtags; " +
-          "'recommended' = posts you're likely to engage with."
-      ),
-    limit: z
-      .number()
-      .int()
-      .min(1)
-      .max(100)
-      .optional()
-      .describe('How many items to return (1–100, default per mode).'),
-    timeWindow: z
-      .enum(['1h', '6h', '12h', '24h', '7d'])
-      .optional()
-      .describe('Lookback window. Only used when mode=trending (default 24h).'),
-    actor: z
-      .string()
-      .optional()
-      .describe(
-        'Optional account to tailor recommendations to. Only used when mode=recommended; ' +
-          'defaults to the authenticated user.'
-      ),
-  })
-  .passthrough();
+const DiscoverSchema = z.object({
+  mode: z
+    .enum(['trending', 'recommended'])
+    .describe(
+      "What to surface from your timeline: 'trending' = trending topics/hashtags; " +
+        "'recommended' = posts you're likely to engage with."
+    ),
+  limit: z
+    .number()
+    .int()
+    .min(1)
+    .max(100)
+    .optional()
+    .describe('How many items to return (1–100, default per mode).'),
+  // --- mode=trending knobs ---
+  timeWindow: z
+    .enum(['1h', '6h', '12h', '24h', '7d'])
+    .optional()
+    .describe('Lookback window. Only used when mode=trending (default 24h).'),
+  includeHashtags: z
+    .boolean()
+    .optional()
+    .describe('Include trending hashtags. Only used when mode=trending (default true).'),
+  includeTopics: z
+    .boolean()
+    .optional()
+    .describe('Include trending topics/keywords. Only used when mode=trending (default true).'),
+  includePosts: z
+    .boolean()
+    .optional()
+    .describe('Include notable trending posts. Only used when mode=trending (default true).'),
+  // --- mode=recommended knobs ---
+  actor: z
+    .string()
+    .optional()
+    .describe(
+      'Optional account to tailor recommendations to. Only used when mode=recommended; ' +
+        'defaults to the authenticated user.'
+    ),
+  topics: z
+    .array(z.string())
+    .optional()
+    .describe(
+      'Restrict recommendations to posts matching these topic keywords. Only used when mode=recommended.'
+    ),
+  minLikes: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe(
+      'Minimum like count for a recommended post. Only used when mode=recommended (default 5).'
+    ),
+  maxAge: z
+    .number()
+    .int()
+    .min(1)
+    .optional()
+    .describe(
+      'Maximum post age in hours for recommendations. Only used when mode=recommended (default 24).'
+    ),
+  excludeReposts: z
+    .boolean()
+    .optional()
+    .describe('Exclude reposts from recommendations. Only used when mode=recommended.'),
+});
 
 interface ITrendingHashtag {
   tag: string;

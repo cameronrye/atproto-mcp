@@ -59,6 +59,24 @@ describe('create_post explicit facets', () => {
     expect(post).not.toHaveBeenCalled();
   });
 
+  it('enforces the 300-grapheme post limit on the explicit-facets path', async () => {
+    const { client, post } = mockClient();
+    const tool = new CreatePostTool(client);
+
+    await expect(
+      tool.handler({
+        text: 'a'.repeat(301), // 301 graphemes — over the 300 limit
+        facets: [
+          {
+            index: { byteStart: 0, byteEnd: 5 },
+            features: [{ type: 'link', value: 'https://x.com' }],
+          },
+        ],
+      })
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(post).not.toHaveBeenCalled();
+  });
+
   it('rejects a facet whose byteStart is not before byteEnd', async () => {
     const { client, post } = mockClient();
     const tool = new CreatePostTool(client);

@@ -921,7 +921,9 @@ export class AnalyzeModerationStatusTool extends BaseTool {
         const post = threadData.post;
 
         moderation = {
-          blocked: post.author?.viewer?.blocking,
+          // Coerce to a boolean to match the declared outputSchema and the user
+          // path (viewer.blocking is an AT-URI string when present, else undefined).
+          blocked: !!post.author?.viewer?.blocking,
           muted: post.author?.viewer?.muted,
           blockedBy: post.author?.viewer?.blockedBy,
         };

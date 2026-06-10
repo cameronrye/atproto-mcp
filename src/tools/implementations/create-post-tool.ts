@@ -205,7 +205,10 @@ export class CreatePostTool extends BaseTool {
 
       if (params.facets && params.facets.length > 0) {
         // Caller-supplied facets are UNTRUSTED: validate each byte range against
-        // the text's UTF-8 length and resolve mention handles to DIDs.
+        // the text's UTF-8 length and resolve mention handles to DIDs. Enforce the
+        // grapheme/byte text limits here too — the auto-detect path does so via
+        // buildRichText, and the explicit-facets path must not skip them.
+        this.assertPostTextWithinLimits(params.text);
         postRecord.text = params.text;
         postRecord.facets = await this.buildExplicitFacets(params.text, params.facets);
       } else {
