@@ -32,8 +32,8 @@ const READ_ONLY_TOOLS = new Set<string>([
   'analyze_account',
   'analyze_image',
   'analyze_moderation_status',
+  'discover',
   'discover_communities',
-  'discover_trending',
   'find_influential_users',
   'find_similar_users',
   'generate_link_preview',
@@ -45,7 +45,6 @@ const READ_ONLY_TOOLS = new Set<string>([
   'get_user_connections',
   'get_user_profile',
   'get_user_summary',
-  'recommend_content',
   'search_posts',
 ]);
 

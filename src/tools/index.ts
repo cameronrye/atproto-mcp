@@ -21,7 +21,7 @@ import {
   CreateThreadTool,
   DeletePostTool,
   DiscoverCommunitiesTool,
-  DiscoverTrendingTool,
+  DiscoverTool,
   FindInfluentialUsersTool,
   FindSimilarUsersTool,
   FollowUserTool,
@@ -37,7 +37,6 @@ import {
   LikePostTool,
   MarkNotificationsSeenTool,
   MuteUserTool,
-  RecommendContentTool,
   RemoveFromListTool,
   ReplyToPostTool,
   ReportContentTool,
@@ -142,9 +141,8 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new FindInfluentialUsersTool(atpClient),
 
     // Content discovery
-    () => new DiscoverTrendingTool(atpClient),
+    () => new DiscoverTool(atpClient),
     () => new FindSimilarUsersTool(atpClient),
-    () => new RecommendContentTool(atpClient),
     () => new DiscoverCommunitiesTool(atpClient),
 
     // Batch operations

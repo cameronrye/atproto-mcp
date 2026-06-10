@@ -5,9 +5,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
   FindSimilarUsersTool,
-  RecommendContentTool,
   DiscoverCommunitiesTool,
 } from '../tools/implementations/content-discovery-tools.js';
+import { DiscoverTool } from '../tools/implementations/discover-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 // Mock AtpClient
@@ -246,30 +246,33 @@ describe('FindSimilarUsersTool', () => {
   });
 });
 
-describe('RecommendContentTool', () => {
-  let tool: RecommendContentTool;
+describe('DiscoverTool (mode=recommended)', () => {
+  let tool: DiscoverTool;
   let mockClient: AtpClient;
 
   beforeEach(() => {
     mockClient = createMockAtpClient();
-    tool = new RecommendContentTool(mockClient);
+    tool = new DiscoverTool(mockClient);
   });
 
   it('should recommend content based on interests', async () => {
     const result = await tool.handler({
+      mode: 'recommended',
       topics: ['AI', 'machine learning'],
-      maxResults: 10,
+      limit: 10,
     });
 
     expect(result.success).toBe(true);
+    expect(result.mode).toBe('recommended');
     expect(result.recommendations).toBeDefined();
     expect(Array.isArray(result.recommendations)).toBe(true);
   });
 
   it('should score recommendations', async () => {
     const result = await tool.handler({
+      mode: 'recommended',
       topics: ['technology'],
-      maxResults: 5,
+      limit: 5,
     });
 
     expect(result.success).toBe(true);
@@ -278,11 +281,47 @@ describe('RecommendContentTool', () => {
     }
   });
 
-  it('should require at least one interest', async () => {
+  it('should work with no topics at all', async () => {
     // Since topics is optional, we test with no topics at all
-    const result = await tool.handler({ maxResults: 10 });
+    const result = await tool.handler({ mode: 'recommended', limit: 10 });
     expect(result.success).toBe(true);
     expect(result.recommendations).toBeDefined();
+  });
+});
+
+describe('DiscoverTool (mode=trending)', () => {
+  let tool: DiscoverTool;
+  let mockClient: AtpClient;
+
+  beforeEach(() => {
+    mockClient = createMockAtpClient();
+    tool = new DiscoverTool(mockClient);
+  });
+
+  it('should surface trending content from the timeline', async () => {
+    const result = await tool.handler({ mode: 'trending', limit: 50 });
+
+    expect(result.success).toBe(true);
+    expect(result.mode).toBe('trending');
+    expect(result.trendingHashtags).toBeDefined();
+    expect(Array.isArray(result.trendingHashtags)).toBe(true);
+    expect(result.trendingTopics).toBeDefined();
+    expect(result.trendingPosts).toBeDefined();
+    expect(result.summary).toBeDefined();
+  });
+
+  it('should honor the timeWindow parameter', async () => {
+    const result = await tool.handler({ mode: 'trending', timeWindow: '7d' });
+
+    expect(result.success).toBe(true);
+    expect(result.timeWindow).toBe('7d');
+  });
+
+  it('should default the time window to 24h', async () => {
+    const result = await tool.handler({ mode: 'trending' });
+
+    expect(result.success).toBe(true);
+    expect(result.timeWindow).toBe('24h');
   });
 });
 

@@ -58,14 +58,10 @@ export { AnalyzeAccountTool } from './analyze-account-tool.js';
 export { FindInfluentialUsersTool } from './analytics-tools.js';
 
 // Content discovery
-export {
-  FindSimilarUsersTool,
-  RecommendContentTool,
-  DiscoverCommunitiesTool,
-} from './content-discovery-tools.js';
+export { FindSimilarUsersTool, DiscoverCommunitiesTool } from './content-discovery-tools.js';
 
-// Content discovery
-export { DiscoverTrendingTool } from './discover-trending-tool.js';
+// Faceted timeline-driven discovery (trending + recommended)
+export { DiscoverTool } from './discover-tool.js';
 
 // Batch operations
 export { BatchFollowTool, BatchLikeTool, BatchRepostTool } from './batch-operations-tools.js';
