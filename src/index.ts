@@ -29,10 +29,9 @@ import { type ISecurityConfig, SecurityManager } from './utils/security.js';
  * which encodes auth requirement, not destructiveness.
  */
 const READ_ONLY_TOOLS = new Set<string>([
-  'analyze_engagement',
+  'analyze_account',
   'analyze_image',
   'analyze_moderation_status',
-  'analyze_network',
   'discover_communities',
   'discover_trending',
   'find_influential_users',
@@ -48,7 +47,6 @@ const READ_ONLY_TOOLS = new Set<string>([
   'get_user_summary',
   'recommend_content',
   'search_posts',
-  'suggest_content_strategy',
 ]);
 
 /**

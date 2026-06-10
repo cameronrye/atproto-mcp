@@ -1,12 +1,12 @@
 /**
- * Regression test: analyze_network must rank top followers over the WHOLE sample,
- * not just the first 25. Previously hydrateProfiles sliced to 25, so the most
- * influential follower beyond index 25 was invisible to the ranking even though
- * maxSampleSize advertises up to 100.
+ * Regression test: analyze_account dimension:'network' must rank top followers
+ * over the WHOLE sample, not just the first 25. Previously hydrateProfiles sliced
+ * to 25, so the most influential follower beyond index 25 was invisible to the
+ * ranking even though maxSampleSize advertises up to 100.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AnalyzeNetworkTool } from '../tools/implementations/analytics-tools.js';
+import { AnalyzeAccountTool } from '../tools/implementations/analyze-account-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 const SELF = 'did:plc:self';
@@ -51,20 +51,22 @@ function mockClient() {
   return { client, agent };
 }
 
-describe('analyze_network top-N over full sample', () => {
+describe("analyze_account dimension:'network' top-N over full sample", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('ranks the most-followed account even when it is beyond the first 25 sampled', async () => {
     const { client, agent } = mockClient();
-    const tool = new AnalyzeNetworkTool(client);
+    const tool = new AnalyzeAccountTool(client);
 
     const result = await tool.handler({
+      dimension: 'network',
       actor: 'self.test',
       includeFollowers: true,
       includeFollows: false,
       maxSampleSize: 30,
     });
 
+    expect(result.dimension).toBe('network');
     expect(result.analysis.topFollowers[0].did).toBe('did:plc:f27');
     // The full sample was hydrated (ceil(30/25) = 2 getProfiles calls).
     expect(agent.getProfiles.mock.calls.length).toBe(2);

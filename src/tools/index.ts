@@ -9,10 +9,9 @@ import type { AtpClient } from '../utils/atp-client.js';
 import { Logger } from '../utils/logger.js';
 import {
   AddToListTool,
-  AnalyzeEngagementTool,
+  AnalyzeAccountTool,
   AnalyzeImageTool,
   AnalyzeModerationStatusTool,
-  AnalyzeNetworkTool,
   BatchFollowTool,
   BatchLikeTool,
   BatchRepostTool,
@@ -45,7 +44,6 @@ import {
   ReportUserTool,
   RepostTool,
   SearchPostsTool,
-  SuggestContentStrategyTool,
   UnblockUserTool,
   UnfollowUserTool,
   UnlikePostTool,
@@ -140,9 +138,7 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new GenerateLinkPreviewTool(atpClient),
 
     // Analytics and insights
-    () => new AnalyzeEngagementTool(atpClient),
-    () => new AnalyzeNetworkTool(atpClient),
-    () => new SuggestContentStrategyTool(atpClient),
+    () => new AnalyzeAccountTool(atpClient),
     () => new FindInfluentialUsersTool(atpClient),
 
     // Content discovery

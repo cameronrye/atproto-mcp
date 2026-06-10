@@ -1,11 +1,12 @@
 /**
- * Behavioral tests for analyze_engagement (previously ~3% covered):
+ * Behavioral tests for analyze_account dimension:'engagement' (previously the
+ * standalone analyze_engagement tool, ~3% covered):
  * - media detection must recognize video / recordWithMedia embeds (not just images)
  * - an empty author feed must not emit Infinity/-Infinity for optimalTextLength
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { AnalyzeEngagementTool } from '../tools/implementations/analyze-engagement-tool.js';
+import { AnalyzeAccountTool } from '../tools/implementations/analyze-account-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 const SELF = 'did:plc:self';
@@ -43,17 +44,18 @@ function postItem(embed: unknown, extra: Record<string, unknown> = {}) {
   };
 }
 
-describe('analyze_engagement', () => {
+describe("analyze_account dimension:'engagement'", () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('detects a video embed as media', async () => {
     const { client } = mockClient([
       postItem({ $type: 'app.bsky.embed.video#view', cid: 'v', playlist: 'p.m3u8' }),
     ]);
-    const tool = new AnalyzeEngagementTool(client);
+    const tool = new AnalyzeAccountTool(client);
 
-    const result = await tool.handler({});
+    const result = await tool.handler({ dimension: 'engagement' });
 
+    expect(result.dimension).toBe('engagement');
     expect(result.topPosts[0]?.hasMedia).toBe(true);
   });
 
@@ -65,20 +67,21 @@ describe('analyze_engagement', () => {
         media: { $type: 'app.bsky.embed.images#view', images: [{}] },
       }),
     ]);
-    const tool = new AnalyzeEngagementTool(client);
+    const tool = new AnalyzeAccountTool(client);
 
-    const result = await tool.handler({});
+    const result = await tool.handler({ dimension: 'engagement' });
 
     expect(result.topPosts[0]?.hasMedia).toBe(true);
   });
 
   it('returns finite optimalTextLength for an empty feed (no Infinity)', async () => {
     const { client } = mockClient([]);
-    const tool = new AnalyzeEngagementTool(client);
+    const tool = new AnalyzeAccountTool(client);
 
-    const result = await tool.handler({});
+    const result = await tool.handler({ dimension: 'engagement' });
 
     expect(result.success).toBe(true);
+    expect(result.dimension).toBe('engagement');
     expect(result.summary.totalPosts).toBe(0);
     expect(Number.isFinite(result.insights.optimalTextLength.min)).toBe(true);
     expect(Number.isFinite(result.insights.optimalTextLength.max)).toBe(true);

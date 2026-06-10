@@ -54,12 +54,8 @@ export {
 export { UploadImageTool, UploadVideoTool, GenerateLinkPreviewTool } from './media-tools.js';
 
 // Analytics and insights
-export { AnalyzeEngagementTool } from './analyze-engagement-tool.js';
-export {
-  AnalyzeNetworkTool,
-  SuggestContentStrategyTool,
-  FindInfluentialUsersTool,
-} from './analytics-tools.js';
+export { AnalyzeAccountTool } from './analyze-account-tool.js';
+export { FindInfluentialUsersTool } from './analytics-tools.js';
 
 // Content discovery
 export {

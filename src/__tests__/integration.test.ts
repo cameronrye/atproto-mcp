@@ -354,7 +354,7 @@ describe('Phase 2 Integration Tests', () => {
       expect(toolNames).toContain('block_user');
       expect(toolNames).toContain('report_content');
       expect(toolNames).toContain('report_user');
-      expect(tools.length).toBe(46); // get_thread + extract_media_from_post folded into get_post_context
+      expect(tools.length).toBe(44); // analyze_engagement/network/suggest_content_strategy merged into analyze_account
     });
 
     it('should have moderation tools with correct schemas', () => {
@@ -484,7 +484,7 @@ describe('Phase 2 Integration Tests', () => {
 
       // Test total tools created in factory
       const allTools = createTools(mockAtpClient);
-      expect(allTools.length).toBe(46); // get_thread + extract_media_from_post folded into get_post_context
+      expect(allTools.length).toBe(44); // analyze_engagement/network/suggest_content_strategy merged into analyze_account
     });
   });
 });
