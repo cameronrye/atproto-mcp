@@ -22,8 +22,7 @@ export { GetUserProfileTool } from './get-user-profile-tool.js';
 export { SearchPostsTool } from './search-posts-tool.js';
 export { GetTimelineTool } from './timeline-tools.js';
 export {
-  GetFollowersTool,
-  GetFollowsTool,
+  GetUserConnectionsTool,
   GetNotificationsTool,
   GetUnreadCountTool,
   MarkNotificationsSeenTool,

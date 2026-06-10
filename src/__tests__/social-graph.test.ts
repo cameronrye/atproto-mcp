@@ -1,19 +1,18 @@
 /**
- * Unit tests for the social graph read tools (get_followers / get_follows /
+ * Unit tests for the social graph read tools (get_user_connections /
  * get_notifications).
  *
  * These lock the on-the-wire contract for the AppView read calls: the actor,
- * limit, and cursor params are passed straight through to the agent method, the
- * returned ProfileView/notification entries are mapped to the documented output
- * shape, and the response cursor (and hasMore flag derived from it) is
- * propagated. GetFollowers/GetFollows are ENHANCED (work unauthenticated via
- * executePublicRequest); GetNotifications is PRIVATE (requires auth).
+ * limit, cursor, and direction params are passed through to the correct agent
+ * method, the returned ProfileView entries are mapped to the documented output
+ * shape, and the response cursor is propagated.
+ * GetUserConnections is ENHANCED (works unauthenticated); GetNotifications is
+ * PRIVATE (requires auth).
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import {
-  GetFollowersTool,
-  GetFollowsTool,
+  GetUserConnectionsTool,
   GetNotificationsTool,
 } from '../tools/implementations/social-graph-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
@@ -48,10 +47,10 @@ const sampleProfile = (suffix: string) => ({
   viewer: { following: 'at://x' },
 });
 
-describe('GetFollowersTool', () => {
+describe('GetUserConnectionsTool — direction: followers', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('passes actor/limit/cursor to agent.getFollowers, maps profiles, and propagates cursor', async () => {
+  it('calls agent.getFollowers with actor/limit/cursor and maps results into connections', async () => {
     const getFollowers = vi.fn().mockResolvedValue({
       data: {
         followers: [sampleProfile('alice'), sampleProfile('bob')],
@@ -59,10 +58,11 @@ describe('GetFollowersTool', () => {
       },
     });
     const client = makeClient({ getFollowers });
-    const tool = new GetFollowersTool(client);
+    const tool = new GetUserConnectionsTool(client);
 
     const result = await tool.handler({
       actor: 'did:plc:target',
+      direction: 'followers',
       limit: 25,
       cursor: 'page2',
     });
@@ -79,11 +79,11 @@ describe('GetFollowersTool', () => {
 
     expect(result.success).toBe(true);
     expect(result.actor).toBe('did:plc:target');
+    expect(result.direction).toBe('followers');
     expect(result.cursor).toBe('next');
-    expect(result.hasMore).toBe(true);
-    expect(result.followers).toHaveLength(2);
+    expect(result.connections).toHaveLength(2);
 
-    const [first] = result.followers;
+    const [first] = result.connections;
     expect(first).toEqual({
       did: 'did:plc:alice',
       handle: 'alice.bsky.social',
@@ -98,14 +98,14 @@ describe('GetFollowersTool', () => {
     expect(first).not.toHaveProperty('followersCount');
   });
 
-  it('applies the default limit of 50 and reports hasMore=false when no cursor is returned', async () => {
+  it('applies the default limit of 50 and returns an empty connections array when none found', async () => {
     const getFollowers = vi.fn().mockResolvedValue({
       data: { followers: [], cursor: undefined },
     });
     const client = makeClient({ getFollowers });
-    const tool = new GetFollowersTool(client);
+    const tool = new GetUserConnectionsTool(client);
 
-    const result = await tool.handler({ actor: 'did:plc:target' });
+    const result = await tool.handler({ actor: 'did:plc:target', direction: 'followers' });
 
     expect(getFollowers).toHaveBeenCalledWith({
       actor: 'did:plc:target',
@@ -113,8 +113,7 @@ describe('GetFollowersTool', () => {
       cursor: undefined,
     });
     expect(result.cursor).toBeUndefined();
-    expect(result.hasMore).toBe(false);
-    expect(result.followers).toEqual([]);
+    expect(result.connections).toEqual([]);
   });
 
   it('works unauthenticated via executePublicRequest (ENHANCED mode)', async () => {
@@ -122,9 +121,13 @@ describe('GetFollowersTool', () => {
       data: { followers: [sampleProfile('alice')], cursor: 'c' },
     });
     const client = makeClient({ getFollowers }, { authenticated: false });
-    const tool = new GetFollowersTool(client);
+    const tool = new GetUserConnectionsTool(client);
 
-    const result = await tool.handler({ actor: 'did:plc:target', limit: 10 });
+    const result = await tool.handler({
+      actor: 'did:plc:target',
+      direction: 'followers',
+      limit: 10,
+    });
 
     expect(client.executePublicRequest).toHaveBeenCalled();
     expect(client.executeAuthenticatedRequest).not.toHaveBeenCalled();
@@ -134,25 +137,27 @@ describe('GetFollowersTool', () => {
       cursor: undefined,
     });
     expect(result.success).toBe(true);
-    expect(result.followers).toHaveLength(1);
+    expect(result.connections).toHaveLength(1);
   });
 });
 
-describe('GetFollowsTool', () => {
+describe('GetUserConnectionsTool — direction: follows', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('passes actor/limit/cursor to agent.getFollows, maps follows, and propagates cursor', async () => {
+  it('calls agent.getFollows (not getFollowers) and maps results into connections', async () => {
     const getFollows = vi.fn().mockResolvedValue({
       data: {
         follows: [sampleProfile('carol')],
         cursor: 'more',
       },
     });
-    const client = makeClient({ getFollows });
-    const tool = new GetFollowsTool(client);
+    const getFollowers = vi.fn();
+    const client = makeClient({ getFollows, getFollowers });
+    const tool = new GetUserConnectionsTool(client);
 
     const result = await tool.handler({
       actor: 'did:plc:target',
+      direction: 'follows',
       limit: 5,
       cursor: 'startHere',
     });
@@ -162,12 +167,14 @@ describe('GetFollowsTool', () => {
       limit: 5,
       cursor: 'startHere',
     });
+    // getFollowers must NOT have been invoked for the 'follows' direction.
+    expect(getFollowers).not.toHaveBeenCalled();
 
     expect(result.success).toBe(true);
     expect(result.actor).toBe('did:plc:target');
+    expect(result.direction).toBe('follows');
     expect(result.cursor).toBe('more');
-    expect(result.hasMore).toBe(true);
-    expect(result.follows).toEqual([
+    expect(result.connections).toEqual([
       {
         did: 'did:plc:carol',
         handle: 'carol.bsky.social',
