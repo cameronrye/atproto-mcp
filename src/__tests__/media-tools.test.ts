@@ -3,7 +3,9 @@
  *
  * These lock the on-the-wire shapes produced by:
  * - UploadImageTool       (src/tools/implementations/media-tools.ts)
- * - ExtractMediaFromPostTool (src/tools/implementations/rich-media-tools.ts)
+ *
+ * Media extraction (formerly extract_media_from_post) now lives in
+ * get_post_context and is covered by post-context-thread.test.ts.
  *
  * The path-based tools read real files under mediaBaseDir() (ATPROTO_MEDIA_DIR
  * or cwd), guarded by assertSafePath. Each test that exercises a path creates a
@@ -17,7 +19,6 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { UploadImageTool } from '../tools/implementations/media-tools.js';
-import { ExtractMediaFromPostTool } from '../tools/implementations/rich-media-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 // Routes an operation the way the real AtpClient does: success -> { success,
@@ -118,100 +119,5 @@ describe('UploadImageTool', () => {
 
     await expect(tool.handler({ filePath: 'doc.txt' })).rejects.toThrow(/Unsupported image format/);
     expect(uploadBlob).not.toHaveBeenCalled();
-  });
-});
-
-describe('ExtractMediaFromPostTool', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('reads the post embed via agent.getPostThread and extracts images with alt text', async () => {
-    const uri = 'at://did:plc:author/app.bsky.feed.post/p1';
-    const getPostThread = vi.fn().mockResolvedValue({
-      data: {
-        thread: {
-          post: {
-            uri,
-            embed: {
-              $type: 'app.bsky.embed.images#view',
-              images: [
-                {
-                  fullsize: 'https://cdn.example.com/full.jpg',
-                  thumb: 'https://cdn.example.com/thumb.jpg',
-                  alt: 'a sunset',
-                  aspectRatio: { width: 1200, height: 800 },
-                },
-              ],
-            },
-          },
-        },
-      },
-    });
-    // ENHANCED tool with an authenticated client uses executeAuthenticatedRequest.
-    const client = makeClient({ getPostThread });
-    const tool = new ExtractMediaFromPostTool(client);
-
-    const result = await tool.handler({ uri });
-
-    expect(getPostThread).toHaveBeenCalledWith(expect.objectContaining({ uri }));
-    expect(result.success).toBe(true);
-    expect(result.media.images).toHaveLength(1);
-    expect(result.media.images[0]).toEqual(
-      expect.objectContaining({
-        uri: 'https://cdn.example.com/full.jpg',
-        alt: 'a sunset',
-        aspectRatio: { width: 1200, height: 800 },
-      })
-    );
-    expect(result.media.videos).toHaveLength(0);
-    expect(result.media.externalLinks).toHaveLength(0);
-  });
-
-  it('extracts an external link embed and works for an unauthenticated (public) caller', async () => {
-    const uri = 'at://did:plc:author/app.bsky.feed.post/p2';
-    const getPostThread = vi.fn().mockResolvedValue({
-      data: {
-        thread: {
-          post: {
-            uri,
-            embed: {
-              $type: 'app.bsky.embed.external#view',
-              external: {
-                uri: 'https://news.example.com/story',
-                title: 'Headline',
-                description: 'A description',
-                thumb: 'https://news.example.com/thumb.jpg',
-              },
-            },
-          },
-        },
-      },
-    });
-    const client = makeClient({ getPostThread }, { authenticated: false });
-    const tool = new ExtractMediaFromPostTool(client);
-
-    const result = await tool.handler({ uri });
-
-    // Unauthenticated ENHANCED mode routes through executePublicRequest.
-    expect(client.executePublicRequest as any).toHaveBeenCalled();
-    expect(result.media.externalLinks).toHaveLength(1);
-    expect(result.media.externalLinks[0]).toEqual(
-      expect.objectContaining({
-        uri: 'https://news.example.com/story',
-        title: 'Headline',
-        description: 'A description',
-      })
-    );
-    expect(result.media.images).toHaveLength(0);
-  });
-
-  it('rejects a non-AT-URI before calling getPostThread', async () => {
-    const getPostThread = vi.fn();
-    const client = makeClient({ getPostThread });
-    const tool = new ExtractMediaFromPostTool(client);
-
-    await expect(tool.handler({ uri: 'https://example.com/not-at-uri' })).rejects.toThrow(
-      /AT Protocol URI/
-    );
-    expect(getPostThread).not.toHaveBeenCalled();
   });
 });

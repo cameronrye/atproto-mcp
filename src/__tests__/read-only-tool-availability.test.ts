@@ -5,11 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  GetListTool,
-  GetThreadTool,
-  GetCustomFeedTool,
-} from '../tools/implementations/advanced-social-tools.js';
+import { GetListTool, GetCustomFeedTool } from '../tools/implementations/advanced-social-tools.js';
 import { AnalyzeModerationStatusTool } from '../tools/implementations/moderation-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
@@ -21,10 +17,6 @@ const unauthClient = {
 describe('read-only tools are available unauthenticated', () => {
   it('get_list is available without authentication', () => {
     expect(new GetListTool(unauthClient).isAvailable()).toBe(true);
-  });
-
-  it('get_thread is available without authentication', () => {
-    expect(new GetThreadTool(unauthClient).isAvailable()).toBe(true);
   });
 
   it('get_custom_feed is available without authentication', () => {

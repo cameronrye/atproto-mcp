@@ -23,7 +23,6 @@ import {
   DeletePostTool,
   DiscoverCommunitiesTool,
   DiscoverTrendingTool,
-  ExtractMediaFromPostTool,
   FindInfluentialUsersTool,
   FindSimilarUsersTool,
   FollowUserTool,
@@ -32,7 +31,6 @@ import {
   GetListTool,
   GetNotificationsTool,
   GetPostContextTool,
-  GetThreadTool,
   GetTimelineTool,
   GetUserConnectionsTool,
   GetUserProfileTool,
@@ -134,7 +132,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new AddToListTool(atpClient),
     () => new RemoveFromListTool(atpClient),
     () => new GetListTool(atpClient),
-    () => new GetThreadTool(atpClient),
     () => new GetCustomFeedTool(atpClient),
 
     // Enhanced media support
@@ -165,7 +162,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
 
     // Rich media
     () => new AnalyzeImageTool(atpClient),
-    () => new ExtractMediaFromPostTool(atpClient),
   ];
 
   // Construct each tool defensively: a single failing constructor must not wipe

@@ -47,7 +47,6 @@ export {
   AddToListTool,
   RemoveFromListTool,
   GetListTool,
-  GetThreadTool,
   GetCustomFeedTool,
 } from './advanced-social-tools.js';
 
@@ -79,4 +78,4 @@ export { BatchFollowTool, BatchLikeTool, BatchRepostTool } from './batch-operati
 export { GetUserSummaryTool, GetPostContextTool } from './composite-tools.js';
 
 // Rich media
-export { AnalyzeImageTool, ExtractMediaFromPostTool } from './rich-media-tools.js';
+export { AnalyzeImageTool } from './rich-media-tools.js';

@@ -33,12 +33,6 @@ const GetListSchema = z.object({
     ),
 });
 
-const GetThreadSchema = z.object({
-  uri: z.string().min(1, 'Post URI is required'),
-  depth: z.number().min(1).max(10).default(6),
-  parentHeight: z.number().min(0).max(10).default(80),
-});
-
 const GetCustomFeedSchema = z.object({
   feedUri: z.string().min(1, 'Feed URI is required'),
   limit: z.number().min(1).max(100).default(50),
@@ -408,109 +402,6 @@ export class GetListTool extends BaseTool {
       };
     } catch (error) {
       this.logger.error('Failed to get list contents', error);
-      this.formatError(error);
-    }
-  }
-}
-
-export class GetThreadTool extends BaseTool {
-  public readonly schema = {
-    method: 'get_thread',
-    description:
-      'Get a complete thread/conversation starting from a specific post, including replies and parent posts.',
-    params: GetThreadSchema,
-  };
-
-  constructor(atpClient: AtpClient) {
-    // Fetching a public thread does not require authentication.
-    super(atpClient, 'GetThread', ToolAuthMode.ENHANCED);
-  }
-
-  protected async execute(params: { uri: string; depth?: number; parentHeight?: number }): Promise<{
-    success: boolean;
-    thread: {
-      post: {
-        uri: string;
-        cid: string;
-        author: {
-          did: string;
-          handle: string;
-          displayName?: string;
-          avatar?: string;
-        };
-        text: string;
-        createdAt: string;
-        replyCount: number;
-        repostCount: number;
-        likeCount: number;
-      };
-      parent?: any;
-      replies?: any[];
-    };
-  }> {
-    try {
-      this.logger.info('Getting thread', {
-        uri: params.uri,
-        depth: params.depth,
-        parentHeight: params.parentHeight,
-      });
-
-      this.validateAtUri(params.uri);
-
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.getPostThread({
-            uri: params.uri,
-            depth: params.depth || 6,
-            parentHeight: params.parentHeight || 80,
-          });
-        },
-        'getThread',
-        { uri: params.uri }
-      );
-
-      // Type-safe access to thread data
-      const thread = response.data.thread as any;
-      const hasParent = thread && 'parent' in thread && !!thread.parent;
-      const replyCount = thread && 'replies' in thread ? thread.replies?.length || 0 : 0;
-
-      this.logger.info('Thread retrieved successfully', {
-        uri: params.uri,
-        hasParent,
-        replyCount,
-      });
-
-      // Extract post data safely
-      const post = thread && 'post' in thread ? thread.post : null;
-      if (!post) {
-        throw new Error('Thread post data not found');
-      }
-
-      return {
-        success: true,
-        thread: {
-          post: {
-            uri: post.uri || '',
-            cid: post.cid || '',
-            author: {
-              did: post.author?.did || '',
-              handle: post.author?.handle || '',
-              displayName: post.author?.displayName,
-              avatar: post.author?.avatar,
-            },
-            text: post.record?.text || '',
-            createdAt: post.record?.createdAt || new Date().toISOString(),
-            replyCount: post.replyCount || 0,
-            repostCount: post.repostCount || 0,
-            likeCount: post.likeCount || 0,
-          },
-          parent: hasParent ? thread.parent : undefined,
-          replies: thread && 'replies' in thread ? thread.replies : [],
-        },
-      };
-    } catch (error) {
-      this.logger.error('Failed to get thread', error);
       this.formatError(error);
     }
   }
