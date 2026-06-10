@@ -201,6 +201,18 @@ describe('MCP Integration Tests', () => {
       // due to authentication mocking complexities in the test environment
       // search_posts was changed to PRIVATE in 2025 when AT Protocol API started requiring auth
     });
+
+    it('advertises an output schema for create_post', async () => {
+      const handler = mockHandlers.get('tools/list');
+      const result = await handler!();
+
+      // tools/list lists every tool regardless of auth state, so create_post is
+      // always present. Its declared outputSchema must be surfaced end-to-end.
+      const createPost = result.tools.find((tool: any) => tool.name === 'create_post');
+      expect(createPost).toBeDefined();
+      expect(createPost.outputSchema).toBeDefined();
+      expect(createPost.outputSchema.type).toBe('object');
+    });
   });
 
   describe('Resources Handler', () => {

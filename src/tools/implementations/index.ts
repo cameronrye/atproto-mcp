@@ -54,12 +54,7 @@ export {
 } from './advanced-social-tools.js';
 
 // Enhanced media support
-export {
-  UploadImageTool,
-  UploadVideoTool,
-  CreateRichTextPostTool,
-  GenerateLinkPreviewTool,
-} from './media-tools.js';
+export { UploadImageTool, UploadVideoTool, GenerateLinkPreviewTool } from './media-tools.js';
 
 // Analytics and insights
 export { AnalyzeEngagementTool } from './analyze-engagement-tool.js';

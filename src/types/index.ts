@@ -239,6 +239,19 @@ export interface ICreatePostParams {
       description: string;
     };
   };
+  // Optional caller-supplied richtext facets (byte-range annotations). When
+  // present, these are used verbatim (after validation + mention resolution)
+  // instead of auto-detecting facets from the text.
+  facets?: Array<{
+    index: { byteStart: number; byteEnd: number };
+    features: Array<{ type: 'mention' | 'link' | 'hashtag'; value: string }>;
+  }>;
+  // Optional quote (record) embed. Mutually exclusive with embed.images and
+  // embed.external.
+  quote?: {
+    uri: string;
+    cid: string;
+  };
   langs?: string[];
 }
 

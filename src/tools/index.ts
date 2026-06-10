@@ -19,7 +19,6 @@ import {
   BlockUserTool,
   CreateListTool,
   CreatePostTool,
-  CreateRichTextPostTool,
   CreateThreadTool,
   DeletePostTool,
   DiscoverCommunitiesTool,
@@ -145,7 +144,6 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     // Enhanced media support
     () => new UploadImageTool(atpClient),
     () => new UploadVideoTool(atpClient),
-    () => new CreateRichTextPostTool(atpClient),
     () => new GenerateLinkPreviewTool(atpClient),
 
     // Analytics and insights

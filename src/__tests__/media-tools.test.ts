@@ -3,7 +3,6 @@
  *
  * These lock the on-the-wire shapes produced by:
  * - UploadImageTool       (src/tools/implementations/media-tools.ts)
- * - CreateRichTextPostTool(src/tools/implementations/media-tools.ts)
  * - ExtractMediaFromPostTool (src/tools/implementations/rich-media-tools.ts)
  *
  * The path-based tools read real files under mediaBaseDir() (ATPROTO_MEDIA_DIR
@@ -17,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { CreateRichTextPostTool, UploadImageTool } from '../tools/implementations/media-tools.js';
+import { UploadImageTool } from '../tools/implementations/media-tools.js';
 import { ExtractMediaFromPostTool } from '../tools/implementations/rich-media-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
@@ -119,88 +118,6 @@ describe('UploadImageTool', () => {
 
     await expect(tool.handler({ filePath: 'doc.txt' })).rejects.toThrow(/Unsupported image format/);
     expect(uploadBlob).not.toHaveBeenCalled();
-  });
-});
-
-describe('CreateRichTextPostTool', () => {
-  beforeEach(() => vi.clearAllMocks());
-
-  it('posts the text and maps a link facet to the on-the-wire app.bsky.richtext.facet#link shape', async () => {
-    const post = vi.fn().mockResolvedValue({
-      uri: 'at://did:plc:self/app.bsky.feed.post/abc',
-      cid: 'cidpost',
-    });
-    const client = makeClient({ post });
-    const tool = new CreateRichTextPostTool(client);
-
-    const text = 'see https://example.com';
-    const result = await tool.handler({
-      text,
-      facets: [
-        {
-          index: { byteStart: 4, byteEnd: 23 },
-          features: [{ type: 'link', value: 'https://example.com' }],
-        },
-      ],
-    });
-
-    expect(post).toHaveBeenCalledTimes(1);
-    const record = post.mock.calls[0][0];
-    expect(record.text).toBe(text);
-    expect(typeof record.createdAt).toBe('string');
-    // The facets array is non-empty and the feature was mapped to the AT facet $type.
-    expect(Array.isArray(record.facets)).toBe(true);
-    expect(record.facets).toHaveLength(1);
-    expect(record.facets[0].features[0]).toEqual({
-      $type: 'app.bsky.richtext.facet#link',
-      uri: 'https://example.com',
-    });
-    expect(record.facets[0].index).toEqual({ byteStart: 4, byteEnd: 23 });
-
-    expect(result.success).toBe(true);
-    expect(result.post).toEqual(
-      expect.objectContaining({ uri: 'at://did:plc:self/app.bsky.feed.post/abc', cid: 'cidpost' })
-    );
-  });
-
-  it('posts plain text with no facets when none are supplied', async () => {
-    const post = vi.fn().mockResolvedValue({
-      uri: 'at://did:plc:self/app.bsky.feed.post/plain',
-      cid: 'cidplain',
-    });
-    const client = makeClient({ post });
-    const tool = new CreateRichTextPostTool(client);
-
-    await tool.handler({ text: 'just words' });
-
-    const record = post.mock.calls[0][0];
-    expect(record.text).toBe('just words');
-    // facets is only attached when facets were provided; bare text -> undefined.
-    expect(record.facets).toBeUndefined();
-    expect(record.embed).toBeUndefined();
-  });
-
-  it('builds an app.bsky.embed.record embed from a record reference', async () => {
-    const post = vi.fn().mockResolvedValue({
-      uri: 'at://did:plc:self/app.bsky.feed.post/q',
-      cid: 'cidq',
-    });
-    const client = makeClient({ post });
-    const tool = new CreateRichTextPostTool(client);
-
-    await tool.handler({
-      text: 'quoting this',
-      embed: {
-        type: 'record',
-        record: { uri: 'at://did:plc:other/app.bsky.feed.post/x', cid: 'cidx' },
-      },
-    });
-
-    const record = post.mock.calls[0][0];
-    expect(record.embed).toEqual({
-      $type: 'app.bsky.embed.record',
-      record: { uri: 'at://did:plc:other/app.bsky.feed.post/x', cid: 'cidx' },
-    });
   });
 });
 
