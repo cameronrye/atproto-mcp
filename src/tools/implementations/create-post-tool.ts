@@ -3,13 +3,7 @@
  */
 
 import { z } from 'zod';
-import {
-  BaseTool,
-  type BlobDescriptor,
-  BlobDescriptorSchema,
-  ToolAuthMode,
-  blobDescriptorToLex,
-} from './base-tool.js';
+import { BaseTool, BlobDescriptorSchema, ToolAuthMode, blobDescriptorToLex } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import {
   type ATURI,
@@ -81,10 +75,55 @@ const CreatePostSchema = z.object({
             'Optional thumbnail for the link card as a pre-uploaded blob descriptor: pass the `preview.thumb.blob` object from generate_link_preview (or the `image.blob` from upload_image) verbatim. Omit for a card without a thumbnail.'
           ),
         })
-        .describe('An external link card to attach. Mutually exclusive with `images` and `quote`.')
+        .describe(
+          'An external link card to attach. Mutually exclusive with `images`, `video`, and `quote`.'
+        )
+        .optional(),
+      video: z
+        .object({
+          video: BlobDescriptorSchema.describe(
+            'Pre-uploaded PROCESSED video blob descriptor: pass the `video.blob` object from a prior upload_video call verbatim. The video must already have been uploaded and processed by the video service — this tool does not accept raw video data.'
+          ),
+          captions: z
+            .array(
+              z.object({
+                lang: z
+                  .string()
+                  .min(2, 'Language code must be at least 2 characters')
+                  .describe(
+                    'BCP-47 language code for the caption track (e.g. "en", "fr", "pt-BR").'
+                  ),
+                file: BlobDescriptorSchema.describe(
+                  'Pre-uploaded WebVTT caption blob descriptor: pass a `video.captions[].file` object from upload_video verbatim.'
+                ),
+              })
+            )
+            .max(20, 'Cannot attach more than 20 caption tracks')
+            .optional()
+            .describe(
+              'Up to 20 caption tracks, each pairing a language code with a pre-uploaded .vtt caption blob descriptor.'
+            ),
+          alt: z
+            .string()
+            .max(1000, 'Alt text cannot exceed 1000 characters')
+            .optional()
+            .describe('Accessibility alt text describing the video (max 1000 characters).'),
+          aspectRatio: z
+            .object({
+              width: z.number().int().min(1).describe('Width component of the aspect ratio.'),
+              height: z.number().int().min(1).describe('Height component of the aspect ratio.'),
+            })
+            .optional()
+            .describe(
+              'Optional aspect ratio hint (e.g. {"width": 16, "height": 9}) clients use to reserve layout space before the video loads.'
+            ),
+        })
+        .describe(
+          'A video to attach (app.bsky.embed.video). Mutually exclusive with `images`, `external`, and `quote`.'
+        )
         .optional(),
     })
-    .describe('Optional media embed: images OR an external link card (at most one).')
+    .describe('Optional media embed: images OR an external link card OR a video (at most one).')
     .optional(),
   facets: z
     .array(
@@ -129,7 +168,7 @@ const CreatePostSchema = z.object({
       cid: z.string().min(1).describe('CID (content hash) of the quoted post.'),
     })
     .describe(
-      'Quote another post (record embed). Mutually exclusive with the `embed.images` and `embed.external` embeds.'
+      'Quote another post (record embed). Mutually exclusive with the `embed.images`, `embed.external`, and `embed.video` embeds.'
     )
     .optional(),
   langs: z
@@ -158,7 +197,7 @@ export class CreatePostTool extends BaseTool {
   public readonly schema = {
     method: 'create_post',
     description:
-      'Create a new post on AT Protocol (Bluesky). The single rich post-creation tool: supports plain text with auto-detected mentions/links/#hashtags, explicit richtext facets, replies, image embeds, an external link card, a quote (record) embed, and language tags. ' +
+      'Create a new post on AT Protocol (Bluesky). The single rich post-creation tool: supports plain text with auto-detected mentions/links/#hashtags, explicit richtext facets, replies, image embeds, a video embed (from upload_video), an external link card, a quote (record) embed, and language tags. ' +
       'Requires authentication (app password). SIDE EFFECT: publishes a public post visible to everyone. Subject to per-tool rate limiting. ' +
       'Use create_thread to publish a multi-post chain in one call, and reply_to_post to reply to an existing post; use this tool for a single standalone post (it can also reply via the `reply` field).',
     params: CreatePostSchema,
@@ -200,10 +239,15 @@ export class CreatePostTool extends BaseTool {
         langs: params.langs,
       });
 
-      // Validate reply parameters if provided
+      // Validate reply parameters if provided, pinning their collection: a
+      // reply's root/parent must be app.bsky.feed.post records — referencing
+      // any other record type (a like, a follow, …) produces a structurally
+      // invalid reply (mirrors reply_to_post).
       if (params.reply) {
         this.validateAtUri(params.reply.root);
         this.validateAtUri(params.reply.parent);
+        this.assertPostCollection('reply.root', params.reply.root);
+        this.assertPostCollection('reply.parent', params.reply.parent);
       }
 
       // Build the post record. Facet handling is a choice between two sources:
@@ -359,11 +403,27 @@ export class CreatePostTool extends BaseTool {
   }
 
   /**
+   * Reject a reply ref whose collection is not app.bsky.feed.post.
+   * Mirrors reply_to_post's validation.
+   */
+  private assertPostCollection(field: 'reply.root' | 'reply.parent', uri: string): void {
+    const { collection } = this.parseAtUri(uri);
+    if (collection !== 'app.bsky.feed.post') {
+      throw new ValidationError(
+        `${field} must reference a post record (collection "${collection}" is not app.bsky.feed.post)`,
+        field,
+        uri
+      );
+    }
+  }
+
+  /**
    * Process embed data for the post.
    *
-   * An AT Protocol post embed is a union: a post may carry images OR an external
-   * link OR a quote (record) embed — at most one. Combining any two previously
-   * produced a malformed record, so any combination is rejected here.
+   * An AT Protocol post embed is a union: a post may carry images OR an
+   * external link OR a video OR a quote (record) embed — at most one.
+   * Combining any two produces a malformed record, so any combination is
+   * rejected here.
    */
   private async processEmbed(
     embed: ICreatePostParams['embed'],
@@ -371,12 +431,13 @@ export class CreatePostTool extends BaseTool {
   ): Promise<any | undefined> {
     const hasImages = !!(embed?.images && embed.images.length > 0);
     const hasExternal = !!embed?.external;
+    const hasVideo = !!embed?.video;
     const hasQuote = !!quote;
 
-    const selected = [hasImages, hasExternal, hasQuote].filter(Boolean).length;
+    const selected = [hasImages, hasExternal, hasVideo, hasQuote].filter(Boolean).length;
     if (selected > 1) {
       throw new ValidationError(
-        'A post can include only one embed: images, an external link, or a quote (record) — not a combination. Provide only one.',
+        'A post can include only one embed: images, an external link, a video, or a quote (record) — not a combination. Provide only one.',
         'embed',
         { embed, quote }
       );
@@ -402,7 +463,7 @@ export class CreatePostTool extends BaseTool {
       // arrive through JSON MCP params, only the descriptor can).
       const images = embed.images.map(img => ({
         alt: img.alt,
-        image: blobDescriptorToLex(img.image as unknown as BlobDescriptor),
+        image: blobDescriptorToLex(img.image),
       }));
 
       return {
@@ -411,14 +472,39 @@ export class CreatePostTool extends BaseTool {
       };
     }
 
+    if (hasVideo && embed?.video) {
+      const video = embed.video;
+      this.logger.debug('Processing video embed', {
+        captionCount: video.captions?.length ?? 0,
+        hasAspectRatio: !!video.aspectRatio,
+      });
+
+      // The PROCESSED blob came back from upload_video (the app.bsky.video
+      // service transcoded it and stored it on the PDS) — reference it in
+      // lexicon form. Optional fields are only emitted when provided.
+      return {
+        $type: 'app.bsky.embed.video',
+        video: blobDescriptorToLex(video.video),
+        ...(video.alt ? { alt: video.alt } : {}),
+        ...(video.aspectRatio ? { aspectRatio: video.aspectRatio } : {}),
+        ...(video.captions && video.captions.length > 0
+          ? {
+              captions: video.captions.map(caption => ({
+                lang: caption.lang,
+                file: blobDescriptorToLex(caption.file),
+              })),
+            }
+          : {}),
+      };
+    }
+
     if (hasExternal && embed?.external) {
       this.logger.debug('Processing external link embed', { uri: embed.external.uri });
 
-      // The validated params carry an optional pre-uploaded thumb descriptor
-      // (generate_link_preview's preview.thumb.blob); ICreatePostParams predates
-      // the field, hence the cast. Without wiring it into the lexicon record the
-      // uploaded thumbnail blob would be orphaned.
-      const thumb = (embed.external as { thumb?: BlobDescriptor }).thumb;
+      // Wire the optional pre-uploaded thumb descriptor
+      // (generate_link_preview's preview.thumb.blob) into the lexicon record —
+      // otherwise the uploaded thumbnail blob would be orphaned.
+      const thumb = embed.external.thumb;
 
       return {
         $type: 'app.bsky.embed.external',

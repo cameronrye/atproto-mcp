@@ -228,6 +228,22 @@ export interface IAtpConfig {
 }
 
 // Tool parameter schemas
+
+/**
+ * Pre-uploaded blob descriptor as returned by upload_image / upload_video /
+ * generate_link_preview and accepted by media-attaching tools. Mirrors the
+ * runtime BlobDescriptorSchema in tools/implementations/base-tool.ts: `ref`
+ * is either the flat CID string those tools return or the lexicon
+ * { $link: <cid> } form found in existing records. MCP params arrive as JSON,
+ * so a binary Blob can never be transported — only this descriptor can.
+ */
+export interface IBlobDescriptor {
+  type?: 'blob';
+  ref: string | { $link: string };
+  mimeType: string;
+  size: number;
+}
+
 export interface ICreatePostParams {
   text: string;
   reply?: {
@@ -237,12 +253,27 @@ export interface ICreatePostParams {
   embed?: {
     images?: Array<{
       alt: string;
-      image: Blob;
+      image: IBlobDescriptor;
     }>;
     external?: {
       uri: string;
       title: string;
       description: string;
+      thumb?: IBlobDescriptor;
+    };
+    // A processed video embed (app.bsky.embed.video). Mutually exclusive with
+    // images, external, and quote.
+    video?: {
+      video: IBlobDescriptor;
+      captions?: Array<{
+        lang: string;
+        file: IBlobDescriptor;
+      }>;
+      alt?: string;
+      aspectRatio?: {
+        width: number;
+        height: number;
+      };
     };
   };
   // Optional caller-supplied richtext facets (byte-range annotations). When
@@ -315,18 +346,6 @@ export interface ISearchPostsParams {
 
 export interface IGetTimelineParams {
   algorithm?: string;
-  limit?: number;
-  cursor?: string;
-}
-
-export interface IGetFollowersParams {
-  actor: string;
-  limit?: number;
-  cursor?: string;
-}
-
-export interface IGetFollowsParams {
-  actor: string;
   limit?: number;
   cursor?: string;
 }

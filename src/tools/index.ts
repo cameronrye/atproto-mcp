@@ -63,9 +63,10 @@ export interface IMcpTool {
     params?: z.ZodSchema;
     annotations?: IToolAnnotations;
     // Optional JSON Schema describing the tool's result, advertised in tools/list.
-    // Purely descriptive: the server builds tools/call responses manually (it does
-    // not use the SDK's high-level registerTool), so this does NOT trigger any SDK
-    // structuredContent validation.
+    // Contract: an advertised outputSchema is BINDING — MCP clients (including the
+    // SDK's Client) validate each tools/call structuredContent against it, so the
+    // schema must accurately describe every shape the tool can return, and any
+    // change to a tool's return shape must update its outputSchema in lockstep.
     outputSchema?: Record<string, unknown>;
   };
   handler: (params: any) => Promise<any>;

@@ -13,7 +13,7 @@
  *   to return — the output contract makes cid optional instead of lying with ''.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreatePostTool } from '../tools/implementations/create-post-tool.js';
 import { LikePostTool } from '../tools/implementations/like-post-tool.js';
 import { RepostTool } from '../tools/implementations/repost-tool.js';
@@ -217,6 +217,73 @@ describe('create_post external embed thumbnail', () => {
 
     const record = post.mock.calls[0]![0];
     expect(record.embed.external).not.toHaveProperty('thumb');
+  });
+});
+
+describe('create_post reply collection pinning', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // Like reply_to_post, create_post's own reply field must reference
+  // app.bsky.feed.post records — any other collection (a like, a follow, …)
+  // produces a structurally invalid reply.
+  function replyClient() {
+    const post = vi.fn().mockResolvedValue({
+      uri: `at://${SELF}/app.bsky.feed.post/created`,
+      cid: 'bafycreated01',
+    });
+    const getRecord = vi.fn().mockResolvedValue({ data: { cid: 'bafyresolved01' } });
+    const client = makeClient({ post, com: { atproto: { repo: { getRecord } } } });
+    return { client, post, getRecord };
+  }
+
+  it('rejects a reply.root that is not an app.bsky.feed.post record', async () => {
+    const { client, post, getRecord } = replyClient();
+    const tool = new CreatePostTool(client);
+
+    await expect(
+      tool.handler({
+        text: 'a reply',
+        reply: {
+          root: 'at://did:plc:author/app.bsky.feed.like/abc',
+          parent: 'at://did:plc:author/app.bsky.feed.post/parentkey',
+        },
+      })
+    ).rejects.toThrow(/not app\.bsky\.feed\.post/);
+    expect(getRecord).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('rejects a reply.parent that is not an app.bsky.feed.post record', async () => {
+    const { client, post, getRecord } = replyClient();
+    const tool = new CreatePostTool(client);
+
+    await expect(
+      tool.handler({
+        text: 'a reply',
+        reply: {
+          root: 'at://did:plc:author/app.bsky.feed.post/rootkey',
+          parent: 'at://did:plc:author/app.bsky.graph.follow/abc',
+        },
+      })
+    ).rejects.toBeInstanceOf(ValidationError);
+    expect(getRecord).not.toHaveBeenCalled();
+    expect(post).not.toHaveBeenCalled();
+  });
+
+  it('accepts reply refs whose collection is app.bsky.feed.post', async () => {
+    const { client, post } = replyClient();
+    const tool = new CreatePostTool(client);
+
+    const result = await tool.handler({
+      text: 'a reply',
+      reply: {
+        root: 'at://did:plc:author/app.bsky.feed.post/rootkey',
+        parent: 'at://did:plc:author/app.bsky.feed.post/parentkey',
+      },
+    });
+
+    expect(result.success).toBe(true);
+    expect(post).toHaveBeenCalledTimes(1);
   });
 });
 

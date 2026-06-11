@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { BaseTool } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import { readFile } from 'fs/promises';
-import { extname } from 'path';
+import { basename, extname } from 'path';
 import { assertSafePath, safeFetch } from '../../utils/url-safety.js';
 
 /**
@@ -58,12 +58,75 @@ const UploadImageSchema = z.object({
     ),
 });
 
+/**
+ * The Bluesky video service. Raw video blobs are NOT playable on Bluesky: the
+ * app.bsky.video service transcodes the upload (to HLS) and stores the
+ * processed blob on the user's PDS, which is what app.bsky.embed.video
+ * records must reference. This is the same flow the official client uses.
+ */
+export const VIDEO_SERVICE_URL = 'https://video.bsky.app';
+export const VIDEO_SERVICE_DID = 'did:web:video.bsky.app';
+
+/**
+ * Maximum video size accepted by the video service, per the
+ * app.bsky.embed.video lexicon (`maxSize: 100000000` — "May be up to 100mb,
+ * formerly limited to 50mb").
+ */
+export const MAX_VIDEO_SIZE_BYTES = 100_000_000;
+
+/** Maximum caption (.vtt) blob size per the app.bsky.embed.video lexicon. */
+export const MAX_CAPTION_SIZE_BYTES = 20_000;
+
+/** Delay between app.bsky.video.getJobStatus polls. */
+export const VIDEO_JOB_POLL_INTERVAL_MS = 1_000;
+
+/** Upper bound on the total processing wait before giving up. */
+export const VIDEO_JOB_POLL_TIMEOUT_MS = 5 * 60_000;
+
+/**
+ * Lifetime of the service-auth token minted for the upload, matching the
+ * official client's 30 minutes (the token must outlive a slow upload).
+ */
+export const VIDEO_UPLOAD_TOKEN_LIFETIME_S = 30 * 60;
+
+/** app.bsky.video.defs#jobStatus as the video service returns it over JSON. */
+interface IVideoJobStatus {
+  jobId: string;
+  did?: string;
+  state: string;
+  progress?: number;
+  blob?: {
+    ref?: string | { $link?: string };
+    mimeType?: string;
+    size?: number;
+  };
+  error?: string;
+  message?: string;
+}
+
+/**
+ * Pull a job status out of a video-service response body. The lexicon wraps
+ * it as { jobStatus }, but the deployed service has returned the bare object
+ * in some paths (e.g. the 409 already_exists answer), so accept both.
+ */
+function videoJobFromBody(body: unknown): IVideoJobStatus | undefined {
+  const candidate = (body as { jobStatus?: unknown } | undefined)?.jobStatus ?? body;
+  if (
+    candidate &&
+    typeof candidate === 'object' &&
+    typeof (candidate as IVideoJobStatus).state === 'string'
+  ) {
+    return candidate as IVideoJobStatus;
+  }
+  return undefined;
+}
+
 const UploadVideoSchema = z.object({
   filePath: z
     .string()
     .min(1, 'File path is required')
     .describe(
-      'Absolute or relative path to the video file on disk. Must resolve within the allowed media directory (ATPROTO_MEDIA_DIR env var, defaults to cwd). Accepted extensions: .mp4, .mov, .webm. Maximum file size 50 MB.'
+      'Absolute or relative path to the video file on disk. Must resolve within the allowed media directory (ATPROTO_MEDIA_DIR env var, defaults to cwd). Accepted extensions: .mp4, .mov, .webm. Maximum file size 100 MB (the app.bsky.video service limit).'
     ),
   altText: z
     .string()
@@ -83,7 +146,7 @@ const UploadVideoSchema = z.object({
           .string()
           .min(1, 'Caption file path is required')
           .describe(
-            'Absolute or relative path to the WebVTT (.vtt) caption file for this language. Must resolve within the allowed media directory.'
+            'Absolute or relative path to the WebVTT (.vtt) caption file for this language. Must resolve within the allowed media directory. Caption files over 20 kB are not supported by the embed lexicon and are skipped.'
           ),
       })
     )
@@ -254,14 +317,14 @@ export class UploadVideoTool extends BaseTool {
   public readonly schema = {
     method: 'upload_video',
     description:
-      'Upload a video file to AT Protocol. Reads a local video file (MP4, MOV, or WebM; max 50 MB) and optionally attaches WebVTT caption tracks, then uploads the video and captions as AT Protocol blobs and returns blob references. NOTE: this server does not yet support video embeds, so the returned blob cannot currently be attached to a post via create_post or any other tool — use this only to stage video blobs for external tooling. Requires authentication (app password). Use upload_image instead for still images. Subject to per-tool rate limiting.',
+      'Upload a video to Bluesky through the app.bsky.video service (video.bsky.app), which transcodes it for playback and stores the processed blob on your PDS. Reads a local video file (MP4, MOV, or WebM; max 100 MB), checks your account video-upload quota, uploads with a service-auth token, polls processing until it completes, and returns the PROCESSED video blob descriptor — pass the returned `video.blob` object verbatim as `embed.video.video` in create_post, and any `video.captions[].file` descriptors as `embed.video.captions[].file`. WebVTT caption tracks are uploaded as ordinary PDS blobs; caption files the embed lexicon does not support (over 20 kB) are skipped. Requires authentication (app password). Use upload_image instead for still images. Subject to per-tool rate limiting and the video service daily quota.',
     params: UploadVideoSchema,
     outputSchema: {
       type: 'object',
       properties: {
         success: {
           type: 'boolean',
-          description: 'Whether the upload succeeded.',
+          description: 'Whether the upload and processing succeeded.',
         },
         message: {
           type: 'string',
@@ -270,24 +333,25 @@ export class UploadVideoTool extends BaseTool {
         video: {
           type: 'object',
           description:
-            'Uploaded video blob reference and metadata. Note: video embeds are not yet supported, so this blob cannot currently be attached to a post.',
+            'Processed video blob descriptor and metadata. Pass the `blob` object as create_post embed.video.video and each `captions[].file` as embed.video.captions[].file.',
           properties: {
             blob: {
               type: 'object',
-              description: 'AT Protocol blob descriptor for the video.',
+              description:
+                'AT Protocol blob descriptor for the PROCESSED video (transcoded by the video service and stored on the PDS).',
               properties: {
                 type: { type: 'string', description: 'Always "blob".' },
                 ref: {
                   type: 'string',
-                  description: 'CID reference string (bafkrei…) of the uploaded video blob.',
+                  description: 'CID reference string (bafkrei…) of the processed video blob.',
                 },
                 mimeType: {
                   type: 'string',
-                  description: 'MIME type of the uploaded video (e.g. "video/mp4").',
+                  description: 'MIME type of the processed video (typically "video/mp4").',
                 },
                 size: {
                   type: 'number',
-                  description: 'Size of the uploaded video blob in bytes.',
+                  description: 'Size of the processed video blob in bytes.',
                 },
               },
               required: ['type', 'ref', 'mimeType', 'size'],
@@ -296,10 +360,14 @@ export class UploadVideoTool extends BaseTool {
               type: 'string',
               description: 'Alt text for the video (empty string if none was provided).',
             },
+            jobId: {
+              type: 'string',
+              description: 'Video-service processing job id (useful for support/debugging).',
+            },
             captions: {
               type: 'array',
               description:
-                'Processed caption tracks. Each entry pairs a BCP-47 language code with the uploaded caption blob CID.',
+                'Uploaded caption tracks. Each entry pairs a BCP-47 language code with the caption blob descriptor for create_post embed.video.captions.',
               items: {
                 type: 'object',
                 properties: {
@@ -308,20 +376,43 @@ export class UploadVideoTool extends BaseTool {
                     description: 'BCP-47 language code for the caption track.',
                   },
                   file: {
-                    type: 'string',
-                    description: 'CID reference string of the uploaded caption blob.',
+                    type: 'object',
+                    description: 'AT Protocol blob descriptor for the uploaded .vtt caption blob.',
+                    properties: {
+                      type: { type: 'string', description: 'Always "blob".' },
+                      ref: {
+                        type: 'string',
+                        description: 'CID reference string of the caption blob.',
+                      },
+                      mimeType: {
+                        type: 'string',
+                        description: 'MIME type of the caption blob (always "text/vtt").',
+                      },
+                      size: {
+                        type: 'number',
+                        description: 'Size of the caption blob in bytes.',
+                      },
+                    },
+                    required: ['type', 'ref', 'mimeType', 'size'],
                   },
                 },
                 required: ['lang', 'file'],
               },
             },
           },
-          required: ['blob', 'alt'],
+          required: ['blob', 'alt', 'jobId'],
         },
       },
       required: ['success', 'message', 'video'],
     },
   };
+
+  /**
+   * Poll knobs as instance fields so tests can tighten them without real
+   * sleeps; production uses the exported constants.
+   */
+  protected jobPollIntervalMs = VIDEO_JOB_POLL_INTERVAL_MS;
+  protected jobPollTimeoutMs = VIDEO_JOB_POLL_TIMEOUT_MS;
 
   constructor(atpClient: AtpClient) {
     super(atpClient, 'UploadVideo');
@@ -342,21 +433,23 @@ export class UploadVideoTool extends BaseTool {
         size: number;
       };
       alt: string;
-      aspectRatio?: {
-        width: number;
-        height: number;
-      };
+      jobId: string;
       captions?: Array<{
         lang: string;
-        file: string;
+        file: {
+          type: string;
+          ref: string;
+          mimeType: string;
+          size: number;
+        };
       }>;
     };
   }> {
     try {
-      this.logger.info('Uploading video', {
+      this.logger.info('Uploading video via the app.bsky.video service', {
         filePath: params.filePath,
         hasAltText: !!params.altText,
-        captionCount: params.captions?.length || 0,
+        captionCount: params.captions?.length ?? 0,
       });
 
       // Read the video file (restricted to the allowed media directory)
@@ -376,69 +469,105 @@ export class UploadVideoTool extends BaseTool {
         throw new Error(`Unsupported video format: ${fileExtension}`);
       }
 
-      // Check file size (max 50MB for videos)
-      if (videoData.length > 50 * 1024 * 1024) {
-        throw new Error('Video file size cannot exceed 50MB');
+      // Enforce the video service's own size limit (app.bsky.embed.video
+      // lexicon maxSize) before doing any network work.
+      if (videoData.length > MAX_VIDEO_SIZE_BYTES) {
+        throw new Error('Video file size cannot exceed 100 MB (the app.bsky.video service limit)');
       }
 
-      const response = await this.executeAtpOperation(
-        async () => {
-          const agent = this.atpClient.getAgent();
-          return await agent.uploadBlob(videoData, {
-            encoding: mimeType,
-          });
+      const agent = this.atpClient.getAgent();
+      const did = agent.session?.did;
+      if (!did) {
+        throw new Error(
+          'Video upload requires an authenticated session: no DID is available to attribute the upload to.'
+        );
+      }
+
+      // Preflight: ask the video service whether this account may upload and
+      // whether enough daily quota remains, so a doomed multi-MB upload fails
+      // fast with a clear reason.
+      await this.assertUploadWithinLimits(videoData.length);
+
+      // The video service relays the processed blob to the user's own PDS, so
+      // the upload token is scoped to uploadBlob on the PDS (aud = the PDS
+      // did:web), exactly like the official client.
+      const uploadToken = await this.getVideoServiceToken(
+        {
+          aud: `did:web:${agent.dispatchUrl.host}`,
+          lxm: 'com.atproto.repo.uploadBlob',
+          exp: Math.floor(Date.now() / 1000) + VIDEO_UPLOAD_TOKEN_LIFETIME_S,
         },
-        'uploadVideo',
-        { filePath: params.filePath, size: videoData.length }
+        'getVideoUploadServiceAuth'
       );
 
-      // Upload captions if provided
-      let processedCaptions: Array<{ lang: string; file: string }> | undefined;
-      if (params.captions && params.captions.length > 0) {
-        processedCaptions = [];
-        for (const caption of params.captions) {
-          try {
-            const captionData = await readFile(assertSafePath(caption.file, mediaBaseDir()));
-            const captionResponse = await this.executeAtpOperation(
-              async () => {
-                const agent = this.atpClient.getAgent();
-                return await agent.uploadBlob(captionData, {
-                  encoding: 'text/vtt',
-                });
-              },
-              'uploadCaption',
-              { file: caption.file, lang: caption.lang }
-            );
+      const uploadResponse = await this.fetchVideoService('app.bsky.video.uploadVideo', {
+        method: 'POST',
+        token: uploadToken,
+        contentType: mimeType,
+        body: videoData,
+        query: { did, name: basename(safePath) },
+      });
 
-            processedCaptions.push({
-              lang: caption.lang,
-              file: captionResponse.data?.blob?.ref?.toString() ?? '',
-            });
-          } catch (captionError) {
-            this.logger.warn('Failed to upload caption', captionError as Error);
-          }
-        }
+      let job: IVideoJobStatus | undefined;
+      if (uploadResponse.ok) {
+        job = videoJobFromBody(uploadResponse.body);
+      } else if (
+        (uploadResponse.body as { error?: string } | undefined)?.error === 'already_exists'
+      ) {
+        // These exact bytes were uploaded before; the service answers 409 with
+        // the existing job, which is just as good — reuse it.
+        const body = uploadResponse.body as { jobId?: string };
+        job =
+          videoJobFromBody(uploadResponse.body) ??
+          (typeof body.jobId === 'string'
+            ? { jobId: body.jobId, state: 'JOB_STATE_CREATED' }
+            : undefined);
+      }
+      if (!job) {
+        const body = uploadResponse.body as { message?: string; error?: string } | undefined;
+        throw new Error(
+          `Video upload to ${VIDEO_SERVICE_URL} failed (HTTP ${uploadResponse.status}): ` +
+            `${body?.message ?? body?.error ?? 'unknown error'}`
+        );
       }
 
-      this.logger.info('Video uploaded successfully', {
+      // Poll until the transcode finishes; only the processed blob is playable.
+      const completed = await this.waitForVideoProcessing(job);
+      const processedBlob = completed.blob;
+      const ref =
+        typeof processedBlob?.ref === 'string'
+          ? processedBlob.ref
+          : (processedBlob?.ref?.$link ?? '');
+      if (!processedBlob || !ref) {
+        throw new Error(
+          `Video processing completed but the service returned no usable blob ref (job ${completed.jobId})`
+        );
+      }
+
+      // Upload captions if provided. Captions are ordinary PDS blobs — the
+      // video service only processes the video itself.
+      const processedCaptions = await this.uploadCaptions(params.captions);
+
+      this.logger.info('Video uploaded and processed successfully', {
         filePath: params.filePath,
-        blobRef: response.data.blob.ref.toString(),
-        size: response.data.blob.size,
-        captionCount: processedCaptions?.length || 0,
+        jobId: completed.jobId,
+        blobRef: ref,
+        size: processedBlob.size,
+        captionCount: processedCaptions?.length ?? 0,
       });
 
       return {
         success: true,
-        message: `Video uploaded successfully from ${params.filePath}`,
+        message: `Video uploaded and processed successfully from ${params.filePath}`,
         video: {
           blob: {
             type: 'blob',
-            // Stringify the multiformats CID to its `bafkrei...` form (see UploadImageTool).
-            ref: response.data?.blob?.ref?.toString() ?? '',
-            mimeType: response.data?.blob?.mimeType || mimeType,
-            size: response.data?.blob?.size || videoData.length,
+            ref,
+            mimeType: processedBlob.mimeType ?? 'video/mp4',
+            size: processedBlob.size ?? videoData.length,
           },
-          alt: params.altText || '',
+          alt: params.altText ?? '',
+          jobId: completed.jobId,
           // NOTE: aspect ratio is intentionally omitted — the video is not
           // decoded here, so reporting a fixed 16:9 ratio would be fabricated.
           captions: processedCaptions,
@@ -448,6 +577,209 @@ export class UploadVideoTool extends BaseTool {
       this.logger.error('Failed to upload video', error);
       this.formatError(error);
     }
+  }
+
+  /**
+   * Mint a service-auth token on the user's PDS for a video-service call.
+   * aud/lxm follow the official client convention: limits checks target the
+   * video service DID directly, while uploads target the user's own PDS with
+   * lxm com.atproto.repo.uploadBlob (the service writes the blob there).
+   */
+  private async getVideoServiceToken(
+    args: { aud: string; lxm: string; exp?: number },
+    operationName: string
+  ): Promise<string> {
+    const response = await this.executeAtpOperation(
+      async () => {
+        const agent = this.atpClient.getAgent();
+        return await agent.com.atproto.server.getServiceAuth(args);
+      },
+      operationName,
+      { aud: args.aud, lxm: args.lxm }
+    );
+    const token = response.data?.token;
+    if (!token) {
+      throw new Error('The PDS did not return a service-auth token for the video service');
+    }
+    return token;
+  }
+
+  /** Perform one JSON request against the video service. */
+  private async fetchVideoService(
+    nsid: string,
+    opts: {
+      method?: 'GET' | 'POST';
+      token?: string;
+      query?: Record<string, string>;
+      contentType?: string;
+      body?: Buffer;
+    } = {}
+  ): Promise<{ ok: boolean; status: number; body: unknown }> {
+    const url = new URL(`/xrpc/${nsid}`, VIDEO_SERVICE_URL);
+    for (const [key, value] of Object.entries(opts.query ?? {})) {
+      url.searchParams.set(key, value);
+    }
+    const headers: Record<string, string> = {};
+    if (opts.token) {
+      headers['Authorization'] = `Bearer ${opts.token}`;
+    }
+    if (opts.contentType) {
+      headers['Content-Type'] = opts.contentType;
+    }
+    const response = await fetch(url, {
+      method: opts.method ?? 'GET',
+      headers,
+      ...(opts.body ? { body: new Uint8Array(opts.body) } : {}),
+    });
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      // Non-JSON body (e.g. an HTML error page); callers handle undefined.
+    }
+    return { ok: response.ok, status: response.status, body };
+  }
+
+  /**
+   * Preflight app.bsky.video.getUploadLimits: fail fast with the service's
+   * reason when the account cannot upload, has no videos left today, or lacks
+   * the byte quota for this file.
+   */
+  private async assertUploadWithinLimits(videoSizeBytes: number): Promise<void> {
+    const token = await this.getVideoServiceToken(
+      { aud: VIDEO_SERVICE_DID, lxm: 'app.bsky.video.getUploadLimits' },
+      'getVideoUploadLimitsServiceAuth'
+    );
+    const { ok, status, body } = await this.fetchVideoService('app.bsky.video.getUploadLimits', {
+      token,
+    });
+    const limits = body as
+      | {
+          canUpload?: boolean;
+          remainingDailyVideos?: number;
+          remainingDailyBytes?: number;
+          message?: string;
+          error?: string;
+        }
+      | undefined;
+    if (!ok || !limits) {
+      throw new Error(`Failed to check video upload limits (HTTP ${status})`);
+    }
+    if (!limits.canUpload) {
+      throw new Error(
+        `This account cannot upload videos right now: ${limits.message ?? limits.error ?? 'the video service gave no reason'}`
+      );
+    }
+    if (typeof limits.remainingDailyVideos === 'number' && limits.remainingDailyVideos <= 0) {
+      throw new Error(
+        'Daily video upload limit reached: no videos remaining today. Try again tomorrow.'
+      );
+    }
+    if (
+      typeof limits.remainingDailyBytes === 'number' &&
+      limits.remainingDailyBytes < videoSizeBytes
+    ) {
+      throw new Error(
+        `Insufficient remaining daily video upload quota: the video is ${videoSizeBytes} bytes ` +
+          `but only ${limits.remainingDailyBytes} bytes remain today.`
+      );
+    }
+  }
+
+  /**
+   * Poll getJobStatus (bounded by jobPollTimeoutMs) until the processing job
+   * completes, fails, or times out. Returns the completed status (with blob).
+   */
+  private async waitForVideoProcessing(initial: IVideoJobStatus): Promise<IVideoJobStatus> {
+    const deadline = Date.now() + this.jobPollTimeoutMs;
+    let status = initial;
+    for (;;) {
+      if (status.state === 'JOB_STATE_COMPLETED') {
+        return status;
+      }
+      if (status.state === 'JOB_STATE_FAILED') {
+        throw new Error(
+          `Video processing failed (job ${status.jobId}): ` +
+            `${status.error ?? status.message ?? 'unknown error'}`
+        );
+      }
+      if (Date.now() >= deadline) {
+        throw new Error(
+          `Timed out after ${this.jobPollTimeoutMs}ms waiting for video processing ` +
+            `(job ${status.jobId}, last state ${status.state})`
+        );
+      }
+      await new Promise(resolve => setTimeout(resolve, this.jobPollIntervalMs));
+      const {
+        ok,
+        status: httpStatus,
+        body,
+      } = await this.fetchVideoService('app.bsky.video.getJobStatus', {
+        query: { jobId: initial.jobId },
+      });
+      const next = ok ? videoJobFromBody(body) : undefined;
+      if (!next) {
+        throw new Error(
+          `Failed to fetch video processing status (job ${initial.jobId}, HTTP ${httpStatus})`
+        );
+      }
+      status = next;
+    }
+  }
+
+  /**
+   * Upload caption tracks as ordinary text/vtt PDS blobs, returning full blob
+   * descriptors so create_post embed.video.captions can use them verbatim.
+   * Per-caption failures (missing file, over the 20 kB lexicon cap, upload
+   * errors) are tolerated: the caption is skipped with a warning.
+   */
+  private async uploadCaptions(
+    captions: Array<{ lang: string; file: string }> | undefined
+  ): Promise<
+    | Array<{ lang: string; file: { type: string; ref: string; mimeType: string; size: number } }>
+    | undefined
+  > {
+    if (!captions || captions.length === 0) {
+      return undefined;
+    }
+    const processed: Array<{
+      lang: string;
+      file: { type: string; ref: string; mimeType: string; size: number };
+    }> = [];
+    for (const caption of captions) {
+      try {
+        const captionData = await readFile(assertSafePath(caption.file, mediaBaseDir()));
+        if (captionData.length > MAX_CAPTION_SIZE_BYTES) {
+          throw new Error(
+            `Caption file exceeds the ${MAX_CAPTION_SIZE_BYTES}-byte app.bsky.embed.video lexicon limit`
+          );
+        }
+        const captionResponse = await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.uploadBlob(captionData, {
+              encoding: 'text/vtt',
+            });
+          },
+          'uploadCaption',
+          { file: caption.file, lang: caption.lang }
+        );
+
+        processed.push({
+          lang: caption.lang,
+          file: {
+            type: 'blob',
+            // Stringify the multiformats CID (see UploadImageTool).
+            ref: captionResponse.data?.blob?.ref?.toString() ?? '',
+            mimeType: captionResponse.data?.blob?.mimeType ?? 'text/vtt',
+            size: captionResponse.data?.blob?.size ?? captionData.length,
+          },
+        });
+      } catch (captionError) {
+        this.logger.warn('Failed to upload caption', captionError as Error);
+      }
+    }
+    return processed;
   }
 }
 

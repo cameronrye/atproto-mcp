@@ -1,13 +1,22 @@
 /**
- * Unit tests for UploadVideoTool (media-tools.ts).
+ * Unit tests for UploadVideoTool (media-tools.ts) — the app.bsky.video flow.
  *
- * These lock the upload contract: the MIME type is derived from the file
- * extension (.mp4/.mov/.webm only), the 50 MB size cap and the media-dir path
- * guard reject before any upload, the video buffer is uploaded with the
- * derived encoding, and caption tracks are uploaded as text/vtt blobs with
- * per-caption failures tolerated. Mirrors the real-file temp-dir pattern of
- * media-tools.test.ts (ATPROTO_MEDIA_DIR points at a temp dir so readFile and
- * assertSafePath behave genuinely).
+ * Real Bluesky video does NOT go through plain agent.uploadBlob (the PDS blob
+ * cap would reject most videos and the raw blob never becomes playable): the
+ * official flow is (1) preflight app.bsky.video.getUploadLimits with a
+ * service-auth token minted for did:web:video.bsky.app, (2) POST the bytes to
+ * https://video.bsky.app/xrpc/app.bsky.video.uploadVideo?did=<did>&name=<file>
+ * with a service-auth token minted for the user's own PDS
+ * (aud did:web:<pds host>, lxm com.atproto.repo.uploadBlob), then (3) poll
+ * app.bsky.video.getJobStatus until JOB_STATE_COMPLETED yields the processed
+ * blob. These tests lock that contract, the local guards (extension map,
+ * 100 MB service cap, media-dir path guard), the caption blob handling
+ * (text/vtt via agent.uploadBlob, 20 kB lexicon cap, per-caption tolerance),
+ * and the upload_image-shaped descriptor output that create_post embed.video
+ * consumes.
+ *
+ * Mirrors the real-file temp-dir pattern of media-tools.test.ts; the video
+ * service HTTP calls are stubbed via vi.stubGlobal('fetch', …).
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,6 +26,8 @@ import { join } from 'node:path';
 import { UploadVideoTool } from '../tools/implementations/media-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
+const SELF = 'did:plc:self';
+
 const wrap = async (op: () => unknown) => {
   try {
     return { success: true, data: await op() };
@@ -25,21 +36,106 @@ const wrap = async (op: () => unknown) => {
   }
 };
 
-function makeClient(agent: any, opts: { authenticated?: boolean } = {}): AtpClient {
+/** Lexicon form of the processed blob the video service hands back as JSON. */
+const LEX_VIDEO_BLOB = {
+  $type: 'blob',
+  ref: { $link: 'bafkreiprocessed' },
+  mimeType: 'video/mp4',
+  size: 999,
+};
+
+/** The descriptor shape upload_image returns — embed.video consumes the same. */
+const PROCESSED_DESCRIPTOR = {
+  type: 'blob',
+  ref: 'bafkreiprocessed',
+  mimeType: 'video/mp4',
+  size: 999,
+};
+
+function makeAgent(overrides: Record<string, unknown> = {}) {
+  const getServiceAuth = vi.fn().mockImplementation(async ({ lxm }: { lxm: string }) => ({
+    data: { token: lxm === 'app.bsky.video.getUploadLimits' ? 'limits-token' : 'upload-token' },
+  }));
+  const uploadBlob = vi.fn();
+  const agent = {
+    session: { did: SELF },
+    dispatchUrl: new URL('https://pds.example.com/'),
+    uploadBlob,
+    com: { atproto: { server: { getServiceAuth } } },
+    ...overrides,
+  };
+  return { agent, getServiceAuth, uploadBlob };
+}
+
+function makeClient(agent: unknown): AtpClient {
   return {
     getAgent: vi.fn().mockReturnValue(agent),
-    isAuthenticated: vi.fn().mockReturnValue(opts.authenticated ?? true),
+    isAuthenticated: vi.fn().mockReturnValue(true),
     hasCredentials: vi.fn().mockReturnValue(true),
     executeAuthenticatedRequest: vi.fn().mockImplementation(wrap),
     executePublicRequest: vi.fn().mockImplementation(wrap),
   } as unknown as AtpClient;
 }
 
-const blobResponse = (ref: string, mimeType: string, size: number) => ({
-  data: { blob: { ref: { toString: () => ref }, mimeType, size } },
+const jsonResponse = (body: unknown, status = 200) => ({
+  ok: status >= 200 && status < 300,
+  status,
+  json: async () => body,
 });
 
-describe('UploadVideoTool', () => {
+interface IRecordedCall {
+  url: URL;
+  init: { method?: string; headers?: Record<string, string>; body?: Uint8Array } | undefined;
+}
+
+/**
+ * Stub global fetch with a router for the three video-service endpoints.
+ * `jobStatus` is called with the 1-based poll attempt number.
+ */
+function stubVideoService(handlers: {
+  limits?: ReturnType<typeof jsonResponse>;
+  upload?: ReturnType<typeof jsonResponse>;
+  jobStatus?: (attempt: number) => ReturnType<typeof jsonResponse>;
+}) {
+  const calls: IRecordedCall[] = [];
+  let pollAttempts = 0;
+  const fetchMock = vi.fn().mockImplementation(async (input: unknown, init?: unknown) => {
+    const url = new URL(String(input));
+    calls.push({ url, init: init as IRecordedCall['init'] });
+    if (url.pathname.endsWith('app.bsky.video.getUploadLimits')) {
+      return (
+        handlers.limits ??
+        jsonResponse({
+          canUpload: true,
+          remainingDailyVideos: 10,
+          remainingDailyBytes: 10_000_000_000,
+        })
+      );
+    }
+    if (url.pathname.endsWith('app.bsky.video.uploadVideo')) {
+      if (!handlers.upload) throw new Error('Unexpected uploadVideo call');
+      return handlers.upload;
+    }
+    if (url.pathname.endsWith('app.bsky.video.getJobStatus')) {
+      if (!handlers.jobStatus) throw new Error('Unexpected getJobStatus call');
+      pollAttempts += 1;
+      return handlers.jobStatus(pollAttempts);
+    }
+    throw new Error(`Unexpected fetch: ${url.toString()}`);
+  });
+  vi.stubGlobal('fetch', fetchMock);
+  const callsTo = (nsid: string) => calls.filter(c => c.url.pathname.endsWith(nsid));
+  return { fetchMock, calls, callsTo };
+}
+
+/** Build the tool with poll knobs tightened so tests never sleep for real. */
+function makeTool(agent: unknown): UploadVideoTool {
+  const tool = new UploadVideoTool(makeClient(agent));
+  (tool as unknown as { jobPollIntervalMs: number }).jobPollIntervalMs = 0;
+  return tool;
+}
+
+describe('UploadVideoTool (app.bsky.video service flow)', () => {
   let baseDir: string;
 
   beforeEach(() => {
@@ -49,132 +145,346 @@ describe('UploadVideoTool', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllGlobals();
     delete process.env['ATPROTO_MEDIA_DIR'];
     rmSync(baseDir, { recursive: true, force: true });
   });
 
-  it('derives video/mp4 from a .mp4 extension and uploads the file buffer with that encoding', async () => {
+  it('runs the full flow: limits preflight, service-auth upload, polling, processed descriptor + jobId', async () => {
     writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('fake-mp4-bytes'));
-
-    const uploadBlob = vi.fn().mockResolvedValue(blobResponse('bafkreivid', 'video/mp4', 14));
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
+    const { agent, getServiceAuth, uploadBlob } = makeAgent();
+    const { callsTo } = stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_ENCODING' },
+      }),
+      jobStatus: attempt =>
+        attempt < 2
+          ? jsonResponse({
+              jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_ENCODING', progress: 50 },
+            })
+          : jsonResponse({
+              jobStatus: {
+                jobId: 'job1',
+                did: SELF,
+                state: 'JOB_STATE_COMPLETED',
+                blob: LEX_VIDEO_BLOB,
+              },
+            }),
+    });
+    const tool = makeTool(agent);
 
     const result = await tool.handler({ filePath: 'clip.mp4', altText: 'a clip' });
 
-    expect(uploadBlob).toHaveBeenCalledTimes(1);
-    const [blobArg, optsArg] = uploadBlob.mock.calls[0]!;
-    expect(Buffer.isBuffer(blobArg)).toBe(true);
-    expect(blobArg.toString()).toBe('fake-mp4-bytes');
-    expect(optsArg).toEqual({ encoding: 'video/mp4' });
-
-    expect(result.success).toBe(true);
-    expect(result.video.blob).toEqual({
-      type: 'blob',
-      ref: 'bafkreivid',
-      mimeType: 'video/mp4',
-      size: 14,
+    // Two service-auth tokens, each with the official aud/lxm convention.
+    expect(getServiceAuth).toHaveBeenCalledTimes(2);
+    expect(getServiceAuth.mock.calls[0]![0]).toEqual({
+      aud: 'did:web:video.bsky.app',
+      lxm: 'app.bsky.video.getUploadLimits',
     });
+    expect(getServiceAuth.mock.calls[1]![0]).toEqual({
+      aud: 'did:web:pds.example.com',
+      lxm: 'com.atproto.repo.uploadBlob',
+      exp: expect.any(Number),
+    });
+
+    // Limits preflight hits the video service with its token.
+    const [limitsCall] = callsTo('app.bsky.video.getUploadLimits');
+    expect(limitsCall!.url.origin).toBe('https://video.bsky.app');
+    expect(limitsCall!.init?.headers).toMatchObject({ Authorization: 'Bearer limits-token' });
+
+    // The upload POSTs the raw bytes to video.bsky.app with did+name params.
+    const [uploadCall] = callsTo('app.bsky.video.uploadVideo');
+    expect(uploadCall!.url.origin).toBe('https://video.bsky.app');
+    expect(uploadCall!.url.searchParams.get('did')).toBe(SELF);
+    expect(uploadCall!.url.searchParams.get('name')).toBe('clip.mp4');
+    expect(uploadCall!.init?.method).toBe('POST');
+    expect(uploadCall!.init?.headers).toMatchObject({
+      Authorization: 'Bearer upload-token',
+      'Content-Type': 'video/mp4',
+    });
+    expect(uploadCall!.init?.body).toBeInstanceOf(Uint8Array);
+    expect(Buffer.from(uploadCall!.init!.body!).toString()).toBe('fake-mp4-bytes');
+
+    // Polling used the returned jobId.
+    const polls = callsTo('app.bsky.video.getJobStatus');
+    expect(polls).toHaveLength(2);
+    expect(polls[0]!.url.searchParams.get('jobId')).toBe('job1');
+
+    // The PROCESSED blob (not the input bytes) comes back in the same
+    // descriptor shape upload_image returns, plus the jobId.
+    expect(result.success).toBe(true);
+    expect(result.video.blob).toEqual(PROCESSED_DESCRIPTOR);
+    expect(result.video.jobId).toBe('job1');
     expect(result.video.alt).toBe('a clip');
-    // No aspect ratio is fabricated (the video is never decoded).
-    expect(result.video).not.toHaveProperty('aspectRatio');
+    // The video must never be uploaded as a plain PDS blob.
+    expect(uploadBlob).not.toHaveBeenCalled();
   });
 
-  it('maps .mov to video/quicktime and .webm to video/webm', async () => {
+  it('skips polling when the upload response is already JOB_STATE_COMPLETED', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
+    const { agent } = makeAgent();
+    const { callsTo } = stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'job2', did: SELF, state: 'JOB_STATE_COMPLETED', blob: LEX_VIDEO_BLOB },
+      }),
+    });
+    const tool = makeTool(agent);
+
+    const result = await tool.handler({ filePath: 'clip.mp4' });
+
+    expect(callsTo('app.bsky.video.getJobStatus')).toHaveLength(0);
+    expect(result.video.blob).toEqual(PROCESSED_DESCRIPTOR);
+    expect(result.video.jobId).toBe('job2');
+  });
+
+  it('recovers when the service answers already_exists for previously-uploaded bytes', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
+    const { agent } = makeAgent();
+    stubVideoService({
+      // The video service returns HTTP 409 with the existing job's status.
+      upload: jsonResponse(
+        {
+          jobId: 'job9',
+          did: SELF,
+          state: 'JOB_STATE_COMPLETED',
+          blob: LEX_VIDEO_BLOB,
+          error: 'already_exists',
+          message: 'Video already processed',
+        },
+        409
+      ),
+    });
+    const tool = makeTool(agent);
+
+    const result = await tool.handler({ filePath: 'clip.mp4' });
+
+    expect(result.success).toBe(true);
+    expect(result.video.blob).toEqual(PROCESSED_DESCRIPTOR);
+    expect(result.video.jobId).toBe('job9');
+  });
+
+  it('fails the preflight clearly when the account cannot upload videos, without uploading', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
+    const { agent } = makeAgent();
+    const { callsTo } = stubVideoService({
+      limits: jsonResponse({ canUpload: false, message: 'account does not meet requirements' }),
+    });
+    const tool = makeTool(agent);
+
+    await expect(tool.handler({ filePath: 'clip.mp4' })).rejects.toThrow(
+      /account does not meet requirements/
+    );
+    expect(callsTo('app.bsky.video.uploadVideo')).toHaveLength(0);
+  });
+
+  it('fails the preflight when the remaining daily byte quota is smaller than the file', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('fourteen-bytes'));
+    const { agent } = makeAgent();
+    const { callsTo } = stubVideoService({
+      limits: jsonResponse({ canUpload: true, remainingDailyVideos: 5, remainingDailyBytes: 5 }),
+    });
+    const tool = makeTool(agent);
+
+    await expect(tool.handler({ filePath: 'clip.mp4' })).rejects.toThrow(/only 5 bytes remain/);
+    expect(callsTo('app.bsky.video.uploadVideo')).toHaveLength(0);
+  });
+
+  it('fails the preflight when no daily videos remain', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
+    const { agent } = makeAgent();
+    const { callsTo } = stubVideoService({
+      limits: jsonResponse({
+        canUpload: true,
+        remainingDailyVideos: 0,
+        remainingDailyBytes: 10_000,
+      }),
+    });
+    const tool = makeTool(agent);
+
+    await expect(tool.handler({ filePath: 'clip.mp4' })).rejects.toThrow(/no videos remaining/i);
+    expect(callsTo('app.bsky.video.uploadVideo')).toHaveLength(0);
+  });
+
+  it('fails with the job error when processing ends in JOB_STATE_FAILED', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
+    const { agent } = makeAgent();
+    stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_ENCODING' },
+      }),
+      jobStatus: () =>
+        jsonResponse({
+          jobStatus: {
+            jobId: 'job1',
+            did: SELF,
+            state: 'JOB_STATE_FAILED',
+            error: 'unsupported codec',
+          },
+        }),
+    });
+    const tool = makeTool(agent);
+
+    await expect(tool.handler({ filePath: 'clip.mp4' })).rejects.toThrow(/unsupported codec/);
+  });
+
+  it('times out with a clear error when the job never completes', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
+    const { agent } = makeAgent();
+    stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_ENCODING' },
+      }),
+      jobStatus: () =>
+        jsonResponse({ jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_ENCODING' } }),
+    });
+    const tool = makeTool(agent);
+    (tool as unknown as { jobPollTimeoutMs: number }).jobPollTimeoutMs = 0;
+
+    await expect(tool.handler({ filePath: 'clip.mp4' })).rejects.toThrow(/timed out/i);
+  });
+
+  it('requires an authenticated session DID before contacting the video service', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
+    const { agent } = makeAgent({ session: undefined });
+    const { fetchMock } = stubVideoService({});
+    const tool = makeTool(agent);
+
+    await expect(tool.handler({ filePath: 'clip.mp4' })).rejects.toThrow(/authenticated session/);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('derives the upload Content-Type from the extension (.mov and .webm)', async () => {
     writeFileSync(join(baseDir, 'clip.mov'), Buffer.from('mov'));
     writeFileSync(join(baseDir, 'clip.webm'), Buffer.from('webm'));
-
-    const uploadBlob = vi
-      .fn()
-      .mockResolvedValueOnce(blobResponse('bafkreimov', 'video/quicktime', 3))
-      .mockResolvedValueOnce(blobResponse('bafkreiwebm', 'video/webm', 4));
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
+    const { agent } = makeAgent();
+    const { callsTo } = stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'jobX', did: SELF, state: 'JOB_STATE_COMPLETED', blob: LEX_VIDEO_BLOB },
+      }),
+    });
+    const tool = makeTool(agent);
 
     await tool.handler({ filePath: 'clip.mov' });
     await tool.handler({ filePath: 'clip.webm' });
 
-    expect(uploadBlob.mock.calls[0]![1]).toEqual({ encoding: 'video/quicktime' });
-    expect(uploadBlob.mock.calls[1]![1]).toEqual({ encoding: 'video/webm' });
+    const uploads = callsTo('app.bsky.video.uploadVideo');
+    expect(uploads[0]!.init?.headers).toMatchObject({ 'Content-Type': 'video/quicktime' });
+    expect(uploads[1]!.init?.headers).toMatchObject({ 'Content-Type': 'video/webm' });
   });
 
-  it('defaults alt to an empty string when no altText is provided', async () => {
-    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('bytes'));
-    const uploadBlob = vi.fn().mockResolvedValue(blobResponse('bafkreivid', 'video/mp4', 5));
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
-
-    const result = await tool.handler({ filePath: 'clip.mp4' });
-
-    expect(result.video.alt).toBe('');
-  });
-
-  it('rejects an unsupported video extension without uploading', async () => {
+  it('rejects an unsupported video extension before any network call', async () => {
     writeFileSync(join(baseDir, 'clip.avi'), Buffer.from('avi-bytes'));
-    const uploadBlob = vi.fn();
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
+    const { agent, getServiceAuth } = makeAgent();
+    const { fetchMock } = stubVideoService({});
+    const tool = makeTool(agent);
 
     await expect(tool.handler({ filePath: 'clip.avi' })).rejects.toThrow(
       /Unsupported video format/
     );
-    expect(uploadBlob).not.toHaveBeenCalled();
+    expect(getServiceAuth).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('rejects a video larger than 50MB without uploading', async () => {
-    writeFileSync(join(baseDir, 'big.mp4'), Buffer.alloc(50 * 1024 * 1024 + 1));
-    const uploadBlob = vi.fn();
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
+  it('rejects a video larger than the 100 MB service limit before any network call', async () => {
+    writeFileSync(join(baseDir, 'big.mp4'), Buffer.alloc(100_000_001));
+    const { agent } = makeAgent();
+    const { fetchMock } = stubVideoService({});
+    const tool = makeTool(agent);
 
-    await expect(tool.handler({ filePath: 'big.mp4' })).rejects.toThrow(/cannot exceed 50MB/);
-    expect(uploadBlob).not.toHaveBeenCalled();
+    await expect(tool.handler({ filePath: 'big.mp4' })).rejects.toThrow(/cannot exceed 100 ?MB/);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('refuses a path that escapes the media base dir (path traversal) and never uploads', async () => {
-    const uploadBlob = vi.fn();
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
+    const { agent } = makeAgent();
+    const { fetchMock } = stubVideoService({});
+    const tool = makeTool(agent);
 
     await expect(tool.handler({ filePath: '../../etc/secret.mp4' })).rejects.toThrow(
       /outside the allowed directory/
     );
-    expect(uploadBlob).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('uploads caption tracks as text/vtt blobs and returns their CIDs paired with the language', async () => {
+  it('uploads caption tracks as text/vtt PDS blobs and returns full blob descriptors', async () => {
     writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('video-bytes'));
     writeFileSync(join(baseDir, 'subs.vtt'), Buffer.from('WEBVTT'));
-
-    const uploadBlob = vi
-      .fn()
-      .mockResolvedValueOnce(blobResponse('bafkreivid', 'video/mp4', 11))
-      .mockResolvedValueOnce(blobResponse('bafkreicap', 'text/vtt', 6));
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
+    const { agent, uploadBlob } = makeAgent();
+    uploadBlob.mockResolvedValue({
+      data: { blob: { ref: { toString: () => 'bafkreicap' }, mimeType: 'text/vtt', size: 6 } },
+    });
+    stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_COMPLETED', blob: LEX_VIDEO_BLOB },
+      }),
+    });
+    const tool = makeTool(agent);
 
     const result = await tool.handler({
       filePath: 'clip.mp4',
       captions: [{ lang: 'en', file: 'subs.vtt' }],
     });
 
-    expect(uploadBlob).toHaveBeenCalledTimes(2);
-    const [captionBuffer, captionOpts] = uploadBlob.mock.calls[1]!;
+    // Captions are ordinary PDS blobs (the video service only processes the video).
+    expect(uploadBlob).toHaveBeenCalledTimes(1);
+    const [captionBuffer, captionOpts] = uploadBlob.mock.calls[0]!;
     expect(captionBuffer.toString()).toBe('WEBVTT');
     expect(captionOpts).toEqual({ encoding: 'text/vtt' });
 
-    expect(result.success).toBe(true);
-    expect(result.video.captions).toEqual([{ lang: 'en', file: 'bafkreicap' }]);
+    // The caption entry carries a FULL descriptor so create_post embed.video
+    // captions can reference it without re-deriving mimeType/size.
+    expect(result.video.captions).toEqual([
+      { lang: 'en', file: { type: 'blob', ref: 'bafkreicap', mimeType: 'text/vtt', size: 6 } },
+    ]);
   });
 
   it('tolerates a failed caption upload: the video still succeeds with that caption skipped', async () => {
     writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('video-bytes'));
     // 'missing.vtt' is never written, so the caption readFile fails.
-
-    const uploadBlob = vi.fn().mockResolvedValue(blobResponse('bafkreivid', 'video/mp4', 11));
-    const tool = new UploadVideoTool(makeClient({ uploadBlob }));
+    const { agent, uploadBlob } = makeAgent();
+    stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_COMPLETED', blob: LEX_VIDEO_BLOB },
+      }),
+    });
+    const tool = makeTool(agent);
 
     const result = await tool.handler({
       filePath: 'clip.mp4',
       captions: [{ lang: 'en', file: 'missing.vtt' }],
     });
 
-    // Only the video blob was uploaded; the failed caption is skipped, not fatal.
-    expect(uploadBlob).toHaveBeenCalledTimes(1);
+    expect(uploadBlob).not.toHaveBeenCalled();
     expect(result.success).toBe(true);
     expect(result.video.captions).toEqual([]);
+  });
+
+  it('skips a caption larger than the 20 kB lexicon cap instead of uploading it', async () => {
+    writeFileSync(join(baseDir, 'clip.mp4'), Buffer.from('video-bytes'));
+    writeFileSync(join(baseDir, 'huge.vtt'), Buffer.alloc(20_001));
+    const { agent, uploadBlob } = makeAgent();
+    stubVideoService({
+      upload: jsonResponse({
+        jobStatus: { jobId: 'job1', did: SELF, state: 'JOB_STATE_COMPLETED', blob: LEX_VIDEO_BLOB },
+      }),
+    });
+    const tool = makeTool(agent);
+
+    const result = await tool.handler({
+      filePath: 'clip.mp4',
+      captions: [{ lang: 'en', file: 'huge.vtt' }],
+    });
+
+    expect(uploadBlob).not.toHaveBeenCalled();
+    expect(result.video.captions).toEqual([]);
+  });
+
+  it('describes its output as ready for create_post embed.video', () => {
+    const { agent } = makeAgent();
+    const tool = makeTool(agent);
+
+    expect(tool.schema.description).toMatch(/create_post/);
+    expect(tool.schema.description).toMatch(/embed\.video/);
+    expect(tool.schema.description).not.toMatch(/does not yet support video embeds/);
   });
 });
