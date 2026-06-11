@@ -78,13 +78,16 @@ These are the only flags the CLI accepts (defined in `src/cli.ts`):
 
 ```bash
 -p, --port <number>        Server port (reserved; stdio transport ignores it)
--h, --host <string>        Server host (reserved; stdio transport ignores it)
+-H, --host <string>        Server host (reserved; stdio transport ignores it)
 -s, --service <url>        AT Protocol service URL (default: https://bsky.social)
--a, --auth <method>        Authentication method: app-password|oauth
+-a, --auth <method>        Authentication method: app-password|oauth (optional)
 -l, --log-level <level>    Log level: debug|info|warn|error (default: info)
-    --help                 Show help message
+-h, --help                 Show this help message
 -v, --version              Show version information
 ```
+
+Note that `-h` is the short flag for `--help`; the short flag for `--host` is
+the capital `-H`.
 
 ### Examples
 

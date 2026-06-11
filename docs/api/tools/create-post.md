@@ -1,8 +1,9 @@
 # create_post
 
-Create a new post on AT Protocol with support for text, replies, images,
-external links, quote posts, richtext facets, and language tags. This is the
-single rich post-creation tool (it replaces the former `create_rich_text_post`):
+Create a new post on AT Protocol with support for text, replies, images, a
+video (from [upload_video](./upload-video.md)), external links, quote posts,
+richtext facets, and language tags. This is the single rich post-creation tool
+(it replaces the former `create_rich_text_post`):
 mentions, links, and #hashtags in the text are auto-detected into richtext facets
 unless you supply `facets` explicitly.
 
@@ -29,15 +30,19 @@ implemented).
 - **Type:** `object`
 - **Description:** Reply information if this post is a reply to another post
 - **Properties:**
-  - `root` (required): `string` - URI of the root post in the thread
-  - `parent` (required): `string` - URI of the immediate parent post
+  - `root` (required): `string` - AT-URI of the root post in the thread
+  - `parent` (required): `string` - AT-URI of the immediate parent post
+
+> Both `root` and `parent` must reference `app.bsky.feed.post` records. An
+> AT-URI naming any other record type (a like, a follow, …) is rejected with a
+> validation error, since it would produce a structurally invalid reply.
 
 ### `embed` (optional)
 
 - **Type:** `object`
-- **Description:** Optional media embed: images OR an external link card (at most
-  one). Mutually exclusive with `quote` — a post may carry images, an external
-  link, OR a quote (record), never a combination.
+- **Description:** Optional media embed: images OR an external link card OR a
+  video (at most one). Mutually exclusive with `quote` — a post may carry
+  images, an external link, a video, OR a quote (record), never a combination.
 - **Properties:**
   - `images` (optional): Array of image objects (max 4)
     - `alt` (required): `string` - Alt text for accessibility (max 1000
@@ -57,6 +62,26 @@ implemented).
       [generate_link_preview](./generate-link-preview.md) (or the `image.blob`
       from [upload_image](./upload-image.md)) verbatim. Omit for a card without
       a thumbnail.
+  - `video` (optional): A video embed (`app.bsky.embed.video`)
+    - `video` (required): `object` - Pre-uploaded **processed** video blob
+      descriptor: pass the `video.blob` object returned by
+      [upload_video](./upload-video.md) verbatim
+      (`{ type: 'blob', ref, mimeType, size }`; `ref` may be the flat CID
+      string or the lexicon `{ "$link": "<cid>" }` form). The video must
+      already have been uploaded and transcoded by the video service — this
+      tool does **not** accept raw video data.
+    - `captions` (optional): Array of caption tracks (max 20)
+      - `lang` (required): `string` - BCP-47 language code for the caption
+        track (at least 2 characters, e.g. `"en"`, `"fr"`, `"pt-BR"`)
+      - `file` (required): `object` - Pre-uploaded WebVTT caption blob
+        descriptor: pass a `video.captions[].file` object from
+        [upload_video](./upload-video.md) verbatim
+    - `alt` (optional): `string` - Alt text describing the video for
+      accessibility (max 1000 characters)
+    - `aspectRatio` (optional): `object` - Aspect ratio hint clients use to
+      reserve layout space before the video loads
+      - `width` (required): `number` - Width component (positive integer)
+      - `height` (required): `number` - Height component (positive integer)
 
 ### `facets` (optional)
 
@@ -82,7 +107,7 @@ implemented).
 
 - **Type:** `object`
 - **Description:** Quote another post (record embed). Mutually exclusive with
-  `embed.images` and `embed.external`.
+  `embed.images`, `embed.external`, and `embed.video`.
 - **Properties:**
   - `uri` (required): `string` - AT-URI of the post to quote
   - `cid` (required): `string` - CID (content hash) of the quoted post
@@ -178,6 +203,72 @@ returned `image.blob` object verbatim as `embed.images[].image`:
         }
       }
     ]
+  }
+}
+```
+
+### Post with Video
+
+Upload the video first with [upload_video](./upload-video.md) — it returns the
+**processed** blob descriptor once the video service finishes transcoding.
+Suppose it returned:
+
+```json
+{
+  "success": true,
+  "message": "Video uploaded and processed successfully from ./videos/tutorial.mp4",
+  "video": {
+    "blob": {
+      "type": "blob",
+      "ref": "bafkreivideo123...",
+      "mimeType": "video/mp4",
+      "size": 4853210
+    },
+    "alt": "Tutorial on using AT Protocol",
+    "jobId": "rmpdzv4uoctlginpv3oddi6w",
+    "captions": [
+      {
+        "lang": "en",
+        "file": {
+          "type": "blob",
+          "ref": "bafkreicaption789...",
+          "mimeType": "text/vtt",
+          "size": 1843
+        }
+      }
+    ]
+  }
+}
+```
+
+Then pass `video.blob` verbatim as `embed.video.video` and each
+`video.captions[]` entry verbatim under `embed.video.captions`:
+
+```json
+{
+  "text": "New tutorial is up! 🎬",
+  "embed": {
+    "video": {
+      "video": {
+        "type": "blob",
+        "ref": "bafkreivideo123...",
+        "mimeType": "video/mp4",
+        "size": 4853210
+      },
+      "alt": "Tutorial on using AT Protocol",
+      "aspectRatio": { "width": 16, "height": 9 },
+      "captions": [
+        {
+          "lang": "en",
+          "file": {
+            "type": "blob",
+            "ref": "bafkreicaption789...",
+            "mimeType": "text/vtt",
+            "size": 1843
+          }
+        }
+      ]
+    }
   }
 }
 ```
@@ -296,12 +387,12 @@ emoji-heavy posts are not falsely rejected:
 
 #### Multiple Embeds Combined
 
-A post can include only one embed: images, an external link, or a quote
-(record) — not a combination.
+A post can include only one embed: images, an external link, a video, or a
+quote (record) — not a combination.
 
 ```json
 {
-  "error": "A post can include only one embed: images, an external link, or a quote (record) — not a combination. Provide only one.",
+  "error": "A post can include only one embed: images, an external link, a video, or a quote (record) — not a combination. Provide only one.",
   "code": "VALIDATION_ERROR"
 }
 ```
@@ -347,6 +438,17 @@ derived from the response's `retry-after` header:
 - Always provide descriptive alt text for accessibility
 - Maximum 4 images per post (Bluesky platform limit)
 
+### Video
+
+- Upload the video first with `upload_video` (it waits for the video service to
+  finish transcoding), then pass the returned `video.blob` descriptor as
+  `embed.video.video`
+- Pass any `video.captions[].file` descriptors from `upload_video` verbatim as
+  `embed.video.captions[].file` (max 20 caption tracks)
+- Provide `alt` text, and an `aspectRatio` hint when you know the dimensions
+- One video per post; a video cannot be combined with images, an external link,
+  or a quote
+
 ### Replies
 
 - Always include both `root` and `parent` URIs when replying
@@ -384,6 +486,8 @@ derived from the response's `retry-after` header.
 - **[create_thread](./create-thread.md)** - Publish a multi-post chain in one
   call
 - **[upload_image](./upload-image.md)** - Upload images separately before
+  posting
+- **[upload_video](./upload-video.md)** - Upload and process a video before
   posting
 - **[generate_link_preview](./generate-link-preview.md)** - Generate link
   preview data

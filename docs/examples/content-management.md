@@ -61,18 +61,41 @@ hard requirements.
 "Update my profile avatar with this image"
 ```
 
-**Tool Call:** `update_profile`
+**Workflow:**
+
+**Step 1: Upload the Image**
+
+**Tool Call:** `upload_image`
 
 **Parameters (JSON):**
 
 ```json
 {
-  "avatar": "<blob reference or base64 encoded image data>"
+  "filePath": "./images/avatar.jpg",
+  "altText": "Profile avatar"
 }
 ```
 
-**Note:** Images are typically provided as blob references or base64-encoded
-data. The LLM receives image data from the user's client.
+**Step 2: Update the Profile**
+
+**Tool Call:** `update_profile` — pass the `image.blob` object returned by
+`upload_image` verbatim:
+
+**Parameters (JSON):**
+
+```json
+{
+  "avatar": {
+    "type": "blob",
+    "ref": "bafkreiavatar123...",
+    "mimeType": "image/jpeg",
+    "size": 145678
+  }
+}
+```
+
+**Note:** `avatar` and `banner` take a pre-uploaded blob descriptor (the
+`image.blob` from a prior `upload_image` call), not raw image data.
 
 ### Update Profile Banner
 
@@ -82,13 +105,20 @@ data. The LLM receives image data from the user's client.
 "Update my profile banner"
 ```
 
+**Workflow:** Upload the banner image with `upload_image` (as above), then:
+
 **Tool Call:** `update_profile`
 
 **Parameters (JSON):**
 
 ```json
 {
-  "banner": "<blob reference or base64 encoded image data>"
+  "banner": {
+    "type": "blob",
+    "ref": "bafkreibanner456...",
+    "mimeType": "image/jpeg",
+    "size": 398765
+  }
 }
 ```
 
@@ -100,6 +130,9 @@ data. The LLM receives image data from the user's client.
 "Update my entire profile with new name, bio, avatar, and banner"
 ```
 
+**Workflow:** Upload the avatar and banner images with `upload_image` first,
+then:
+
 **Tool Call:** `update_profile`
 
 **Parameters (JSON):**
@@ -108,8 +141,18 @@ data. The LLM receives image data from the user's client.
 {
   "displayName": "Alice Smith",
   "description": "Full-stack developer | Open source contributor | Coffee addict",
-  "avatar": "<blob reference>",
-  "banner": "<blob reference>"
+  "avatar": {
+    "type": "blob",
+    "ref": "bafkreiavatar123...",
+    "mimeType": "image/jpeg",
+    "size": 145678
+  },
+  "banner": {
+    "type": "blob",
+    "ref": "bafkreibanner456...",
+    "mimeType": "image/jpeg",
+    "size": 398765
+  }
 }
 ```
 
@@ -129,8 +172,8 @@ data. The LLM receives image data from the user's client.
 
 ```json
 {
-  "image": "<blob reference or base64 encoded image data>",
-  "alt": "A beautiful sunset over the ocean"
+  "filePath": "./photos/sunset.jpg",
+  "altText": "A beautiful sunset over the ocean"
 }
 ```
 
@@ -139,18 +182,24 @@ data. The LLM receives image data from the user's client.
 ```json
 {
   "success": true,
-  "blob": {
-    "ref": {
-      "$link": "bafkreiabc123..."
+  "message": "Image uploaded successfully from ./photos/sunset.jpg",
+  "image": {
+    "blob": {
+      "type": "blob",
+      "ref": "bafkreiabc123...",
+      "mimeType": "image/jpeg",
+      "size": 245678
     },
-    "mimeType": "image/jpeg",
-    "size": 245678
-  },
-  "alt": "A beautiful sunset over the ocean"
+    "alt": "A beautiful sunset over the ocean"
+  }
 }
 ```
 
-**Note:** The returned blob reference can be used in posts with images.
+**Note:** `upload_image` reads a local file (JPEG, PNG, GIF, WebP, or AVIF; max
+1 MB) whose path must resolve within the allowed media directory
+(`ATPROTO_MEDIA_DIR`, defaults to the working directory). Pass the returned
+`image.blob` object verbatim as `embed.images[].image` in `create_post`, or as
+`avatar`/`banner` in `update_profile`.
 
 ### Upload Multiple Images Workflow
 
@@ -166,8 +215,8 @@ data. The LLM receives image data from the user's client.
 
 ```json
 {
-  "image": "<blob reference 1>",
-  "alt": "Image 1"
+  "filePath": "./photos/photo1.jpg",
+  "altText": "Image 1"
 }
 ```
 
@@ -175,8 +224,8 @@ data. The LLM receives image data from the user's client.
 
 ```json
 {
-  "image": "<blob reference 2>",
-  "alt": "Image 2"
+  "filePath": "./photos/photo2.jpg",
+  "altText": "Image 2"
 }
 ```
 
@@ -184,12 +233,13 @@ data. The LLM receives image data from the user's client.
 
 ```json
 {
-  "image": "<blob reference 3>",
-  "alt": "Image 3"
+  "filePath": "./photos/photo3.jpg",
+  "altText": "Image 3"
 }
 ```
 
-**Result:** Collect all blob references to use in a post.
+**Result:** Collect the returned `image.blob` descriptors to use in a post (up
+to 4 per post).
 
 ### Upload Video
 
@@ -205,8 +255,8 @@ data. The LLM receives image data from the user's client.
 
 ```json
 {
-  "video": "<blob reference or base64 encoded video data>",
-  "alt": "Tutorial on using AT Protocol"
+  "filePath": "./videos/tutorial.mp4",
+  "altText": "Tutorial on using AT Protocol"
 }
 ```
 
@@ -215,15 +265,25 @@ data. The LLM receives image data from the user's client.
 ```json
 {
   "success": true,
-  "blob": {
-    "ref": {
-      "$link": "bafkreivideo123..."
+  "message": "Video uploaded and processed successfully from ./videos/tutorial.mp4",
+  "video": {
+    "blob": {
+      "type": "blob",
+      "ref": "bafkreivideo123...",
+      "mimeType": "video/mp4",
+      "size": 5242880
     },
-    "mimeType": "video/mp4",
-    "size": 5242880
+    "alt": "Tutorial on using AT Protocol",
+    "jobId": "rmpdzv4uoctlginpv3oddi6w"
   }
 }
 ```
+
+**Note:** `upload_video` reads a local file (MP4, MOV, or WebM; max 100 MB),
+checks your daily video-upload quota, uploads to the `app.bsky.video` service
+(`video.bsky.app`), and waits — up to 5 minutes — for transcoding to finish.
+The returned `video.blob` describes the **processed** video; pass it verbatim
+as `embed.video.video` in `create_post`.
 
 ### Upload Video with Captions
 
@@ -239,16 +299,90 @@ data. The LLM receives image data from the user's client.
 
 ```json
 {
-  "video": "<blob reference>",
-  "alt": "Conference talk with captions",
+  "filePath": "./videos/talk.mp4",
+  "altText": "Conference talk with captions",
   "captions": [
     {
       "lang": "en",
-      "file": "<blob reference to VTT file>"
+      "file": "./captions/en.vtt"
     }
   ]
 }
 ```
+
+**Response (JSON):**
+
+```json
+{
+  "success": true,
+  "message": "Video uploaded and processed successfully from ./videos/talk.mp4",
+  "video": {
+    "blob": {
+      "type": "blob",
+      "ref": "bafkreivideo456...",
+      "mimeType": "video/mp4",
+      "size": 9120004
+    },
+    "alt": "Conference talk with captions",
+    "jobId": "kwx5ej3tqxxv2hcyvbq7worf",
+    "captions": [
+      {
+        "lang": "en",
+        "file": {
+          "type": "blob",
+          "ref": "bafkreicaption789...",
+          "mimeType": "text/vtt",
+          "size": 1843
+        }
+      }
+    ]
+  }
+}
+```
+
+**Note:** Caption files are local WebVTT (`.vtt`) paths; each must be under
+20 kB (the embed lexicon limit) or it is skipped. The captions come back as
+`text/vtt` blob descriptors ready for `create_post`.
+
+### Post the Uploaded Video
+
+**Tool Call:** `create_post` — pass `video.blob` verbatim as
+`embed.video.video` and each `video.captions[]` entry verbatim under
+`embed.video.captions`:
+
+**Parameters (JSON):**
+
+```json
+{
+  "text": "My conference talk is online! 🎬",
+  "embed": {
+    "video": {
+      "video": {
+        "type": "blob",
+        "ref": "bafkreivideo456...",
+        "mimeType": "video/mp4",
+        "size": 9120004
+      },
+      "alt": "Conference talk with captions",
+      "aspectRatio": { "width": 16, "height": 9 },
+      "captions": [
+        {
+          "lang": "en",
+          "file": {
+            "type": "blob",
+            "ref": "bafkreicaption789...",
+            "mimeType": "text/vtt",
+            "size": 1843
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+**Note:** A post can carry only one embed — a video cannot be combined with
+images, an external link, or a quote.
 
 ## Rich Text Posts
 
@@ -473,19 +607,26 @@ mention.
 ```json
 {
   "success": true,
+  "message": "Link preview generated for https://example.com/article",
   "preview": {
     "uri": "https://example.com/article",
     "title": "Article Title",
     "description": "Article description text",
     "thumb": {
-      "ref": {
-        "$link": "bafkreithumb..."
-      },
-      "mimeType": "image/jpeg"
+      "blob": {
+        "type": "blob",
+        "ref": "bafkreithumb...",
+        "mimeType": "image/jpeg",
+        "size": 45678
+      }
     }
   }
 }
 ```
+
+**Note:** `preview.thumb` is only present when the page had a usable `og:image`.
+Pass the `preview.thumb.blob` object verbatim as `embed.external.thumb` in
+`create_post`.
 
 ### Post with Link Preview Workflow
 
@@ -522,14 +663,19 @@ mention.
       "title": "AT Protocol Overview",
       "description": "Learn about the AT Protocol architecture and features",
       "thumb": {
-        "ref": {
-          "$link": "bafkreithumb..."
-        }
+        "type": "blob",
+        "ref": "bafkreithumb...",
+        "mimeType": "image/jpeg",
+        "size": 45678
       }
     }
   }
 }
 ```
+
+**Note:** `thumb` is the full blob descriptor (`type`, `ref`, `mimeType`,
+`size`) returned as `preview.thumb.blob` in Step 1 — a bare `ref` is not
+enough.
 
 ## Post Management
 
@@ -845,17 +991,18 @@ and pacing the calls per the rate-limiting note at the top of this page.
 
 ```json
 // Batch 1
-{ "image": "<blob reference 1>", "alt": "Image 1" }
-{ "image": "<blob reference 2>", "alt": "Image 2" }
-{ "image": "<blob reference 3>", "alt": "Image 3" }
+{ "filePath": "./photos/img1.jpg", "altText": "Image 1" }
+{ "filePath": "./photos/img2.jpg", "altText": "Image 2" }
+{ "filePath": "./photos/img3.jpg", "altText": "Image 3" }
 
 // Batch 2
-{ "image": "<blob reference 4>", "alt": "Image 4" }
-{ "image": "<blob reference 5>", "alt": "Image 5" }
-{ "image": "<blob reference 6>", "alt": "Image 6" }
+{ "filePath": "./photos/img4.jpg", "altText": "Image 4" }
+{ "filePath": "./photos/img5.jpg", "altText": "Image 5" }
+{ "filePath": "./photos/img6.jpg", "altText": "Image 6" }
 ```
 
-Collect the returned blob references to attach to a post.
+Collect the returned `image.blob` descriptors to attach to posts (a single post
+carries at most 4 images).
 
 ### Batch Create Posts Workflow
 
@@ -878,14 +1025,17 @@ per the rate-limiting note at the top of this page.
 
 ### Image Optimization
 
-**Note:** LLMs cannot directly optimize images, and this server does not enforce
-its own image size or format caps. Any size/format limits come from the
-**Bluesky platform**, not from this tool. Image optimization should be done by
-the client application before providing the image to the LLM.
+**Note:** LLMs cannot directly optimize media files. `upload_image` enforces a
+**1 MB** cap and accepts only `.jpg`/`.jpeg`/`.png`/`.gif`/`.webp`/`.avif`
+files; `upload_video` enforces the video service's **100 MB** cap and accepts
+only `.mp4`/`.mov`/`.webm`. Both read local file paths that must resolve within
+the allowed media directory (`ATPROTO_MEDIA_DIR`, defaults to the working
+directory). Optimization should be done before the file is handed to these
+tools.
 
-When a user provides a very large image, the LLM can suggest resizing or
-compressing it (using a common web format such as JPEG, PNG, or WebP) to stay
-within the platform's upload limits before uploading.
+When a user provides an oversized file, the LLM can suggest resizing or
+compressing it (e.g. JPEG/WebP for images, H.264 MP4 for video) to fit within
+these limits before uploading.
 
 ### Error Recovery Workflow
 
@@ -899,8 +1049,8 @@ within the platform's upload limits before uploading.
 
 ```json
 {
-  "image": "<blob reference>",
-  "alt": "Photo description"
+  "filePath": "./photos/photo.jpg",
+  "altText": "Photo description"
 }
 ```
 
