@@ -9,6 +9,16 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Planned
+
+- OAuth token exchange (the `oauth-client` scaffolding is in place)
+- Direct messaging support (`chat.bsky.convo`)
+- Group/community features
+- Custom feed generator integration
+- Multi-account management
+
+## [0.5.0] - 2026-06-11
+
 This release is driven by a full end-to-end audit of the server. It fixes the
 broken `npx` launch path, makes image posting work for the first time over MCP,
 completes the video publishing pipeline through the `app.bsky.video` service,
