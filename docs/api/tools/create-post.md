@@ -119,6 +119,44 @@ implemented).
   `"pt-BR"`)
 - **Example:** `["en", "es"]`
 
+### `replyControls` (optional)
+
+- **Type:** `object`
+- **Description:** Who can reply to the post. After the post is created, an
+  `app.bsky.feed.threadgate` record is written **with the same rkey as the
+  post** (a lexicon requirement). Enabled options combine into up to 5 allow
+  rules. Providing the object with **no** rules enabled writes an empty allow
+  list, which means **nobody can reply**; omitting `replyControls` entirely
+  writes no record and leaves replies open to everyone.
+- **Properties:**
+  - `allowMentioned` (optional): `boolean` - Allow replies from accounts
+    @-mentioned in the post text (`mentionRule`)
+  - `allowFollowing` (optional): `boolean` - Allow replies from accounts you
+    follow (`followingRule`)
+  - `allowFollowers` (optional): `boolean` - Allow replies from accounts that
+    follow you (`followerRule`)
+  - `allowListUris` (optional): `string[]` - Allow replies from members of
+    these lists (`listRule`, max 5 rules total). Each entry must be the AT-URI
+    of an `app.bsky.graph.list` record
+    (`at://did/app.bsky.graph.list/rkey`); anything else is rejected with a
+    validation error **before** the post is created.
+
+### `quoteControls` (optional)
+
+- **Type:** `object`
+- **Description:** Quote (embed) policy for the post.
+- **Properties:**
+  - `allowQuotes` (required): `boolean` - Set `false` to disable quoting:
+    after the post is created, an `app.bsky.feed.postgate` record (same rkey
+    as the post) is written with a `disableRule`. `true` is the network
+    default — quoting stays enabled and **no** postgate record is written.
+
+> **Partial-failure contract:** the gate records are written *after* the post
+> exists. If a gate write fails at that point, the call still returns
+> `success: true` (the post is live) with `gateApplied: false` and a `warning`
+> explaining which gate failed and how to retry — it does **not** fail the
+> whole call.
+
 ## Response
 
 Returns an object with the following properties:
@@ -129,6 +167,11 @@ Returns an object with the following properties:
   cid: string; // Content identifier (CID) of the post
   success: boolean; // Whether the operation succeeded
   message: string; // Success message
+  gateApplied?: boolean; // Only when replyControls/quoteControls were given:
+  // true when every requested gate record was written; false when the post
+  // was created but a gate write failed (post is live without the controls)
+  warning?: string; // Only when gateApplied is false: which gate failed and
+  // how to retry
 }
 ```
 
@@ -325,6 +368,57 @@ card carries a thumbnail:
 }
 ```
 
+### Post with Reply and Quote Controls
+
+Only people the author follows or members of a list may reply, and quoting is
+disabled:
+
+```json
+{
+  "text": "Sharing this with a smaller circle.",
+  "replyControls": {
+    "allowFollowing": true,
+    "allowListUris": ["at://did:plc:abc123/app.bsky.graph.list/trusted"]
+  },
+  "quoteControls": { "allowQuotes": false }
+}
+```
+
+**Response:**
+
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "cid": "bafyreiabc123...",
+  "success": true,
+  "message": "Post created successfully",
+  "gateApplied": true
+}
+```
+
+To lock replies entirely (nobody can reply), pass `replyControls` with no
+rules enabled:
+
+```json
+{
+  "text": "Announcement only — replies are closed.",
+  "replyControls": {}
+}
+```
+
+If the post is created but a gate write then fails, the call still succeeds:
+
+```json
+{
+  "uri": "at://did:plc:abc123/app.bsky.feed.post/xyz789",
+  "cid": "bafyreiabc123...",
+  "success": true,
+  "message": "Post created successfully",
+  "gateApplied": false,
+  "warning": "Reply controls could not be applied (the app.bsky.feed.threadgate write failed: ...). The post itself was created and replies are currently OPEN; retry by writing a threadgate record with rkey \"xyz789\"."
+}
+```
+
 ### Post with Explicit Richtext Facets
 
 Link the text "AT Protocol" (bytes 11-22) to a URL instead of relying on
@@ -381,6 +475,19 @@ emoji-heavy posts are not falsely rejected:
 ```json
 {
   "error": "Invalid AT Protocol URI format",
+  "code": "VALIDATION_ERROR"
+}
+```
+
+#### Invalid Reply-Control List URI
+
+`replyControls.allowListUris` entries must reference `app.bsky.graph.list`
+records; this is validated **before** the post is created, so nothing is
+published:
+
+```json
+{
+  "error": "replyControls.allowListUris entries must be AT-URIs of app.bsky.graph.list records (at://did/app.bsky.graph.list/rkey); got \"at://did:plc:abc123/app.bsky.feed.post/xyz\".",
   "code": "VALIDATION_ERROR"
 }
 ```
@@ -466,6 +573,16 @@ derived from the response's `retry-after` header:
 - Provide accurate and descriptive titles
 - Write clear descriptions that summarize the linked content
 - Ensure URLs are valid and accessible
+
+### Reply and Quote Controls
+
+- The gate records are keyed by the post's own rkey — they only exist after
+  the post does, so always check `gateApplied` in the response when you supply
+  `replyControls` or `quoteControls`
+- `replyControls: {}` (no rules enabled) means **nobody can reply**; omit the
+  field to leave replies open
+- `quoteControls: { "allowQuotes": true }` is a no-op (the network default);
+  only `false` writes a postgate record
 
 ## Rate Limiting
 

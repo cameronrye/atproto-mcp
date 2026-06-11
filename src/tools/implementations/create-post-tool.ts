@@ -9,10 +9,125 @@ import {
   type ATURI,
   type CID,
   type ICreatePostParams,
+  type IQuoteControls,
+  type IReplyControls,
   ValidationError,
   validateATURI,
   validateCID,
 } from '../../types/index.js';
+
+/**
+ * A single app.bsky.feed.threadgate allow rule in lexicon form.
+ */
+export interface IThreadgateAllowRule {
+  $type: string;
+  list?: string;
+}
+
+/**
+ * Map the tool-level reply controls onto app.bsky.feed.threadgate allow rules.
+ * Pure and shared with create_thread. An empty result is meaningful: per the
+ * lexicon, `allow: []` means NOBODY can reply (whereas omitting the record
+ * entirely leaves replies open).
+ */
+export function buildThreadgateAllowRules(controls: IReplyControls): IThreadgateAllowRule[] {
+  const rules: IThreadgateAllowRule[] = [];
+  if (controls.allowMentioned) {
+    rules.push({ $type: 'app.bsky.feed.threadgate#mentionRule' });
+  }
+  if (controls.allowFollowing) {
+    rules.push({ $type: 'app.bsky.feed.threadgate#followingRule' });
+  }
+  if (controls.allowFollowers) {
+    rules.push({ $type: 'app.bsky.feed.threadgate#followerRule' });
+  }
+  for (const list of controls.allowListUris ?? []) {
+    rules.push({ $type: 'app.bsky.feed.threadgate#listRule', list });
+  }
+  return rules;
+}
+
+/**
+ * Build the full app.bsky.feed.threadgate record for a post. The caller must
+ * write it with the SAME rkey as the post (a lexicon requirement: the gate
+ * record's rkey must match the gated post's rkey, in the same repository).
+ */
+export function buildThreadgateRecord(
+  postUri: string,
+  controls: IReplyControls
+): Record<string, unknown> {
+  return {
+    $type: 'app.bsky.feed.threadgate',
+    post: postUri,
+    allow: buildThreadgateAllowRules(controls),
+    createdAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Validate reply controls BEFORE any post is published — these failures are
+ * fully predictable, and surfacing them after the post exists would leave a
+ * live post whose requested gate silently never applied.
+ *
+ * - every allowListUris entry must be the AT-URI of an app.bsky.graph.list
+ *   record (a threadgate listRule referencing any other collection is invalid);
+ * - the combined rule count must not exceed the lexicon's `allow` maxLength (5).
+ */
+export function validateReplyControls(controls: IReplyControls): void {
+  for (const uri of controls.allowListUris ?? []) {
+    const parts = uri.startsWith('at://') ? uri.slice('at://'.length).split('/') : [];
+    const [repo, collection, rkey] = parts;
+    if (parts.length < 3 || !repo || !rkey || collection !== 'app.bsky.graph.list') {
+      throw new ValidationError(
+        `replyControls.allowListUris entries must be AT-URIs of app.bsky.graph.list ` +
+          `records (at://did/app.bsky.graph.list/rkey); got "${uri}".`,
+        'replyControls.allowListUris',
+        uri
+      );
+    }
+  }
+  const ruleCount = buildThreadgateAllowRules(controls).length;
+  if (ruleCount > 5) {
+    throw new ValidationError(
+      `replyControls produce ${ruleCount} threadgate allow rules; the lexicon allows at most 5 ` +
+        `(each enabled option and each list URI counts as one rule).`,
+      'replyControls'
+    );
+  }
+}
+
+/**
+ * Zod schema for the replyControls parameter, shared with create_thread (which
+ * re-describes it as root-post-only).
+ */
+export const ReplyControlsSchema = z.object({
+  allowMentioned: z
+    .boolean()
+    .optional()
+    .describe('Allow replies from accounts @-mentioned in the post text (threadgate mentionRule).'),
+  allowFollowing: z
+    .boolean()
+    .optional()
+    .describe('Allow replies from accounts the author follows (threadgate followingRule).'),
+  allowFollowers: z
+    .boolean()
+    .optional()
+    .describe('Allow replies from accounts that follow the author (threadgate followerRule).'),
+  allowListUris: z
+    .array(
+      z
+        .string()
+        .min(1, 'List URI cannot be empty')
+        .describe('AT-URI of an app.bsky.graph.list record whose members may reply.')
+    )
+    .max(5, 'Cannot reference more than 5 lists (threadgate allows at most 5 rules)')
+    .optional()
+    .describe(
+      'Allow replies from members of these moderation/curation lists (threadgate listRule). ' +
+        'Each entry must be the AT-URI of an app.bsky.graph.list record ' +
+        '(at://did/app.bsky.graph.list/rkey); anything else is rejected before the post is created.'
+    ),
+});
 
 /**
  * Zod schema for create post parameters
@@ -184,6 +299,29 @@ const CreatePostSchema = z.object({
       'Optional BCP-47 language tags (e.g. en, en-US, pt-BR) declaring the languages of the post text.'
     )
     .optional(),
+  replyControls: ReplyControlsSchema.describe(
+    'Who can reply to this post. Writes an app.bsky.feed.threadgate record (same rkey as the post) ' +
+      'AFTER the post is created. Enabled options combine, up to 5 rules. Provide the object with NO ' +
+      'rules enabled to let nobody reply; omit it entirely to leave replies open to everyone. ' +
+      'If the gate write fails after the post succeeded, the call still succeeds with gateApplied:false ' +
+      'and a warning instead of failing.'
+  ).optional(),
+  quoteControls: z
+    .object({
+      allowQuotes: z
+        .boolean()
+        .describe(
+          'Set false to disable quoting/embedding of this post: writes an app.bsky.feed.postgate ' +
+            'record (same rkey as the post) with a disableRule. true is the network default — ' +
+            'quoting stays enabled and no postgate record is written.'
+        ),
+    })
+    .describe(
+      'Quote (embed) policy for this post. Only allowQuotes:false writes an app.bsky.feed.postgate ' +
+        'record, AFTER the post is created. If that write fails after the post succeeded, the call ' +
+        'still succeeds with gateApplied:false and a warning instead of failing.'
+    )
+    .optional(),
 });
 
 /**
@@ -197,7 +335,7 @@ export class CreatePostTool extends BaseTool {
   public readonly schema = {
     method: 'create_post',
     description:
-      'Create a new post on AT Protocol (Bluesky). The single rich post-creation tool: supports plain text with auto-detected mentions/links/#hashtags, explicit richtext facets, replies, image embeds, a video embed (from upload_video), an external link card, a quote (record) embed, and language tags. ' +
+      'Create a new post on AT Protocol (Bluesky). The single rich post-creation tool: supports plain text with auto-detected mentions/links/#hashtags, explicit richtext facets, replies, image embeds, a video embed (from upload_video), an external link card, a quote (record) embed, language tags, reply controls (who can reply, via a threadgate record), and quote controls (quote policy, via a postgate record). ' +
       'Requires authentication (app password). SIDE EFFECT: publishes a public post visible to everyone. Subject to per-tool rate limiting. ' +
       'Use create_thread to publish a multi-post chain in one call, and reply_to_post to reply to an existing post; use this tool for a single standalone post (it can also reply via the `reply` field).',
     params: CreatePostSchema,
@@ -214,6 +352,21 @@ export class CreatePostTool extends BaseTool {
           type: 'string',
           description: 'Human-readable status message.',
         },
+        gateApplied: {
+          type: 'boolean',
+          description:
+            'Present only when replyControls and/or quoteControls were requested. True when every ' +
+            'requested gate record (threadgate/postgate) is in effect. False when the post was ' +
+            'created but a gate write failed — the post is LIVE without the requested controls ' +
+            '(success stays true; see `warning` for which gate failed and how to retry).',
+        },
+        warning: {
+          type: 'string',
+          description:
+            'Present only when gateApplied is false: explains which gate record (threadgate ' +
+            'and/or postgate) could not be written and how to retry. The post itself was created ' +
+            'successfully.',
+        },
       },
       required: ['uri', 'cid', 'success', 'message'],
     },
@@ -228,6 +381,8 @@ export class CreatePostTool extends BaseTool {
     cid: CID;
     success: boolean;
     message: string;
+    gateApplied?: boolean;
+    warning?: string;
   }> {
     try {
       this.logger.info('Creating new post', {
@@ -237,7 +392,16 @@ export class CreatePostTool extends BaseTool {
         hasQuote: !!params.quote,
         hasExplicitFacets: !!params.facets?.length,
         langs: params.langs,
+        hasReplyControls: !!params.replyControls,
+        hasQuoteControls: !!params.quoteControls,
       });
+
+      // Validate reply controls BEFORE publishing anything: a bad list URI or
+      // too many rules is fully predictable, and failing after agent.post()
+      // would leave a live post whose requested gate never applied.
+      if (params.replyControls) {
+        validateReplyControls(params.replyControls);
+      }
 
       // Validate reply parameters if provided, pinning their collection: a
       // reply's root/parent must be app.bsky.feed.post records — referencing
@@ -321,16 +485,112 @@ export class CreatePostTool extends BaseTool {
       const uri = validateATURI(response.uri);
       const cid = validateCID(response.cid);
 
+      // Apply reply/quote gate records AFTER the post exists. The post is
+      // already live, so a gate failure must not fail the whole call — it is
+      // reported as gateApplied:false + warning instead.
+      const gateResult = await this.applyGates(uri, params.replyControls, params.quoteControls);
+
       return {
         uri,
         cid,
         success: true,
         message: 'Post created successfully',
+        ...(gateResult ?? {}),
       };
     } catch (error) {
       this.logger.error('Failed to create post', error);
       this.formatError(error);
     }
+  }
+
+  /**
+   * Write the requested threadgate (reply controls) and/or postgate (quote
+   * controls) records for a freshly created post. Both records are keyed by
+   * the POST's OWN rkey in the post's own repository — a lexicon requirement —
+   * so they are written via com.atproto.repo.putRecord (create-or-replace at a
+   * fixed rkey) rather than createRecord.
+   *
+   * The post is already live when this runs, so failures here must not throw:
+   * they are converted into gateApplied:false plus a warning describing how to
+   * retry. Returns undefined when no controls were requested at all (the
+   * result then carries no gateApplied/warning fields).
+   */
+  private async applyGates(
+    postUri: string,
+    replyControls?: IReplyControls,
+    quoteControls?: IQuoteControls
+  ): Promise<{ gateApplied: boolean; warning?: string } | undefined> {
+    if (!replyControls && !quoteControls) {
+      return undefined;
+    }
+
+    const { repo, rkey } = this.parseAtUri(postUri);
+    const warnings: string[] = [];
+
+    if (replyControls) {
+      try {
+        await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.com.atproto.repo.putRecord({
+              repo,
+              collection: 'app.bsky.feed.threadgate',
+              rkey,
+              record: buildThreadgateRecord(postUri, replyControls),
+            });
+          },
+          'applyThreadgate',
+          { postUri, rkey }
+        );
+        this.logger.info('Threadgate (reply controls) applied', { postUri, rkey });
+      } catch (error) {
+        this.logger.warn('Post created but threadgate write failed', error as Error);
+        warnings.push(
+          `Reply controls could not be applied (the app.bsky.feed.threadgate write failed: ` +
+            `${error instanceof Error ? error.message : 'unknown error'}). The post itself was ` +
+            `created and replies are currently OPEN; retry by writing a threadgate record with ` +
+            `rkey "${rkey}".`
+        );
+      }
+    }
+
+    // allowQuotes:true is the network default (no postgate record means anyone
+    // can embed, per the lexicon), so only allowQuotes:false writes a record.
+    if (quoteControls && !quoteControls.allowQuotes) {
+      try {
+        await this.executeAtpOperation(
+          async () => {
+            const agent = this.atpClient.getAgent();
+            return await agent.com.atproto.repo.putRecord({
+              repo,
+              collection: 'app.bsky.feed.postgate',
+              rkey,
+              record: {
+                $type: 'app.bsky.feed.postgate',
+                post: postUri,
+                embeddingRules: [{ $type: 'app.bsky.feed.postgate#disableRule' }],
+                createdAt: new Date().toISOString(),
+              },
+            });
+          },
+          'applyPostgate',
+          { postUri, rkey }
+        );
+        this.logger.info('Postgate (quote controls) applied', { postUri, rkey });
+      } catch (error) {
+        this.logger.warn('Post created but postgate write failed', error as Error);
+        warnings.push(
+          `Quote controls could not be applied (the app.bsky.feed.postgate write failed: ` +
+            `${error instanceof Error ? error.message : 'unknown error'}). The post itself was ` +
+            `created and quoting is currently ENABLED; retry by writing a postgate record with ` +
+            `rkey "${rkey}".`
+        );
+      }
+    }
+
+    return warnings.length === 0
+      ? { gateApplied: true }
+      : { gateApplied: false, warning: warnings.join(' ') };
   }
 
   // getCidFromUri is provided by BaseTool (shared by reply/batch tools).

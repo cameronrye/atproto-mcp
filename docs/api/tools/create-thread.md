@@ -10,10 +10,43 @@ exceeds the 300-character limit.
 
 ## Parameters
 
-| Parameter | Type                                      | Required | Default | Description                                                                                                                          |
-| --------- | ----------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `posts`   | `Array<{text: string, langs?: string[]}>` | Yes      | -       | Posts to create in the thread. **2 to 25** posts; each `text` is 1-300 characters. Each post can have optional BCP-47 language tags. |
-| `langs`   | `string[]`                                | No       | -       | Default BCP-47 language tags for all posts (e.g., `["en"]`, `["pt-BR"]`). Can be overridden per post.                                |
+| Parameter       | Type                                      | Required | Default | Description                                                                                                                          |
+| --------------- | ----------------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `posts`         | `Array<{text: string, langs?: string[]}>` | Yes      | -       | Posts to create in the thread. **2 to 25** posts; each `text` is 1-300 characters. Each post can have optional BCP-47 language tags. |
+| `langs`         | `string[]`                                | No       | -       | Default BCP-47 language tags for all posts (e.g., `["en"]`, `["pt-BR"]`). Can be overridden per post.                                |
+| `replyControls` | `object`                                  | No       | -       | Who can reply to the thread. Applies to the **root post only** — see [Reply Controls](#reply-controls) below.                       |
+
+### Reply Controls
+
+`replyControls` writes a single `app.bsky.feed.threadgate` record keyed by the
+**root post's rkey** (a lexicon requirement: the gate record's rkey must match
+the gated post's rkey). It accepts the same shape as
+[create_post](./create-post.md#replycontrols-optional):
+
+- `allowMentioned` (`boolean`): allow replies from accounts @-mentioned in the
+  root post (`mentionRule`)
+- `allowFollowing` (`boolean`): allow replies from accounts you follow
+  (`followingRule`)
+- `allowFollowers` (`boolean`): allow replies from accounts that follow you
+  (`followerRule`)
+- `allowListUris` (`string[]`): allow replies from members of these lists
+  (`listRule`). Each entry must be the AT-URI of an `app.bsky.graph.list`
+  record; invalid entries are rejected **before any post is published**.
+
+Enabled options combine into up to 5 allow rules. Passing `replyControls: {}`
+(no rules enabled) means **nobody can reply** to the thread; omitting it leaves
+replies open.
+
+The gate applies to the **root post only**, which gates the whole thread for
+other users. The replies *within* the thread are your own posts: the threadgate
+record is written **after** every post in the thread is published, so the
+thread's own reply chain is never subject to it.
+
+If the gate write fails after the posts were published, the call still returns
+`success: true` with `gateApplied: false` and a `warning` (the posts are live;
+only the gate is missing). If the thread *partially* fails, the gate is still
+applied to the live root post so the partial thread does not sit on the network
+ungated.
 
 ## Response
 
@@ -36,6 +69,11 @@ illustrative.
     cid: string;
   }
   totalPosts: number;
+  gateApplied?: boolean; // Only when replyControls were given: true when the
+  // root threadgate record was written; false when the posts were published
+  // but the gate write failed (replies are then open — see warning)
+  warning?: string; // Only when gateApplied is false: why the gate write
+  // failed and how to retry
 }
 ```
 
@@ -59,6 +97,28 @@ and references the root post, so `thread[0]` has `position: 1` and
   "langs": ["en"]
 }
 ```
+
+### Create Thread with Reply Controls
+
+Only mentioned accounts and accounts you follow may reply to the thread; the
+threadgate is written on the root post after all three posts are published:
+
+```json
+{
+  "posts": [
+    { "text": "Announcement thread for the beta cohort 🧵" },
+    { "text": "Invites go out on Friday. Check your DMs." },
+    { "text": "Questions? Reply here (mentioned folks and people I follow)." }
+  ],
+  "replyControls": {
+    "allowMentioned": true,
+    "allowFollowing": true
+  }
+}
+```
+
+The response then includes `"gateApplied": true` (or `"gateApplied": false`
+plus a `warning` if the posts were published but the gate write failed).
 
 ### Create Thread with Per-Post Languages
 
@@ -108,6 +168,12 @@ is created):
 - **Empty text**: A post has empty text (minimum 1 character)
 - **Text too long**: A post exceeds 300 characters
 - **Invalid language tag**: A `langs` entry is not a valid BCP-47 tag
+- **Invalid reply controls**: A `replyControls.allowListUris` entry is not an
+  `app.bsky.graph.list` AT-URI, or more than 5 allow rules are requested
+
+A threadgate write failure is **not** an error: the posts are already live, so
+the call returns `success: true` with `gateApplied: false` and a `warning`
+instead.
 
 Because posts are created one at a time, a failure partway through can leave the
 earlier posts already published.

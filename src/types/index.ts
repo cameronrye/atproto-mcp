@@ -244,6 +244,32 @@ export interface IBlobDescriptor {
   size: number;
 }
 
+/**
+ * Reply controls written as an app.bsky.feed.threadgate record after a post is
+ * created. Per the lexicon, the gate record's rkey must equal the gated post's
+ * rkey (and live in the same repository). Each enabled option contributes one
+ * allow rule (mentionRule / followingRule / followerRule / one listRule per
+ * list URI, max 5 rules total). Providing the object with NO rules enabled
+ * writes `allow: []`, which means nobody can reply; omitting the object writes
+ * no record, leaving replies open to everyone.
+ */
+export interface IReplyControls {
+  allowMentioned?: boolean;
+  allowFollowing?: boolean;
+  allowFollowers?: boolean;
+  // AT-URIs of app.bsky.graph.list records whose members may reply (validated).
+  allowListUris?: string[];
+}
+
+/**
+ * Quote (embed) policy written as an app.bsky.feed.postgate record (same rkey
+ * as the post). Only allowQuotes:false writes a record (embeddingRules with a
+ * disableRule); true is the network default, so no record is written.
+ */
+export interface IQuoteControls {
+  allowQuotes: boolean;
+}
+
 export interface ICreatePostParams {
   text: string;
   reply?: {
@@ -290,6 +316,12 @@ export interface ICreatePostParams {
     cid: string;
   };
   langs?: string[];
+  // Optional reply controls: writes an app.bsky.feed.threadgate record with
+  // the same rkey as the post after the post is created.
+  replyControls?: IReplyControls;
+  // Optional quote controls: writes an app.bsky.feed.postgate record with the
+  // same rkey as the post when allowQuotes is false.
+  quoteControls?: IQuoteControls;
 }
 
 export interface IReplyToPostParams {

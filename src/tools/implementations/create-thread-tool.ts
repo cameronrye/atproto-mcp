@@ -4,8 +4,13 @@
 
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
+import {
+  ReplyControlsSchema,
+  buildThreadgateRecord,
+  validateReplyControls,
+} from './create-post-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import { type ATURI, type CID, ValidationError } from '../../types/index.js';
+import { type ATURI, type CID, type IReplyControls, ValidationError } from '../../types/index.js';
 
 /**
  * Zod schema for create thread parameters
@@ -59,6 +64,14 @@ const CreateThreadSchema = z.object({
     .describe(
       'Default language tags (BCP-47) applied to every post in the thread. Individual posts can override this with their own langs field.'
     ),
+  replyControls: ReplyControlsSchema.describe(
+    'Who can reply to the thread. Applies to the ROOT post only: a single app.bsky.feed.threadgate ' +
+      'record is written with the root post’s rkey, AFTER every post in the thread is published ' +
+      '(the in-thread replies are your own posts, created before the gate exists, so they are ' +
+      'unaffected). Enabled options combine, up to 5 rules; provide the object with NO rules enabled ' +
+      'to let nobody reply; omit it to leave replies open. If the gate write fails after the posts ' +
+      'succeeded, the call still succeeds with gateApplied:false and a warning instead of failing.'
+  ).optional(),
 });
 
 /**
@@ -76,7 +89,7 @@ export class CreateThreadTool extends BaseTool {
   public readonly schema = {
     method: 'create_thread',
     description:
-      'Create a thread of 2–25 posts in a single operation, automatically chaining each post as a reply to the previous one so readers see them as a continuous conversation. Use this instead of repeated create_post calls when content spans multiple posts; use create_post for a single standalone post or reply_to_post to append to an existing thread. Requires authentication (app password). If publishing fails mid-thread, already-published posts are returned with a failedAtPosition indicator so you can delete or resume them. Subject to per-tool rate limiting.',
+      'Create a thread of 2–25 posts in a single operation, automatically chaining each post as a reply to the previous one so readers see them as a continuous conversation. Use this instead of repeated create_post calls when content spans multiple posts; use create_post for a single standalone post or reply_to_post to append to an existing thread. Optional replyControls gate who can reply (a threadgate record on the ROOT post, written after the whole thread is published). Requires authentication (app password). If publishing fails mid-thread, already-published posts are returned with a failedAtPosition indicator so you can delete or resume them. Subject to per-tool rate limiting.',
     params: CreateThreadSchema,
     outputSchema: {
       type: 'object',
@@ -146,6 +159,20 @@ export class CreateThreadTool extends BaseTool {
           description:
             '1-based position of the post that failed; present only when success is false.',
         },
+        gateApplied: {
+          type: 'boolean',
+          description:
+            'Present only when replyControls were provided. True when the threadgate record was ' +
+            'written on the root post (it is written after the whole thread is published, and is ' +
+            'still attempted on the live root if the thread partially fails). False when the posts ' +
+            'were published but the gate write failed — replies are then OPEN; see `warning`.',
+        },
+        warning: {
+          type: 'string',
+          description:
+            'Present only when gateApplied is false: explains that the threadgate write failed and ' +
+            'how to retry. The published posts themselves are unaffected.',
+        },
       },
       required: ['success', 'message', 'thread', 'rootPost', 'totalPosts'],
     },
@@ -158,6 +185,7 @@ export class CreateThreadTool extends BaseTool {
   protected async execute(params: {
     posts: Array<{ text: string; langs?: string[] }>;
     langs?: string[];
+    replyControls?: IReplyControls;
   }): Promise<{
     success: boolean;
     message: string;
@@ -174,6 +202,8 @@ export class CreateThreadTool extends BaseTool {
     };
     totalPosts: number;
     failedAtPosition?: number;
+    gateApplied?: boolean;
+    warning?: string;
   }> {
     const createdPosts: Array<{
       uri: ATURI;
@@ -190,7 +220,15 @@ export class CreateThreadTool extends BaseTool {
       this.logger.info('Creating thread', {
         postCount: params.posts.length,
         totalCharacters: params.posts.reduce((sum, p) => sum + p.text.length, 0),
+        hasReplyControls: !!params.replyControls,
       });
+
+      // Validate reply controls BEFORE publishing anything: a bad list URI or
+      // too many rules is fully predictable, and discovering it after posts
+      // exist would orphan a live, ungated thread.
+      if (params.replyControls) {
+        validateReplyControls(params.replyControls);
+      }
 
       // Validate EVERY post's text limits upfront, before creating any record.
       // A 300-grapheme/3000-byte violation is fully predictable, so letting post
@@ -310,15 +348,30 @@ export class CreateThreadTool extends BaseTool {
         rootCid,
       });
 
+      // The loop above ran at least twice (schema minimum of 2 posts) and the
+      // first iteration always sets the root refs, so this never fires; it
+      // narrows the types without non-null assertions.
+      if (!rootUri || !rootCid) {
+        throw new Error('Thread completed without a root post reference');
+      }
+
+      // Apply reply controls to the ROOT post only, AFTER the whole thread is
+      // published: the in-thread replies are the author's own posts and exist
+      // before the gate does, so the gate cannot interfere with them. The
+      // thread is already live, so a gate failure is reported as
+      // gateApplied:false + warning rather than failing the call.
+      const gateResult = await this.applyRootThreadgate(rootUri, params.replyControls);
+
       return {
         success: true,
         message: `Thread created successfully with ${createdPosts.length} posts`,
         thread: createdPosts,
         rootPost: {
-          uri: rootUri!,
-          cid: rootCid!,
+          uri: rootUri,
+          cid: rootCid,
         },
         totalPosts: createdPosts.length,
+        ...(gateResult ?? {}),
       };
     } catch (error) {
       // If some posts were already published, they are LIVE on the network. Return
@@ -330,6 +383,10 @@ export class CreateThreadTool extends BaseTool {
           createdCount: createdPosts.length,
           createdUris: createdPosts.map(p => p.uri),
         });
+        // The root post is live even though the thread is incomplete, so the
+        // requested reply controls are still applied to it — otherwise the
+        // partial thread would sit on the network ungated.
+        const gateResult = await this.applyRootThreadgate(rootUri, params.replyControls);
         return {
           success: false,
           message:
@@ -340,10 +397,57 @@ export class CreateThreadTool extends BaseTool {
           rootPost: { uri: rootUri, cid: rootCid },
           totalPosts: createdPosts.length,
           failedAtPosition: createdPosts.length + 1,
+          ...(gateResult ?? {}),
         };
       }
       this.logger.error('Failed to create thread', error);
       this.formatError(error);
+    }
+  }
+
+  /**
+   * Write the app.bsky.feed.threadgate record for the thread's root post. Per
+   * the lexicon, the gate record's rkey must equal the ROOT post's rkey (in the
+   * same repository), so it is written via com.atproto.repo.putRecord
+   * (create-or-replace at a fixed rkey). The thread is already live when this
+   * runs, so failures must not throw — they become gateApplied:false plus a
+   * warning. Returns undefined when no replyControls were requested.
+   */
+  private async applyRootThreadgate(
+    rootUri: ATURI,
+    replyControls?: IReplyControls
+  ): Promise<{ gateApplied: boolean; warning?: string } | undefined> {
+    if (!replyControls) {
+      return undefined;
+    }
+
+    const { repo, rkey } = this.parseAtUri(rootUri);
+    try {
+      await this.executeAtpOperation(
+        async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.com.atproto.repo.putRecord({
+            repo,
+            collection: 'app.bsky.feed.threadgate',
+            rkey,
+            record: buildThreadgateRecord(rootUri, replyControls),
+          });
+        },
+        'applyThreadgate',
+        { rootUri, rkey }
+      );
+      this.logger.info('Threadgate (reply controls) applied to thread root', { rootUri, rkey });
+      return { gateApplied: true };
+    } catch (error) {
+      this.logger.warn('Thread created but root threadgate write failed', error as Error);
+      return {
+        gateApplied: false,
+        warning:
+          `Reply controls could not be applied (the app.bsky.feed.threadgate write failed: ` +
+          `${error instanceof Error ? error.message : 'unknown error'}). The thread posts were ` +
+          `published and replies are currently OPEN; retry by writing a threadgate record with ` +
+          `rkey "${rkey}" on the root post.`,
+      };
     }
   }
 }
