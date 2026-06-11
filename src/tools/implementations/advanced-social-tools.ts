@@ -286,7 +286,8 @@ export class RemoveFromListTool extends BaseTool {
       properties: {
         success: {
           type: 'boolean',
-          description: 'Whether the user was removed (or was not in the list).',
+          description:
+            'Whether the user was removed. False when the user was not in the list, or when the list was too large to scan fully (see message).',
         },
         message: { type: 'string', description: 'Human-readable result message.' },
         removedFrom: {
@@ -360,6 +361,18 @@ export class RemoveFromListTool extends BaseTool {
       }
 
       if (!listItem) {
+        // A cursor left over after the page cap means the list was NOT fully
+        // scanned — report that distinctly instead of a false "not in list".
+        if (cursor) {
+          return {
+            success: false,
+            message: `List too large to scan: user ${params.actor} was not found within the first ${MAX_PAGES * 100} entries`,
+            removedFrom: {
+              listUri: params.listUri,
+              actor: params.actor,
+            },
+          };
+        }
         return {
           success: false,
           message: `User ${params.actor} is not in the specified list`,
