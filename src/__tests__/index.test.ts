@@ -176,6 +176,15 @@ describe('AtpMcpServer', () => {
 
       expect(mockAtpClient.cleanup).toHaveBeenCalled();
     });
+
+    it('propagates the original startup error even when cleanup also fails', async () => {
+      const server = new AtpMcpServer();
+      mockServer.connect.mockRejectedValue(new Error('Connection failed'));
+      mockAtpClient.cleanup.mockRejectedValue(new Error('Cleanup failed'));
+
+      // The cleanup failure must not mask the startup failure.
+      await expect(server.start()).rejects.toThrow('Server startup failed');
+    });
   });
 
   describe('stop', () => {
@@ -259,16 +268,30 @@ describe('AtpMcpServer', () => {
 
     // Note: 'initialize' and 'ping' are handled natively by the SDK Server/Protocol
     // and are no longer registered by our code (see tool-dispatch.test.ts for the
-    // real handshake). Our code registers exactly six handlers: tools/list,
-    // tools/call, resources/list, resources/read, prompts/list, prompts/get.
+    // real handshake). Our code registers exactly seven handlers: tools/list,
+    // tools/call, resources/list, resources/templates/list, resources/read,
+    // prompts/list, prompts/get.
 
     it('should register a single tools/call handler that routes by name', async () => {
       const server = new AtpMcpServer();
       void server;
 
       // Exactly one handler is registered per method (the dispatch bug was many
-      // tools/call handlers overwriting each other). Six handlers total.
-      expect(mockServer.setRequestHandler.mock.calls.length).toBe(6);
+      // tools/call handlers overwriting each other). Seven handlers total.
+      expect(mockServer.setRequestHandler.mock.calls.length).toBe(7);
+    });
+
+    it('should register resources/templates/list handler returning an empty list', async () => {
+      const server = new AtpMcpServer();
+      void server;
+
+      // Clients probe resources/templates/list because the resources capability
+      // is declared; an unhandled method surfaces as -32601 to them.
+      const templatesCall = findHandlerByMethod('resources/templates/list');
+      expect(templatesCall).toBeDefined();
+
+      const result = await templatesCall![1]({ method: 'resources/templates/list' });
+      expect(result).toEqual({ resourceTemplates: [] });
     });
 
     it('should register tools/list handler', async () => {

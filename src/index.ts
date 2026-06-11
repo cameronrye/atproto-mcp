@@ -10,7 +10,11 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
+import {
+  ErrorCode,
+  ListResourceTemplatesRequestSchema,
+  McpError,
+} from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ConfigurationError, type IMcpServerConfig, ValidationError } from './types/index.js';
@@ -24,59 +28,112 @@ import { type IPerformanceMetrics, PerformanceMonitor } from './utils/performanc
 import { type ISecurityConfig, SecurityManager } from './utils/security.js';
 
 /**
- * Pure read tools (no writes to the network). readOnlyHint:true lets clients
- * auto-approve them. Curated explicitly per tool — NOT derived from auth mode,
- * which encodes auth requirement, not destructiveness.
+ * MCP spec error code for "Resource not found" (resources/read with an unknown
+ * URI). Not part of the SDK's ErrorCode enum, which only covers the generic
+ * JSON-RPC codes.
  */
-const READ_ONLY_TOOLS = new Set<string>([
-  'analyze_account',
-  'analyze_image',
-  'analyze_moderation_status',
-  'discover',
-  'discover_communities',
-  'find_influential_users',
-  'find_similar_users',
-  'generate_link_preview',
-  'get_author_feed',
-  'get_custom_feed',
-  'get_list',
-  'get_notifications',
-  'get_post_context',
-  'get_timeline',
-  'get_user_connections',
-  'get_user_profile',
-  'get_user_summary',
-  'search_actors',
-  'search_posts',
-]);
+const RESOURCE_NOT_FOUND_ERROR_CODE = -32002;
 
 /**
- * Tools whose effect is irreversible or removes/limits data (deletes, blocks,
- * mutes, reports, removals, token revocation). destructiveHint:true lets clients
- * surface confirmation UI and withhold auto-approval.
+ * Explicit per-tool annotation hints, advertised verbatim in tools/list.
+ *
+ * Per MCP spec defaults, clients assume the worst case for any hint a server
+ * omits on a non-read-only tool (destructiveHint: true, idempotentHint:
+ * false), so every write tool carries both hints explicitly.
+ *
+ * - readOnlyHint: pure reads (no writes to the network). Curated explicitly
+ *   per tool — NOT derived from auth mode, which encodes auth requirement,
+ *   not destructiveness. destructive/idempotent hints are only meaningful for
+ *   write tools and are omitted on read-only entries.
+ * - destructiveHint: the tool may delete or overwrite existing data/state
+ *   (record deletes, list removals, profile overwrites, blocks, irreversible
+ *   moderation reports). Purely additive, reversible writes carry an explicit
+ *   false.
+ * - idempotentHint: repeating the call with identical arguments has no
+ *   additional effect. Claimed only where verified — an implementation-level
+ *   dedup/no-op path, or set/clear semantics of the underlying XRPC endpoint.
  */
-const DESTRUCTIVE_TOOLS = new Set<string>([
-  'block_user',
-  'delete_post',
-  'mute_user',
-  'remove_from_list',
-  'report_content',
-  'report_user',
-  'unfollow_user',
-  'unlike_post',
-  'unrepost',
-]);
+const TOOL_ANNOTATIONS: Readonly<Record<string, IToolAnnotations>> = {
+  // Pure read tools.
+  analyze_account: { readOnlyHint: true },
+  analyze_image: { readOnlyHint: true },
+  analyze_moderation_status: { readOnlyHint: true },
+  discover: { readOnlyHint: true },
+  discover_communities: { readOnlyHint: true },
+  find_influential_users: { readOnlyHint: true },
+  find_similar_users: { readOnlyHint: true },
+  generate_link_preview: { readOnlyHint: true },
+  get_author_feed: { readOnlyHint: true },
+  get_custom_feed: { readOnlyHint: true },
+  get_list: { readOnlyHint: true },
+  get_notifications: { readOnlyHint: true },
+  get_post_context: { readOnlyHint: true },
+  get_timeline: { readOnlyHint: true },
+  get_user_connections: { readOnlyHint: true },
+  get_user_profile: { readOnlyHint: true },
+  get_user_summary: { readOnlyHint: true },
+  search_actors: { readOnlyHint: true },
+  search_posts: { readOnlyHint: true },
+
+  // Additive, reversible writes. Idempotency notes name the verified
+  // dedup/no-op path in the implementation.
+  // add_to_list has no dedup: duplicate listitem records are possible.
+  add_to_list: { destructiveHint: false, idempotentHint: false },
+  // batch_action only supports follow/like/repost (no quote text), and every
+  // path dedups per target via authoritative viewer state.
+  batch_action: { destructiveHint: false, idempotentHint: true },
+  create_list: { destructiveHint: false, idempotentHint: false },
+  create_post: { destructiveHint: false, idempotentHint: false },
+  create_thread: { destructiveHint: false, idempotentHint: false },
+  // Dedups via viewer.following.
+  follow_user: { destructiveHint: false, idempotentHint: true },
+  // Dedups via viewer.like.
+  like_post: { destructiveHint: false, idempotentHint: true },
+  // seenAt defaults to "now", so repeated calls advance the seen marker.
+  mark_notifications_seen: { destructiveHint: false, idempotentHint: false },
+  // app.bsky.graph.muteActor sets server-side state; repeating it is a no-op.
+  mute_user: { destructiveHint: false, idempotentHint: true },
+  reply_to_post: { destructiveHint: false, idempotentHint: false },
+  // Plain reposts dedup via viewer.repost, but quote text creates a new post
+  // on every call, so the tool as a whole is not idempotent.
+  repost: { destructiveHint: false, idempotentHint: false },
+  upload_image: { destructiveHint: false, idempotentHint: false },
+  upload_video: { destructiveHint: false, idempotentHint: false },
+
+  // Destructive writes: may delete or overwrite data/state. These hints let
+  // clients surface confirmation UI and withhold auto-approval.
+  // Blocking imposes hard bidirectional restrictions and has no dedup
+  // (duplicate block records are possible).
+  block_user: { destructiveHint: true, idempotentHint: false },
+  delete_post: { destructiveHint: true, idempotentHint: false },
+  // "Not in list" resolves to an explicit success:false no-op.
+  remove_from_list: { destructiveHint: true, idempotentHint: true },
+  // Reports are irreversible moderation actions against third parties; each
+  // call files a new report.
+  report_content: { destructiveHint: true, idempotentHint: false },
+  report_user: { destructiveHint: true, idempotentHint: false },
+  // "Not blocked" resolves to an explicit success:false no-op.
+  unblock_user: { destructiveHint: true, idempotentHint: true },
+  unfollow_user: { destructiveHint: true, idempotentHint: false },
+  unlike_post: { destructiveHint: true, idempotentHint: false },
+  // app.bsky.graph.unmuteActor clears server-side state; repeating is a no-op.
+  unmute_user: { destructiveHint: true, idempotentHint: true },
+  unrepost: { destructiveHint: true, idempotentHint: false },
+  // Overwrites profile fields; the read-merge-write (CAS-guarded) converges
+  // to the same record for identical arguments.
+  update_profile: { destructiveHint: true, idempotentHint: true },
+};
 
 /**
  * Build the advertised annotations for a tool. openWorldHint is true for every
  * tool (they all reach a live network). A per-tool `schema.annotations` override
- * wins over these defaults.
+ * wins over these defaults. Tools missing from TOOL_ANNOTATIONS fall back to
+ * the MCP client-side worst-case defaults (destructive, non-idempotent).
  */
 function computeToolAnnotations(method: string, override?: IToolAnnotations): IToolAnnotations {
   return {
     openWorldHint: true,
-    ...(READ_ONLY_TOOLS.has(method) ? { readOnlyHint: true } : {}),
-    ...(DESTRUCTIVE_TOOLS.has(method) ? { destructiveHint: true } : {}),
+    ...(TOOL_ANNOTATIONS[method] ?? {}),
     ...(override ?? {}),
   };
 }
@@ -201,10 +258,12 @@ export class AtpMcpServer {
           inputSchema: tool.schema.params
             ? this.zodToJsonSchema(tool.schema.params)
             : { type: 'object', properties: {} },
-          // Advertise an output schema when the tool declares one. This is purely
-          // descriptive metadata in the tools/list payload; because tools/call
-          // responses are built by this custom handler (not the SDK's high-level
-          // registerTool), it does not trigger structuredContent validation.
+          // Advertise the tool's declared output schema. This is a binding
+          // contract, not decoration: spec-compliant clients (including the
+          // official SDK's Client.callTool) validate every tools/call
+          // structuredContent against this schema and hard-fail on mismatch,
+          // so each outputSchema literal must track its tool's actual return
+          // shape (see the structuredContent note in the tools/call handler).
           ...(tool.schema.outputSchema ? { outputSchema: tool.schema.outputSchema } : {}),
           annotations: computeToolAnnotations(tool.schema.method, tool.schema.annotations),
         })),
@@ -294,10 +353,13 @@ export class AtpMcpServer {
           //   to re-parse the pretty-printed string. SDK structuredContent must be a
           //   JSON object, so bare arrays/primitives are wrapped under `result`.
           //
-          // NOTE: we intentionally do NOT declare per-tool `outputSchema` — doing so
-          // makes the SDK REQUIRE and validate structuredContent on every call and
-          // throw on any non-conforming object. structuredContent here is additive
-          // and best-effort.
+          // NOTE: per-tool `outputSchema` IS advertised in tools/list (see
+          // registerTools above), and SDK clients validate structuredContent
+          // against it, failing the call on any drift. structuredContent is
+          // therefore a contract, not best-effort: tools that declare an
+          // outputSchema must return a conforming object. (Server-side, this
+          // custom handler performs no validation of its own — the SDK only
+          // auto-validates when tools are registered via registerTool.)
           const structuredContent =
             result != null && typeof result === 'object' && !Array.isArray(result)
               ? (result as Record<string, unknown>)
@@ -366,6 +428,14 @@ export class AtpMcpServer {
       })),
     }));
 
+    // Register resources/templates/list handler. The declared resources
+    // capability invites clients to probe this method; without a handler the
+    // SDK answers -32601 Method not found. No URI templates are offered (all
+    // resources have fixed URIs), so the list is empty.
+    this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+      resourceTemplates: [],
+    }));
+
     // Register resources/read handler
     this.server.setRequestHandler(
       z.object({
@@ -379,8 +449,10 @@ export class AtpMcpServer {
           const resource = resources.find(r => r.uri === request.params.uri);
 
           if (!resource) {
+            // The MCP spec reserves -32002 for "Resource not found"; the SDK's
+            // ErrorCode enum does not (yet) name it, so use the literal.
             throw new McpError(
-              ErrorCode.InvalidParams,
+              RESOURCE_NOT_FOUND_ERROR_CODE,
               `Resource not found: ${request.params.uri}`,
               {
                 uri: request.params.uri,
@@ -399,13 +471,22 @@ export class AtpMcpServer {
           }
 
           const content = await resource.read();
+          // Per the MCP resource content schema, each item is either text
+          // contents or base64 blob contents. Binary payloads must be passed
+          // through as a blob, not coerced to empty text.
           return {
             contents: [
-              {
-                uri: content.uri,
-                mimeType: content.mimeType,
-                text: content.text ?? '',
-              },
+              content.blob
+                ? {
+                    uri: content.uri,
+                    mimeType: content.mimeType,
+                    blob: Buffer.from(content.blob).toString('base64'),
+                  }
+                : {
+                    uri: content.uri,
+                    mimeType: content.mimeType,
+                    text: content.text ?? '',
+                  },
             ],
           };
         } catch (error) {
@@ -455,16 +536,10 @@ export class AtpMcpServer {
             );
           }
 
-          // Check if prompt is available
-          const isAvailable = prompt.isAvailable();
-          if (!isAvailable) {
-            throw new McpError(
-              ErrorCode.InternalError,
-              `Prompt not available: ${request.params.name}`,
-              { name: request.params.name }
-            );
-          }
-
+          // No availability/auth gate here: prompts are pure text templates
+          // that never touch the AT Protocol client. Required arguments are
+          // enforced inside prompt.get(), which throws an InvalidParams
+          // McpError that toHandlerMcpError passes through verbatim.
           const messages = await prompt.get(request.params.arguments ?? {});
           return { messages };
         } catch (error) {
@@ -560,8 +635,13 @@ export class AtpMcpServer {
     } catch (error) {
       this.logger.error('Failed to start AT Protocol MCP Server', error);
 
-      // Cleanup on failure
-      await this.cleanup();
+      // Cleanup on failure — but never let a failing cleanup mask the
+      // original startup error, which is the one the caller must see.
+      try {
+        await this.cleanup();
+      } catch (cleanupError) {
+        this.logger.error('Cleanup after failed startup also failed', cleanupError);
+      }
 
       if (error instanceof ConfigurationError) {
         throw error;

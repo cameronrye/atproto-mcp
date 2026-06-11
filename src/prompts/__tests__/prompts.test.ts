@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ContentCompositionPrompt, ReplyTemplatePrompt } from '../index.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 
@@ -45,34 +46,43 @@ describe('ContentCompositionPrompt', () => {
   });
 
   describe('Availability', () => {
+    // Prompts are pure text templates that never touch the AT Protocol client,
+    // so they are available regardless of authentication state.
     it('should be available when authenticated', () => {
       expect(prompt.isAvailable()).toBe(true);
     });
 
-    it('should not be available when not authenticated', () => {
+    it('should be available when not authenticated', () => {
       const unauthClient = createMockAtpClient(false);
       const unauthPrompt = new ContentCompositionPrompt(unauthClient);
-      expect(unauthPrompt.isAvailable()).toBe(false);
+      expect(unauthPrompt.isAvailable()).toBe(true);
     });
 
-    it('should handle errors gracefully', () => {
+    it('should be available even when the client errors', () => {
       const errorClient = {
         isAuthenticated: vi.fn().mockImplementation(() => {
           throw new Error('Test error');
         }),
       } as unknown as AtpClient;
       const errorPrompt = new ContentCompositionPrompt(errorClient);
-      expect(errorPrompt.isAvailable()).toBe(false);
+      expect(errorPrompt.isAvailable()).toBe(true);
     });
   });
 
   describe('Content Generation', () => {
-    it('should generate prompt with default values', async () => {
-      const content = await prompt.get();
-      expect(content).toHaveLength(1);
-      expect(content[0]!.role).toBe('user');
-      expect(content[0]!.content.type).toBe('text');
-      expect(content[0]!.content.text).toContain('general topic');
+    it('rejects a missing required topic with an invalid-params error', async () => {
+      // The declared required argument must be enforced, not silently replaced
+      // with a 'general topic' placeholder.
+      const error = await prompt.get().catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(McpError);
+      expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+      expect((error as McpError).message).toContain('topic');
+    });
+
+    it('rejects an empty topic with an invalid-params error', async () => {
+      const error = await prompt.get({ topic: '   ' }).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(McpError);
+      expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
     });
 
     it('should generate prompt with custom topic', async () => {
@@ -129,12 +139,27 @@ describe('ReplyTemplatePrompt', () => {
     });
   });
 
+  describe('Availability', () => {
+    it('should be available when not authenticated', () => {
+      const unauthClient = createMockAtpClient(false);
+      const unauthPrompt = new ReplyTemplatePrompt(unauthClient);
+      expect(unauthPrompt.isAvailable()).toBe(true);
+    });
+  });
+
   describe('Content Generation', () => {
     it('should generate reply prompt', async () => {
       const content = await prompt.get({ original_post: 'Test post' });
       expect(content).toHaveLength(1);
       expect(content[0]!.role).toBe('user');
       expect(content[0]!.content.type).toBe('text');
+    });
+
+    it('rejects a missing required original_post with an invalid-params error', async () => {
+      const error = await prompt.get({}).catch((e: unknown) => e);
+      expect(error).toBeInstanceOf(McpError);
+      expect((error as McpError).code).toBe(ErrorCode.InvalidParams);
+      expect((error as McpError).message).toContain('original_post');
     });
   });
 });

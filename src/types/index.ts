@@ -25,8 +25,14 @@ export function validateDID(value: string): DID {
     throw new Error(`Invalid DID format: ${value}. Must start with 'did:'`);
   }
   const parts = value.split(':');
-  if (parts.length < 3) {
-    throw new Error(`Invalid DID format: ${value}. Must be 'did:method:identifier'`);
+  // The identifier segment may itself contain colons (e.g. did:web:host:path),
+  // so everything after the method belongs to the identifier.
+  const method = parts[1];
+  const identifier = parts.slice(2).join(':');
+  if (parts.length < 3 || !method || !identifier) {
+    throw new Error(
+      `Invalid DID format: ${value}. Must be 'did:method:identifier' with non-empty method and identifier`
+    );
   }
   return value as DID;
 }

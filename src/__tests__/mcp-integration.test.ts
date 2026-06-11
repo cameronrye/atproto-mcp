@@ -295,6 +295,59 @@ describe('MCP Integration Tests', () => {
       }
     });
 
+    it('returns the spec Resource-not-found code (-32002) for unknown resource URIs', async () => {
+      const handler = mockHandlers.get('resources/read');
+
+      try {
+        await handler!({
+          params: {
+            uri: 'atproto://does-not-exist',
+          },
+        });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        // MCP spec: unknown resources are reported with -32002, not the generic
+        // JSON-RPC invalid-params code (-32602).
+        expect(error.code).toBe(-32002);
+        expect(error.message).toContain('Resource not found');
+      }
+    });
+
+    it('rejects prompts/get with missing required arguments using -32602', async () => {
+      const handler = mockHandlers.get('prompts/get');
+
+      try {
+        await handler!({
+          params: {
+            name: 'content_composition',
+            arguments: {},
+          },
+        });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.code).toBe(-32602);
+        expect(error.message).toContain('topic');
+      }
+    });
+
+    it('serves prompts/get without authentication (pure text templates)', async () => {
+      const handler = mockHandlers.get('prompts/get');
+
+      mockAtpClient.isAuthenticated.mockReturnValue(false);
+      try {
+        const result = await handler!({
+          params: {
+            name: 'content_composition',
+            arguments: { topic: 'decentralized social media' },
+          },
+        });
+        expect(result.messages).toHaveLength(1);
+        expect(result.messages[0].content.text).toContain('decentralized social media');
+      } finally {
+        mockAtpClient.isAuthenticated.mockReturnValue(true);
+      }
+    });
+
     it('should handle prompt get errors gracefully', async () => {
       const handler = mockHandlers.get('prompts/get');
       expect(handler).toBeDefined();

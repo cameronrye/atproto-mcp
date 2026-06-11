@@ -2,6 +2,7 @@
  * MCP Prompts for AT Protocol content creation assistance
  */
 
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { AtpClient } from '../utils/atp-client.js';
 import { Logger } from '../utils/logger.js';
 
@@ -45,14 +46,30 @@ export abstract class BasePrompt implements IMcpPrompt {
   }
 
   /**
-   * Check if the prompt is available
+   * Check if the prompt is available.
+   *
+   * Prompts are pure text templates: they never call the AT Protocol client,
+   * so they are available regardless of authentication state.
    */
   isAvailable(): boolean {
-    try {
-      return this.atpClient.isAuthenticated();
-    } catch {
-      return false;
+    return true;
+  }
+
+  /**
+   * Read a declared-required string argument, rejecting missing/blank values
+   * with the spec invalid-params error instead of silently substituting a
+   * placeholder.
+   */
+  protected requireStringArg(args: Record<string, unknown> | undefined, name: string): string {
+    const value = args?.[name];
+    if (typeof value !== 'string' || value.trim() === '') {
+      throw new McpError(
+        ErrorCode.InvalidParams,
+        `Missing required argument "${name}" for prompt "${this.name}"`,
+        { prompt: this.name, argument: name }
+      );
     }
+    return value;
   }
 
   /**
@@ -67,7 +84,7 @@ export abstract class BasePrompt implements IMcpPrompt {
 export class ContentCompositionPrompt extends BasePrompt {
   public readonly name = 'content_composition';
   public readonly description =
-    'Generate engaging social media post content with proper formatting and hashtags. Requires authentication.';
+    'Generate engaging social media post content with proper formatting and hashtags. Pure text template; works without authentication.';
   public readonly arguments = [
     {
       name: 'topic',
@@ -96,7 +113,7 @@ export class ContentCompositionPrompt extends BasePrompt {
   }
 
   async get(args?: Record<string, unknown>): Promise<IPromptContent[]> {
-    const topic = (args?.['topic'] as string | undefined) ?? 'general topic';
+    const topic = this.requireStringArg(args, 'topic');
     const tone = (args?.['tone'] as string | undefined) ?? 'casual';
     const length = (args?.['length'] as string | undefined) ?? 'medium';
     const includeHashtags = (args?.['include_hashtags'] as boolean | undefined) !== false;
@@ -149,7 +166,7 @@ Please provide the post text ready to publish.`,
 export class ReplyTemplatePrompt extends BasePrompt {
   public readonly name = 'reply_template';
   public readonly description =
-    'Generate thoughtful reply templates for different types of posts. Requires authentication.';
+    'Generate thoughtful reply templates for different types of posts. Pure text template; works without authentication.';
   public readonly arguments = [
     {
       name: 'original_post',
@@ -173,7 +190,7 @@ export class ReplyTemplatePrompt extends BasePrompt {
   }
 
   async get(args?: Record<string, unknown>): Promise<IPromptContent[]> {
-    const originalPost = (args?.['original_post'] as string | undefined) ?? 'the original post';
+    const originalPost = this.requireStringArg(args, 'original_post');
     const replyType = (args?.['reply_type'] as string | undefined) ?? 'supportive';
     const relationship = (args?.['relationship'] as string | undefined) ?? 'stranger';
 

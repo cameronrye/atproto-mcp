@@ -204,11 +204,12 @@ export class NotificationsResource extends BaseResource {
   }
 }
 
-// Import conversation context resource
-import { ConversationContextResource } from './conversation-context-resource.js';
-
-// Export conversation context resource
-export { ConversationContextResource };
+// Export the conversation context resource class for API compatibility. It is
+// intentionally NOT registered below: MCP offers no client-write mechanism for
+// resources and no tool currently populates its store, so the resource would
+// always read as empty. Re-register it only together with a real population
+// path (e.g. tool handlers appending to it).
+export { ConversationContextResource } from './conversation-context-resource.js';
 
 /**
  * Create all MCP resources for AT Protocol data
@@ -222,7 +223,6 @@ export function createResources(atpClient: AtpClient): BaseResource[] {
     () => new TimelineResource(atpClient),
     () => new ProfileResource(atpClient),
     () => new NotificationsResource(atpClient),
-    () => new ConversationContextResource(atpClient),
   ];
 
   const resources: BaseResource[] = [];

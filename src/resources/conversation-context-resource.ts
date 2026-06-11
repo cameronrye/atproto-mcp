@@ -44,23 +44,22 @@ interface IConversationContext {
 /**
  * Conversation Context Resource
  *
- * This resource maintains state across LLM interactions, tracking:
- * - Posts that have been discussed in the conversation
- * - Active threads being followed
- * - Users that have been mentioned
- * - Search queries performed
- * - Recent actions taken
+ * In-memory store for conversation state (discussed posts, active threads,
+ * mentioned users, searches, recent actions), exposed as an MCP resource.
  *
- * This helps LLMs maintain context and provide more coherent, contextual responses.
+ * NOT REGISTERED with the MCP server (see createResources): MCP has no
+ * client-write mechanism for resources, and no tool currently calls the
+ * static add* methods, so the resource would always read as empty. The class
+ * is retained so a future change can populate it from tool handlers and
+ * re-register it.
  */
 export class ConversationContextResource extends BaseResource {
   public readonly uri = 'atproto://conversation-context';
   public readonly name = 'Conversation Context';
   public readonly description =
-    'Scratchpad for conversation state (recently discussed posts, active threads, mentioned ' +
-    'users, recent actions). NOTE: the server does not yet populate this automatically during ' +
-    'tool calls, so it is empty unless a client explicitly writes to it; treat empty arrays as ' +
-    '"not tracked", not "nothing happened".';
+    'Server-side scratchpad of conversation state (recently discussed posts, active threads, ' +
+    'mentioned users, recent actions). Populated only by server-side tool integrations; in the ' +
+    'current release nothing writes to it, so it always reads as empty arrays.';
   public readonly mimeType = 'application/json';
 
   private static context: IConversationContext = {

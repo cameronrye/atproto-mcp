@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { TimelineResource, ProfileResource, NotificationsResource } from '../index.js';
+import {
+  TimelineResource,
+  ProfileResource,
+  NotificationsResource,
+  createResources,
+} from '../index.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import type { BskyAgent } from '@atproto/api';
 
@@ -168,6 +173,20 @@ describe('ProfileResource', () => {
       expect(data.profile.handle).toBe('test.bsky.social');
       expect(data.session.did).toBe('did:plc:test123');
     });
+  });
+});
+
+describe('createResources', () => {
+  it('registers only resources that can actually have content', () => {
+    // The conversation-context resource has no population path: MCP offers no
+    // client-write mechanism for resources and no tool writes to it, so it
+    // would always read as empty. It must not be advertised.
+    const resources = createResources(createMockAtpClient());
+    expect(resources.map(r => r.uri)).toEqual([
+      'atproto://timeline',
+      'atproto://profile',
+      'atproto://notifications',
+    ]);
   });
 });
 

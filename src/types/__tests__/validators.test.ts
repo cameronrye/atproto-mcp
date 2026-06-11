@@ -39,6 +39,16 @@ describe('DID Validation', () => {
       expect(() => validateDID('did:plc')).toThrow("Must be 'did:method:identifier'");
       expect(() => validateDID('did:')).toThrow("Must be 'did:method:identifier'");
     });
+
+    it('should reject structurally empty method or identifier segments', () => {
+      expect(() => validateDID('did::')).toThrow("Must be 'did:method:identifier'");
+      expect(() => validateDID('did:plc:')).toThrow("Must be 'did:method:identifier'");
+      expect(() => validateDID('did::abc123')).toThrow("Must be 'did:method:identifier'");
+    });
+
+    it('should accept identifiers containing additional colons', () => {
+      expect(validateDID('did:web:example.com:user:alice')).toBe('did:web:example.com:user:alice');
+    });
   });
 
   describe('isDID', () => {
