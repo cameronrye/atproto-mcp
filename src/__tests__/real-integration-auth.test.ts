@@ -42,11 +42,7 @@ import {
   BlockUserTool,
   UnblockUserTool,
 } from '../tools/implementations/moderation-tools.js';
-import {
-  BatchFollowTool,
-  BatchLikeTool,
-  BatchRepostTool,
-} from '../tools/implementations/batch-operations-tools.js';
+import { BatchActionTool } from '../tools/implementations/batch-operations-tools.js';
 import { UploadImageTool } from '../tools/implementations/media-tools.js';
 
 // Helper to skip tests unless authenticated mode is enabled
@@ -84,9 +80,7 @@ describeAuth('Real AT Protocol Integration Tests - Authenticated Mode', () => {
   let unmuteUserTool: UnmuteUserTool;
   let blockUserTool: BlockUserTool;
   let unblockUserTool: UnblockUserTool;
-  let batchFollowTool: BatchFollowTool;
-  let batchLikeTool: BatchLikeTool;
-  let batchRepostTool: BatchRepostTool;
+  let batchActionTool: BatchActionTool;
   let uploadImageTool: UploadImageTool;
 
   beforeAll(async () => {
@@ -132,9 +126,7 @@ describeAuth('Real AT Protocol Integration Tests - Authenticated Mode', () => {
     unmuteUserTool = new UnmuteUserTool(atpClient);
     blockUserTool = new BlockUserTool(atpClient);
     unblockUserTool = new UnblockUserTool(atpClient);
-    batchFollowTool = new BatchFollowTool(atpClient);
-    batchLikeTool = new BatchLikeTool(atpClient);
-    batchRepostTool = new BatchRepostTool(atpClient);
+    batchActionTool = new BatchActionTool(atpClient);
     uploadImageTool = new UploadImageTool(atpClient);
 
     console.log('✅ Server started in authenticated mode');

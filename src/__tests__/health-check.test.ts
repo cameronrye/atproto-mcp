@@ -26,9 +26,9 @@ describe('Health Check - Real-world Usage', () => {
   describe('Basic Health Check', () => {
     it('should pass health check in unauthenticated mode', async () => {
       // Clear auth env vars to ensure unauthenticated mode
-      delete process.env.ATPROTO_IDENTIFIER;
-      delete process.env.ATPROTO_PASSWORD;
-      delete process.env.ATPROTO_AUTH_METHOD;
+      delete process.env['ATPROTO_IDENTIFIER'];
+      delete process.env['ATPROTO_PASSWORD'];
+      delete process.env['ATPROTO_AUTH_METHOD'];
 
       const { output, exitCode } = await runHealthCheck();
 
@@ -39,8 +39,8 @@ describe('Health Check - Real-world Usage', () => {
     });
 
     it('should report unauthenticated mode status', async () => {
-      delete process.env.ATPROTO_IDENTIFIER;
-      delete process.env.ATPROTO_PASSWORD;
+      delete process.env['ATPROTO_IDENTIFIER'];
+      delete process.env['ATPROTO_PASSWORD'];
 
       const { output } = await runHealthCheck();
 
@@ -64,7 +64,7 @@ describe('Health Check - Real-world Usage', () => {
 
   describe('Configuration', () => {
     it('should use default service when not specified', async () => {
-      delete process.env.ATPROTO_SERVICE;
+      delete process.env['ATPROTO_SERVICE'];
 
       const { output, exitCode } = await runHealthCheck();
 
@@ -73,7 +73,7 @@ describe('Health Check - Real-world Usage', () => {
     });
 
     it('should accept custom service URL', async () => {
-      process.env.ATPROTO_SERVICE = 'https://bsky.social';
+      process.env['ATPROTO_SERVICE'] = 'https://bsky.social';
 
       const { output, exitCode } = await runHealthCheck();
 
@@ -82,7 +82,7 @@ describe('Health Check - Real-world Usage', () => {
     });
 
     it('should handle empty service URL', async () => {
-      process.env.ATPROTO_SERVICE = '';
+      process.env['ATPROTO_SERVICE'] = '';
 
       const { output, exitCode } = await runHealthCheck();
 

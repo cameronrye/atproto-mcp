@@ -70,38 +70,38 @@ describe('ContentCompositionPrompt', () => {
     it('should generate prompt with default values', async () => {
       const content = await prompt.get();
       expect(content).toHaveLength(1);
-      expect(content[0].role).toBe('user');
-      expect(content[0].content.type).toBe('text');
-      expect(content[0].content.text).toContain('general topic');
+      expect(content[0]!.role).toBe('user');
+      expect(content[0]!.content.type).toBe('text');
+      expect(content[0]!.content.text).toContain('general topic');
     });
 
     it('should generate prompt with custom topic', async () => {
       const content = await prompt.get({ topic: 'AI and decentralization' });
-      expect(content[0].content.text).toContain('AI and decentralization');
+      expect(content[0]!.content.text).toContain('AI and decentralization');
     });
 
     it('should generate prompt with custom tone', async () => {
       const content = await prompt.get({ topic: 'test', tone: 'professional' });
-      expect(content[0].content.text).toContain('professional');
+      expect(content[0]!.content.text).toContain('professional');
     });
 
     it('should generate prompt with custom length', async () => {
       const content = await prompt.get({ topic: 'test', length: 'short' });
-      expect(content[0].content.text).toContain('short');
+      expect(content[0]!.content.text).toContain('short');
     });
 
     it('should handle hashtags preference', async () => {
       const withHashtags = await prompt.get({ topic: 'test', include_hashtags: true });
-      expect(withHashtags[0].content.text).toContain('Yes');
+      expect(withHashtags[0]!.content.text).toContain('Yes');
 
       const withoutHashtags = await prompt.get({ topic: 'test', include_hashtags: false });
-      expect(withoutHashtags[0].content.text).toContain('No');
+      expect(withoutHashtags[0]!.content.text).toContain('No');
     });
 
     it('should include AT Protocol context', async () => {
       const content = await prompt.get({ topic: 'test' });
-      expect(content[0].content.text).toContain('AT Protocol');
-      expect(content[0].content.text).toContain('300-character');
+      expect(content[0]!.content.text).toContain('AT Protocol');
+      expect(content[0]!.content.text).toContain('300-character');
     });
   });
 });
@@ -133,8 +133,8 @@ describe('ReplyTemplatePrompt', () => {
     it('should generate reply prompt', async () => {
       const content = await prompt.get({ original_post: 'Test post' });
       expect(content).toHaveLength(1);
-      expect(content[0].role).toBe('user');
-      expect(content[0].content.type).toBe('text');
+      expect(content[0]!.role).toBe('user');
+      expect(content[0]!.content.type).toBe('text');
     });
   });
 });

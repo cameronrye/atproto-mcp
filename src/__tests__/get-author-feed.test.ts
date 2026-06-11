@@ -87,7 +87,7 @@ describe('GetAuthorFeedTool', () => {
     });
 
     expect(getAuthorFeed).toHaveBeenCalledOnce();
-    const callArgs = getAuthorFeed.mock.calls[0][0];
+    const callArgs = getAuthorFeed.mock.calls[0]![0];
     expect(callArgs.actor).toBe('author.bsky.social');
     expect(callArgs.limit).toBe(20);
     expect(callArgs.cursor).toBe('some-cursor');
@@ -134,7 +134,7 @@ describe('GetAuthorFeedTool', () => {
 
     await tool.handler({ actor: 'author.bsky.social' });
 
-    expect(getAuthorFeed.mock.calls[0][0].limit).toBe(50);
+    expect(getAuthorFeed.mock.calls[0]![0].limit).toBe(50);
   });
 
   it('omits cursor and filter from API call when not provided', async () => {
@@ -143,7 +143,7 @@ describe('GetAuthorFeedTool', () => {
 
     await tool.handler({ actor: 'author.bsky.social' });
 
-    const callArgs = getAuthorFeed.mock.calls[0][0];
+    const callArgs = getAuthorFeed.mock.calls[0]![0];
     expect(callArgs.cursor).toBeUndefined();
     expect(callArgs.filter).toBeUndefined();
   });
@@ -177,7 +177,7 @@ describe('GetAuthorFeedTool', () => {
 
     expect(getAuthorFeed).toHaveBeenCalledTimes(4);
     for (let i = 0; i < 4; i++) {
-      expect(getAuthorFeed.mock.calls[i][0].filter).toBe(filters[i]);
+      expect(getAuthorFeed.mock.calls[i]![0].filter).toBe(filters[i]);
     }
   });
 });

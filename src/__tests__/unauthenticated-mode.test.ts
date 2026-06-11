@@ -71,7 +71,10 @@ describe('Unauthenticated Mode', () => {
       });
 
       expect(result.success).toBe(true);
-      expect(result.data).toEqual({ test: 'data' });
+      // Narrow the Result union; the assertion above fails first if not ok.
+      if (result.success) {
+        expect(result.data).toEqual({ test: 'data' });
+      }
     });
 
     it('should reject authenticated requests without credentials', async () => {
@@ -83,7 +86,10 @@ describe('Unauthenticated Mode', () => {
       });
 
       expect(result.success).toBe(false);
-      expect(result.error?.message).toContain('authentication');
+      // Narrow the Result union; the assertion above fails first if not an error.
+      if (!result.success) {
+        expect(result.error.message).toContain('authentication');
+      }
     });
   });
 

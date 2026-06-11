@@ -43,7 +43,7 @@ describe('quote post facet detection', () => {
     });
 
     expect(post).toHaveBeenCalledTimes(1);
-    const record = post.mock.calls[0][0] as { text: string; facets?: unknown[]; embed?: any };
+    const record = post.mock.calls[0]![0] as { text: string; facets?: unknown[]; embed?: any };
     expect(Array.isArray(record.facets)).toBe(true);
     expect(record.facets!.length).toBeGreaterThan(0);
     // The embedded quote is still present.

@@ -95,7 +95,7 @@ describe('TimelineResource', () => {
       expect(result.mimeType).toBe('application/json');
       expect(result.text).toBeTruthy();
 
-      const data = JSON.parse(result.text);
+      const data = JSON.parse(result.text!);
       expect(data.posts).toHaveLength(1);
       expect(data.posts[0].text).toBe('Test post');
       expect(data.posts[0].isLiked).toBe(true);
@@ -106,7 +106,7 @@ describe('TimelineResource', () => {
       mockAgent.getTimeline = vi.fn().mockResolvedValue({ data: { feed: [] } });
 
       const result = await resource.read();
-      const data = JSON.parse(result.text);
+      const data = JSON.parse(result.text!);
       expect(data.posts).toHaveLength(0);
     });
   });
@@ -163,7 +163,7 @@ describe('ProfileResource', () => {
       expect(result.uri).toBe('atproto://profile');
       expect(result.mimeType).toBe('application/json');
 
-      const data = JSON.parse(result.text);
+      const data = JSON.parse(result.text!);
       expect(data.profile.did).toBe('did:plc:test123');
       expect(data.profile.handle).toBe('test.bsky.social');
       expect(data.session.did).toBe('did:plc:test123');

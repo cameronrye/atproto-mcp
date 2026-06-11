@@ -13,15 +13,15 @@ describe('ConfigManager', () => {
     mockConsole();
 
     // Clear environment variables
-    delete process.env.ATPROTO_SERVICE;
-    delete process.env.ATPROTO_IDENTIFIER;
-    delete process.env.ATPROTO_PASSWORD;
-    delete process.env.ATPROTO_CLIENT_ID;
-    delete process.env.ATPROTO_CLIENT_SECRET;
-    delete process.env.ATPROTO_AUTH_METHOD;
-    delete process.env.MCP_SERVER_PORT;
-    delete process.env.MCP_SERVER_HOST;
-    delete process.env.MCP_SERVER_NAME;
+    delete process.env['ATPROTO_SERVICE'];
+    delete process.env['ATPROTO_IDENTIFIER'];
+    delete process.env['ATPROTO_PASSWORD'];
+    delete process.env['ATPROTO_CLIENT_ID'];
+    delete process.env['ATPROTO_CLIENT_SECRET'];
+    delete process.env['ATPROTO_AUTH_METHOD'];
+    delete process.env['MCP_SERVER_PORT'];
+    delete process.env['MCP_SERVER_HOST'];
+    delete process.env['MCP_SERVER_NAME'];
   });
 
   describe('constructor', () => {
@@ -38,11 +38,11 @@ describe('ConfigManager', () => {
     });
 
     it('should apply environment variables', () => {
-      process.env.MCP_SERVER_PORT = '8080';
-      process.env.MCP_SERVER_HOST = '0.0.0.0';
-      process.env.ATPROTO_SERVICE = 'https://custom.bsky.social';
-      process.env.ATPROTO_IDENTIFIER = 'test.bsky.social';
-      process.env.ATPROTO_PASSWORD = 'test-password';
+      process.env['MCP_SERVER_PORT'] = '8080';
+      process.env['MCP_SERVER_HOST'] = '0.0.0.0';
+      process.env['ATPROTO_SERVICE'] = 'https://custom.bsky.social';
+      process.env['ATPROTO_IDENTIFIER'] = 'test.bsky.social';
+      process.env['ATPROTO_PASSWORD'] = 'test-password';
 
       const config = new ConfigManager();
       const result = config.getConfig();
@@ -55,7 +55,7 @@ describe('ConfigManager', () => {
     });
 
     it('should apply overrides with highest priority', () => {
-      process.env.MCP_SERVER_PORT = '8080';
+      process.env['MCP_SERVER_PORT'] = '8080';
 
       const config = new ConfigManager({
         port: 9000,
@@ -91,8 +91,8 @@ describe('ConfigManager', () => {
 
     it('should throw error for app-password without identifier', async () => {
       // Temporarily set NODE_ENV to production to test validation
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      const originalEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'production';
 
       try {
         await expectToThrow(
@@ -108,14 +108,14 @@ describe('ConfigManager', () => {
           /requires both identifier and password/
         );
       } finally {
-        process.env.NODE_ENV = originalEnv;
+        process.env['NODE_ENV'] = originalEnv;
       }
     });
 
     it('should throw error for app-password without password', async () => {
       // Temporarily set NODE_ENV to production to test validation
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      const originalEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'production';
 
       try {
         await expectToThrow(
@@ -131,7 +131,7 @@ describe('ConfigManager', () => {
           /requires both identifier and password/
         );
       } finally {
-        process.env.NODE_ENV = originalEnv;
+        process.env['NODE_ENV'] = originalEnv;
       }
     });
 
@@ -150,8 +150,8 @@ describe('ConfigManager', () => {
 
     it('should throw error for oauth without clientId', async () => {
       // Temporarily set NODE_ENV to production to test validation
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      const originalEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'production';
 
       try {
         await expectToThrow(
@@ -167,7 +167,7 @@ describe('ConfigManager', () => {
           /requires both clientId and clientSecret/
         );
       } finally {
-        process.env.NODE_ENV = originalEnv;
+        process.env['NODE_ENV'] = originalEnv;
       }
     });
 
@@ -276,8 +276,8 @@ describe('ConfigManager', () => {
 
     it('should return false for invalid app-password config', () => {
       // Temporarily set NODE_ENV to production to test validation
-      const originalEnv = process.env.NODE_ENV;
-      process.env.NODE_ENV = 'production';
+      const originalEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'production';
 
       try {
         const config = new ConfigManager({
@@ -291,7 +291,7 @@ describe('ConfigManager', () => {
 
         expect(config.isValidForAuth('app-password')).toBe(false);
       } finally {
-        process.env.NODE_ENV = originalEnv;
+        process.env['NODE_ENV'] = originalEnv;
       }
     });
   });

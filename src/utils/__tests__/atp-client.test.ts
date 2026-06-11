@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import type { AtpAgentOptions } from '@atproto/api';
 import { AtpClient } from '../atp-client.js';
 import { AuthenticationError, AtpError, ValidationError } from '../../types/index.js';
 import {
@@ -108,7 +109,7 @@ describe('AtpClient', () => {
       // Simulate session event
       const { AtpAgent } = await import('@atproto/api');
       const constructorCall = vi.mocked(AtpAgent).mock.calls[0];
-      const persistSession = constructorCall?.[0]?.persistSession;
+      const persistSession = (constructorCall?.[0] as AtpAgentOptions | undefined)?.persistSession;
 
       await client.initialize();
 
@@ -143,11 +144,11 @@ describe('AtpClient', () => {
       // Simulate session expired event
       const { AtpAgent } = await import('@atproto/api');
       const constructorCall = vi.mocked(AtpAgent).mock.calls[0];
-      const persistSession = constructorCall?.[0]?.persistSession;
+      const persistSession = (constructorCall?.[0] as AtpAgentOptions | undefined)?.persistSession;
 
       if (persistSession) {
         persistSession('create', mockSession);
-        persistSession('expired');
+        persistSession('expired', undefined);
       }
 
       // Wait for refresh to complete
@@ -173,7 +174,7 @@ describe('AtpClient', () => {
       // Set up session
       const { AtpAgent } = await import('@atproto/api');
       const constructorCall = vi.mocked(AtpAgent).mock.calls[0];
-      const persistSession = constructorCall?.[0]?.persistSession;
+      const persistSession = (constructorCall?.[0] as AtpAgentOptions | undefined)?.persistSession;
       if (persistSession) {
         persistSession('create', mockSession);
       }

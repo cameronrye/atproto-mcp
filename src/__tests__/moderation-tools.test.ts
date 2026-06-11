@@ -94,9 +94,9 @@ describe('BlockUserTool', () => {
 
     expect(create).toHaveBeenCalledTimes(1);
     // First arg is the repo descriptor (the authed user's repo).
-    expect(create.mock.calls[0][0]).toEqual(expect.objectContaining({ repo: 'did:plc:self' }));
+    expect(create.mock.calls[0]![0]).toEqual(expect.objectContaining({ repo: 'did:plc:self' }));
     // Second arg is the record: subject must be the resolved DID, with a createdAt.
-    const record = create.mock.calls[0][1];
+    const record = create.mock.calls[0]![1];
     expect(record).toEqual(expect.objectContaining({ subject: 'did:plc:target' }));
     expect(typeof record.createdAt).toBe('string');
 
@@ -170,7 +170,7 @@ describe('ReportContentTool', () => {
     });
 
     expect(createReport).toHaveBeenCalledTimes(1);
-    const payload = createReport.mock.calls[0][0];
+    const payload = createReport.mock.calls[0]![0];
     expect(payload.reasonType).toBe('com.atproto.moderation.defs#reasonSpam');
     expect(payload.reason).toBe('lots of spam');
     expect(payload.subject).toEqual({
@@ -196,7 +196,7 @@ describe('ReportContentTool', () => {
       reasonType: 'violation',
     });
 
-    expect(createReport.mock.calls[0][0].reasonType).toBe(
+    expect(createReport.mock.calls[0]![0].reasonType).toBe(
       'com.atproto.moderation.defs#reasonViolation'
     );
   });
@@ -220,7 +220,7 @@ describe('ReportUserTool', () => {
     });
 
     expect(createReport).toHaveBeenCalledTimes(1);
-    const payload = createReport.mock.calls[0][0];
+    const payload = createReport.mock.calls[0]![0];
     expect(payload.reasonType).toBe('com.atproto.moderation.defs#reasonMisleading');
     expect(payload.reason).toBe('impersonation');
     expect(payload.subject).toEqual({

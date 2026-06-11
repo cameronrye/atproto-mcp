@@ -18,10 +18,10 @@ describe('CLI - Real-world Usage', () => {
   beforeEach(() => {
     originalEnv = { ...process.env };
     // Clear ATP-related env vars for clean tests
-    delete process.env.ATPROTO_SERVICE;
-    delete process.env.ATPROTO_IDENTIFIER;
-    delete process.env.ATPROTO_PASSWORD;
-    delete process.env.ATPROTO_AUTH_METHOD;
+    delete process.env['ATPROTO_SERVICE'];
+    delete process.env['ATPROTO_IDENTIFIER'];
+    delete process.env['ATPROTO_PASSWORD'];
+    delete process.env['ATPROTO_AUTH_METHOD'];
   });
 
   afterEach(() => {

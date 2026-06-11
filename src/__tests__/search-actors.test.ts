@@ -72,7 +72,7 @@ describe('SearchActorsTool', () => {
     await tool.handler({ query: 'alice', limit: 10, cursor: 'some-cursor' });
 
     expect(searchActors).toHaveBeenCalledOnce();
-    const callArgs = searchActors.mock.calls[0][0];
+    const callArgs = searchActors.mock.calls[0]![0];
     expect(callArgs.q).toBe('alice');
     expect(callArgs.limit).toBe(10);
     expect(callArgs.cursor).toBe('some-cursor');
@@ -119,7 +119,7 @@ describe('SearchActorsTool', () => {
 
     await tool.handler({ query: 'test' });
 
-    expect(searchActors.mock.calls[0][0].limit).toBe(25);
+    expect(searchActors.mock.calls[0]![0].limit).toBe(25);
   });
 
   it('omits cursor from API call when not provided', async () => {
@@ -128,7 +128,7 @@ describe('SearchActorsTool', () => {
 
     await tool.handler({ query: 'test' });
 
-    expect(searchActors.mock.calls[0][0].cursor).toBeUndefined();
+    expect(searchActors.mock.calls[0]![0].cursor).toBeUndefined();
   });
 
   it('returns empty actors array with no cursor when API returns empty results', async () => {

@@ -107,10 +107,10 @@ describe('create_post explicit facets', () => {
     });
 
     expect(resolveHandle).toHaveBeenCalledWith({ handle: 'bob.test' });
-    const record = post.mock.calls[0][0] as {
+    const record = post.mock.calls[0]![0] as {
       facets: Array<{ features: Array<{ did?: string }> }>;
     };
-    expect(record.facets[0].features[0].did).toBe('did:plc:bob');
+    expect(record.facets[0]!.features[0]!.did).toBe('did:plc:bob');
   });
 
   it('maps a link facet to the on-the-wire app.bsky.richtext.facet#link shape', async () => {
@@ -128,7 +128,7 @@ describe('create_post explicit facets', () => {
       ],
     });
 
-    const record = post.mock.calls[0][0];
+    const record = post.mock.calls[0]![0];
     expect(record.text).toBe(text);
     expect(Array.isArray(record.facets)).toBe(true);
     expect(record.facets).toHaveLength(1);
@@ -155,7 +155,7 @@ describe('create_post explicit facets', () => {
       ],
     });
 
-    const record = post.mock.calls[0][0];
+    const record = post.mock.calls[0]![0];
     expect(record.facets).toHaveLength(1);
     expect(record.facets[0].features[0]).toEqual({
       $type: 'app.bsky.richtext.facet#link',
@@ -176,7 +176,7 @@ describe('create_post quote (record) embed', () => {
       quote: { uri: 'at://did:plc:other/app.bsky.feed.post/x', cid: 'cidx' },
     });
 
-    const record = post.mock.calls[0][0];
+    const record = post.mock.calls[0]![0];
     expect(record.embed).toEqual({
       $type: 'app.bsky.embed.record',
       record: { uri: 'at://did:plc:other/app.bsky.feed.post/x', cid: 'cidx' },

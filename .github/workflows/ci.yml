@@ -38,6 +38,11 @@ jobs:
       - name: Type check
         run: pnpm run type-check
 
+      - name: Type check (tests)
+        # Test files are excluded from the production tsconfig, so without this
+        # step stale imports/types in tests only surface at runtime.
+        run: pnpm run type-check:tests
+
       - name: Lint
         run: pnpm run lint
 

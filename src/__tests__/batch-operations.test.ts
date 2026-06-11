@@ -2,7 +2,7 @@
  * Tests for batch operation tools
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
 import { BatchActionTool } from '../tools/implementations/batch-operations-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
@@ -125,7 +125,7 @@ describe('BatchActionTool — action=follow', () => {
   it('should handle partial failures gracefully', async () => {
     const agent = mockClient.getAgent();
     // Mock getProfile to fail for the second user
-    agent.getProfile
+    (agent.getProfile as Mock)
       .mockResolvedValueOnce({
         data: {
           did: 'did:plc:user1',
@@ -191,7 +191,7 @@ describe('BatchActionTool — action=like', () => {
     const agent = mockClient.getAgent();
     // The post lookup succeeds for the first URI and returns no post for the
     // second (not found), so that item fails.
-    agent.getPosts
+    (agent.getPosts as Mock)
       .mockResolvedValueOnce({
         data: {
           posts: [{ uri: 'at://did:plc:user1/app.bsky.feed.post/1', cid: 'cid123', viewer: {} }],

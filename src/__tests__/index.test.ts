@@ -132,7 +132,7 @@ describe('AtpMcpServer', () => {
 
       // Verify that the first argument of each call is a Zod schema
       const calls = mockServer.setRequestHandler.mock.calls;
-      calls.forEach(call => {
+      calls.forEach((call: any[]) => {
         expect(call[0]).toHaveProperty('parse'); // Zod schemas have a parse method
         expect(call[1]).toBeTypeOf('function'); // Second argument should be a handler function
       });

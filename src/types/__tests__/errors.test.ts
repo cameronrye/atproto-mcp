@@ -12,10 +12,19 @@ import {
   ConfigurationError,
 } from '../index.js';
 
+// BaseError is abstract only at the type level; instantiate it directly so the
+// `error.name === 'BaseError'` assertion (name comes from constructor.name)
+// keeps testing the real class rather than a test-only subclass.
+const ConcreteBaseError = BaseError as unknown as new (
+  message: string,
+  code: string,
+  context?: Record<string, unknown>
+) => BaseError;
+
 describe('Error Classes', () => {
   describe('BaseError', () => {
     it('should create error with message and code', () => {
-      const error = new BaseError('Test error', 'TEST_CODE');
+      const error = new ConcreteBaseError('Test error', 'TEST_CODE');
       expect(error.message).toBe('Test error');
       expect(error.code).toBe('TEST_CODE');
       expect(error.context).toBeUndefined();
@@ -24,12 +33,12 @@ describe('Error Classes', () => {
 
     it('should create error with context', () => {
       const context = { userId: '123', action: 'test' };
-      const error = new BaseError('Test error', 'TEST_CODE', context);
+      const error = new ConcreteBaseError('Test error', 'TEST_CODE', context);
       expect(error.context).toEqual(context);
     });
 
     it('should be instanceof Error', () => {
-      const error = new BaseError('Test', 'CODE');
+      const error = new ConcreteBaseError('Test', 'CODE');
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(BaseError);
     });

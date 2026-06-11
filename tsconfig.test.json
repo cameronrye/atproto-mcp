@@ -1,0 +1,11 @@
+{
+  // Type-checks test files (excluded from the production tsconfig) so stale
+  // imports/types in tests fail CI instead of surfacing at runtime.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "docs"]
+}

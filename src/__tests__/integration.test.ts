@@ -362,19 +362,19 @@ describe('Phase 2 Integration Tests', () => {
 
       const muteUserTool = tools.find((tool: any) => tool.schema.method === 'mute_user');
       expect(muteUserTool).toBeDefined();
-      expect(muteUserTool.schema.description).toContain('Mute a user');
+      expect(muteUserTool!.schema.description).toContain('Mute a user');
 
       const blockUserTool = tools.find((tool: any) => tool.schema.method === 'block_user');
       expect(blockUserTool).toBeDefined();
-      expect(blockUserTool.schema.description).toContain('Block a user');
+      expect(blockUserTool!.schema.description).toContain('Block a user');
 
       const reportContentTool = tools.find((tool: any) => tool.schema.method === 'report_content');
       expect(reportContentTool).toBeDefined();
-      expect(reportContentTool.schema.description).toContain('Report content');
+      expect(reportContentTool!.schema.description).toContain('Report content');
 
       const reportUserTool = tools.find((tool: any) => tool.schema.method === 'report_user');
       expect(reportUserTool).toBeDefined();
-      expect(reportUserTool.schema.description).toContain('Report a user');
+      expect(reportUserTool!.schema.description).toContain('Report a user');
     });
   });
 
