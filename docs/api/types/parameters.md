@@ -5,9 +5,9 @@ Tool parameter schemas and interfaces.
 ::: tip Partial reference
 
 These 16 interfaces are the TypeScript parameter shapes exported from
-`src/types/index.ts`. They cover roughly 16 of the server's 60 tools — the
-analytics, discovery, media, streaming, and OAuth tools define their input
-schemas elsewhere and are not listed here.
+`src/types/index.ts`. They cover roughly 16 of the server's 43 tools — the
+analytics, discovery, media, and composite tools define their input schemas
+elsewhere and are not listed here.
 
 :::
 

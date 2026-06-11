@@ -44,7 +44,7 @@ const config: IMcpServerConfig = {
   port: 3000, // reserved/ignored under stdio
   host: 'localhost', // reserved/ignored under stdio
   name: 'AT Protocol MCP Server',
-  version: '0.2.1',
+  version: '0.4.0',
   description: 'MCP server for AT Protocol',
   atproto: {
     service: 'https://bsky.social',

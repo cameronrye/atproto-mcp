@@ -215,11 +215,12 @@ Your LLM client performs multiple steps:
 
 1. Calls `get_user_profile` to get @bsky.app's information
 2. Searches for their recent posts
-3. Calls `like_post` with the post URI
+3. Calls `like_post` with the post URI and CID
 
 ```json
 {
-  "uri": "at://did:plc:abc123.../app.bsky.feed.post/xyz789"
+  "uri": "at://did:plc:abc123.../app.bsky.feed.post/xyz789",
+  "cid": "bafyreib2rxk3rh6kzwq..."
 }
 ```
 
@@ -387,8 +388,8 @@ Your LLM can combine multiple MCP tool calls for complex workflows:
 Your LLM client performs multiple steps:
 
 1. Calls `search_posts({ q: "decentralization", sort: "top", limit: 1 })`
-2. Extracts the post URI from the result
-3. Calls `like_post({ uri: "..." })`
+2. Extracts the post URI and CID from the result
+3. Calls `like_post({ uri: "...", cid: "..." })`
 
 **What Your LLM Tells You:**
 

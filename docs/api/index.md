@@ -61,6 +61,8 @@ Tools for searching and retrieving data:
   following lists via `direction: 'followers' | 'follows'`
 - **[get_notifications](./tools/get-notifications.md)** - Access notification
   feeds (use `countOnly: true` for a cheap unread count)
+- **[mark_notifications_seen](./tools/mark-notifications-seen.md)** - Mark
+  notifications as seen up to a timestamp (defaults to now)
 
 ### Content Management
 

@@ -38,11 +38,59 @@ authenticated user's home timeline.
 - **Default:** `"24h"`
 - **Description:** Lookback window. Only used when `mode: "trending"`.
 
+### `includeHashtags` (optional)
+
+- **Type:** `boolean`
+- **Default:** `true`
+- **Description:** Include trending hashtags. Only used when `mode: "trending"`.
+
+### `includeTopics` (optional)
+
+- **Type:** `boolean`
+- **Default:** `true`
+- **Description:** Include trending topics/keywords. Only used when
+  `mode: "trending"`.
+
+### `includePosts` (optional)
+
+- **Type:** `boolean`
+- **Default:** `true`
+- **Description:** Include notable trending posts. Only used when
+  `mode: "trending"`.
+
 ### `actor` (optional)
 
 - **Type:** `string`
 - **Description:** Optional account to tailor recommendations to. Only used when
   `mode: "recommended"`; defaults to the authenticated user.
+
+### `topics` (optional)
+
+- **Type:** `string[]`
+- **Description:** Restrict recommendations to posts matching these topic
+  keywords. Only used when `mode: "recommended"`.
+
+### `minLikes` (optional)
+
+- **Type:** `number`
+- **Constraints:** >= 0
+- **Default:** `5`
+- **Description:** Minimum like count for a recommended post. Only used when
+  `mode: "recommended"`.
+
+### `maxAge` (optional)
+
+- **Type:** `number`
+- **Constraints:** >= 1
+- **Default:** `24`
+- **Description:** Maximum post age in hours for recommendations. Only used when
+  `mode: "recommended"`.
+
+### `excludeReposts` (optional)
+
+- **Type:** `boolean`
+- **Description:** Exclude reposts from recommendations. Only used when
+  `mode: "recommended"`.
 
 ## Response
 
@@ -133,8 +181,9 @@ Tool results are returned as stringified JSON text. Every response includes
 - Both modes sample the **caller's own home timeline** (roughly the most recent
   ~50-100 posts), not the network at large. Trending results reflect what is
   popular among the accounts you follow.
-- `timeWindow` only applies to `mode: "trending"`; `actor` only applies to
-  `mode: "recommended"`.
+- `timeWindow`, `includeHashtags`, `includeTopics`, and `includePosts` only
+  apply to `mode: "trending"`; `actor`, `topics`, `minLikes`, `maxAge`, and
+  `excludeReposts` only apply to `mode: "recommended"`.
 
 ## Error Handling
 

@@ -22,15 +22,12 @@ Desktop). It does **not** listen on a TCP port and exposes no HTTP endpoints.
 
 The `ConfigManager` reads the variables defined in `ENV_MAPPINGS` in
 `src/utils/config.ts` (listed below), plus `LOG_LEVEL` (read by the logger) and
-`NODE_ENV` (used to relax validation under `test`). A few additional variables
-are read directly by specific subsystems: `ATPROTO_MEDIA_DIR` (base directory
-that tool-supplied media file paths must stay within; defaults to the working
-directory), `ATPROTO_RELAY` (firehose relay WebSocket URL; defaults to
-`wss://bsky.network`), and — for the experimental OAuth tools — the OAuth client
-credentials, which accept the `ATPROTO_CLIENT_ID` / `ATPROTO_CLIENT_SECRET`
-names as well as the legacy `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` fallbacks,
-plus a redirect URI via `ATPROTO_OAUTH_REDIRECT_URI` (falling back to
-`OAUTH_REDIRECT_URI`). Other variables are ignored.
+`NODE_ENV` (used to relax validation under `test`). Two additional variables are
+read directly by specific subsystems: `ATPROTO_MEDIA_DIR` (base directory that
+tool-supplied media file paths must stay within; defaults to the working
+directory) and `ATPROTO_RELAY` (firehose relay WebSocket URL; defaults to
+`wss://bsky.network`). Other variables — including the legacy `OAUTH_CLIENT_ID`
+/ `OAUTH_CLIENT_SECRET` / `OAUTH_REDIRECT_URI` names — are ignored.
 
 ### Authentication
 
@@ -194,7 +191,8 @@ services:
 ::: tip
 
 The server speaks stdio, so there is nothing to publish with `ports:`. The
-`EXPOSE 3000` line in the image's Dockerfile is vestigial and binds nothing.
+image's Dockerfile deliberately has no `EXPOSE` line — the container binds no
+port.
 
 :::
 

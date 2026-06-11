@@ -65,7 +65,7 @@ The server registers **43 tools**. Most require authentication; a small number o
 - [Get Author Feed](https://cameronrye.github.io/atproto-mcp/api/tools/get-author-feed.html): List a specific user's posts
 - [Get User Connections](https://cameronrye.github.io/atproto-mcp/api/tools/get-user-connections.html): Get followers or follows via `direction: 'followers' | 'follows'`
 - [Get Notifications](https://cameronrye.github.io/atproto-mcp/api/tools/get-notifications.html): Retrieve notifications (use `countOnly: true` for a cheap unread count)
-- [Mark Notifications Seen](https://cameronrye.github.io/atproto-mcp/api/tools/get-notifications.html): Mark notifications as seen up to a timestamp
+- [Mark Notifications Seen](https://cameronrye.github.io/atproto-mcp/api/tools/mark-notifications-seen.html): Mark notifications as seen up to a timestamp
 - [Get Custom Feed](https://cameronrye.github.io/atproto-mcp/api/tools/get-custom-feed.html): Access custom feeds
 
 ### Content Management

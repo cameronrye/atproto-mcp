@@ -31,7 +31,7 @@ If you want to understand the protocol itself in depth, start here:
 
 The table below maps the AT Protocol building blocks to the MCP tools this
 server exposes. See the [API Reference](../api/index.md) for the full catalog of
-60 tools.
+43 tools.
 
 | AT Protocol concept                                                  | What it is                                                                                                            | Related MCP tools                                                                                                                                                        |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

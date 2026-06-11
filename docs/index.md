@@ -22,7 +22,7 @@ hero:
 features:
   - title: Complete AT Protocol Integration
     details:
-      60 tools built on the official @atproto/api, covering posts, replies,
+      43 tools built on the official @atproto/api, covering posts, replies,
       likes, reposts, follows, profiles, timelines, search, and moderation.
 
   - title: MCP Server Compliance
@@ -71,37 +71,41 @@ features:
       guides, and best practices for integration.
 ---
 
-## What's New in v0.2.1
+## What's New in v0.4.0
 
-The latest release expands the toolset to 60 tools and refines the AT Protocol
-integration:
+The latest release reshapes the tool API for clarity and reliability,
+consolidating the 62-tool roster down to 43 tools that are all functional,
+single-purpose, and fully documented:
 
-::: tip Batch Operations
+::: tip Consolidated Toolset
 
-Perform multiple operations in a single call! Follow, like, or repost up to 25
-items at once to reduce API round-trips and improve efficiency.
-
-:::
-
-::: tip Analytics & Insights
-
-Summarize engagement velocity and map your network using transparent heuristics
-over your own posts and graph data. These are descriptive metrics, not
-machine-learning predictions.
+Redundant tools were merged behind parameters — for example
+`get_followers` + `get_follows` became `get_user_connections`
+(`direction: 'followers' | 'follows'`), and the batch tools became one
+`batch_action` (`action: 'follow' | 'like' | 'repost'`). Tools that never worked
+(OAuth flows, real-time streaming, `generate_alt_text`) were removed.
 
 :::
 
-::: tip Content Discovery
+::: tip Machine-Readable Schemas
 
-Find similar users from shared follows and followers, and sample trending topics
-from your home timeline.
+Every tool now advertises a JSON Schema `outputSchema` in `tools/list`, and
+every tool parameter carries a description. A test enforces 100% coverage so
+this cannot regress.
 
 :::
 
-::: warning Experimental
+::: tip New Tools
 
-Real-time firehose streaming and full OAuth (callback exchange, token
-refresh/revoke) are registered but not yet functional. See
+`search_actors` finds accounts by handle or display name, and `get_author_feed`
+lists a specific user's posts.
+
+:::
+
+::: warning Removed Experimental Tools
+
+The non-functional OAuth and real-time streaming tools were removed in 0.4.0;
+they are no longer registered. See
 [Experimental & Roadmap](./guide/experimental) for current status.
 
 :::
@@ -145,9 +149,8 @@ npx atproto-mcp
 - Unauthenticated mode for public read-only tools
 - In-memory session handling
 
-> Real-time firehose streaming and full OAuth (callback exchange, token
-> refresh/revoke) are experimental and not yet functional. See
-> [Experimental & Roadmap](./guide/experimental).
+> Real-time firehose streaming and OAuth login are not yet implemented and are
+> not exposed as tools. See [Experimental & Roadmap](./guide/experimental).
 
 ### Developer Experience
 

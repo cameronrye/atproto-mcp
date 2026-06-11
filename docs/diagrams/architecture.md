@@ -56,9 +56,10 @@ graph TB
 
 ::: warning Streaming is not wired into this diagram
 
-Firehose/streaming tools are registered but **not functional** — firehose
-decoding is gated off, so the server opens no WebSocket and surfaces no live
-events. See [Experimental & Roadmap](../guide/experimental.md).
+There are **no streaming tools** — the non-functional firehose/streaming tools
+were removed in 0.4.0, and firehose frame decoding is not implemented, so the
+server opens no WebSocket and surfaces no live events. See
+[Experimental & Roadmap](../guide/experimental.md).
 
 :::
 
@@ -123,8 +124,8 @@ structured schema.
 
 ## Tool Organization
 
-A representative slice of the 60 tools, grouped by area. (Streaming and OAuth
-completion tools exist but are experimental/non-functional — see
+A representative slice of the 43 tools, grouped by area. (The former streaming
+and OAuth tools were removed in 0.4.0 because they never worked — see
 [Experimental & Roadmap](../guide/experimental.md).)
 
 ```mermaid

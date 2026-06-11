@@ -235,6 +235,10 @@ export default withMermaid(
               { text: 'Get Author Feed', link: '/api/tools/get-author-feed' },
               { text: 'Get Custom Feed', link: '/api/tools/get-custom-feed' },
               { text: 'Get Notifications', link: '/api/tools/get-notifications' },
+              {
+                text: 'Mark Notifications Seen',
+                link: '/api/tools/mark-notifications-seen',
+              },
               { text: 'Delete Post', link: '/api/tools/delete-post' },
             ],
           },

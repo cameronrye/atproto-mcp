@@ -77,6 +77,7 @@ Upload an image to AT Protocol for use in posts or profile.
 - **PNG** (`.png`)
 - **WebP** (`.webp`)
 - **GIF** (`.gif`)
+- **AVIF** (`.avif`)
 
 ## Size Limits
 
@@ -101,7 +102,7 @@ content). The exact text:
 Unsupported image format: <extension>
 ```
 
-Only `.jpg`, `.jpeg`, `.png`, `.gif`, and `.webp` are accepted.
+Only `.jpg`, `.jpeg`, `.png`, `.gif`, `.webp`, and `.avif` are accepted.
 
 #### File Too Large
 

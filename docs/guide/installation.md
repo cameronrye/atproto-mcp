@@ -132,8 +132,8 @@ example.
 ::: tip stdio transport
 
 The server communicates over the stdio transport and does not bind a network
-port, so no `-p`/port publishing is required. The `Dockerfile` includes an
-`EXPOSE 3000` line, but it is vestigial — nothing listens on that port.
+port, so no `-p`/port publishing is required. The `Dockerfile` deliberately has
+no `EXPOSE` line — nothing listens on a port.
 
 :::
 
@@ -163,12 +163,16 @@ atproto-mcp
 
 You should see output like:
 
+```text
+[2026-06-11T12:00:00.000Z] INFO  [ToolsFactory] Created 43 AT Protocol MCP tools
+[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 43 MCP tools
+[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 4 MCP resources
+[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 2 MCP prompts
+[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Starting AT Protocol MCP Server...
+[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] AT Protocol MCP Server started successfully
 ```
-[INFO] AT Protocol MCP Server starting...
-[INFO] Server initialized successfully
-[INFO] Registered 60 tools, 4 resources, 2 prompts
-[INFO] Server ready on stdio transport
-```
+
+Logs are written to stderr (stdout carries the MCP protocol).
 
 ### Health Check
 

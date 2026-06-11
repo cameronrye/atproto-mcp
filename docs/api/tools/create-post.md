@@ -10,7 +10,8 @@ unless you supply `facets` explicitly.
 
 **Required:** Yes (Private tool)
 
-This tool requires authentication using either app passwords or OAuth.
+This tool requires authentication using an app password (OAuth is not yet
+implemented).
 
 ## Parameters
 

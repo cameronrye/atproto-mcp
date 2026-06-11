@@ -240,7 +240,7 @@ Keep in mind Bluesky itself also enforces platform-side rate limits; persistent
 **Fix**:
 
 - Ask your client to list tools (for example, "What tools are available?"). The
-  server exposes 60 tools.
+  server exposes 43 tools.
 - Tool names are `snake_case` (`create_post`, not `createPost`).
 - Some tools require authentication; without credentials they are unavailable.
   See [Authentication Issues](#authentication-issues).

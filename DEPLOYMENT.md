@@ -27,9 +27,9 @@ This means there are only two supported deployment shapes today:
 - Node.js 20+ (the published runtime target; CI tests Node 20, 22, and 24)
 - An MCP-compatible client (e.g. Claude Desktop)
 - (Optional) An AT Protocol account with an **app password** for authenticated
-  tools — without it, only public/enhanced tools such as `get_user_profile`,
-  `get_followers`, and `get_follows` work (`search_posts` requires
-  authentication as of the 2025 AT Protocol API change)
+  tools — without it, only public/enhanced tools such as `get_user_profile` and
+  `get_user_connections` work (`search_posts` requires authentication as of the
+  2025 AT Protocol API change)
 - (Optional) Docker, if you prefer running the server in a container
 
 ## Quick Start (stdio)

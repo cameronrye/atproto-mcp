@@ -15,19 +15,36 @@ The server provides three types of MCP primitives:
 
 ### Public Tools (No Authentication Required)
 
-These tools work in unauthenticated mode against public AT Protocol data:
+These tools work in unauthenticated mode against public AT Protocol data. All
+except `analyze_image` are ENHANCED-mode tools: they work without authentication
+and provide richer viewer-specific data when authenticated.
 
 #### Data Retrieval
 
-- `get_user_profile` - Get public profile information (ENHANCED mode: provides
-  additional viewer-specific data when authenticated)
+- `get_user_profile` - Get public profile information
 - `get_user_summary` - Get a profile with recent posts and engagement stats in
-  one call (ENHANCED mode)
-- `search_actors` - Find accounts by handle or display name (ENHANCED mode)
-- `get_author_feed` - List a specific user's posts (ENHANCED mode)
+  one call
+- `get_post_context` - Get a post with thread, author, engagement, and media
+  data (replaces the former `get_thread` and `extract_media_from_post`)
+- `search_actors` - Find accounts by handle or display name
+- `get_author_feed` - List a specific user's posts
 - `get_user_connections` - Get a user's followers or follows via
-  `direction: 'followers' | 'follows'` (ENHANCED mode: works without
-  authentication, richer viewer data when authenticated)
+  `direction: 'followers' | 'follows'`
+- `get_custom_feed` - Access custom feeds
+- `get_list` - Get list details
+
+#### Moderation & Analysis
+
+- `analyze_moderation_status` - Check moderation status of content
+- `find_influential_users` - Find influential users in a topic area
+- `find_similar_users` - Find similar users by shared follows/followers (graph
+  overlap only; does not analyze content or topics)
+- `discover_communities` - Discover communities around topics
+
+#### Rich Media
+
+- `analyze_image` - Report an image blob's declared size and MIME type (PUBLIC
+  mode; does not decode pixels, so no dimensions or aspect ratio)
 
 **Note:** Most other tools require authentication. `search_posts`, in
 particular, requires authentication (the AT Protocol search API changed in 2025
@@ -64,7 +81,6 @@ These tools require authentication to perform write operations:
 - `get_notifications` - Get notifications (use `countOnly: true` for a cheap
   unread badge count)
 - `mark_notifications_seen` - Mark notifications as seen up to a timestamp
-- `get_custom_feed` - Access custom feeds
 
 #### Content Management
 
@@ -79,7 +95,6 @@ These tools require authentication to perform write operations:
 - `create_list` - Create user lists
 - `add_to_list` - Add users to lists
 - `remove_from_list` - Remove users from lists
-- `get_list` - Get list details
 
 #### Moderation
 
@@ -87,7 +102,6 @@ These tools require authentication to perform write operations:
 - `block_user` / `unblock_user` - Block and unblock users
 - `report_content` - Report inappropriate content
 - `report_user` - Report users
-- `analyze_moderation_status` - Check moderation status of content
 
 #### Batch Operations
 
@@ -99,26 +113,11 @@ These tools require authentication to perform write operations:
 - `analyze_account` - Analyze a single account along one dimension via
   `dimension: 'engagement' | 'network' | 'strategy'` (engagement rate is
   engagement per hour since posting, a time-velocity measure)
-- `find_influential_users` - Find influential users in a topic area
 
 #### Content Discovery
 
 - `discover` - Surface timeline content via `mode: 'trending' | 'recommended'`,
   sampling the caller's own home timeline (~100 posts), not the whole network
-- `find_similar_users` - Find similar users by shared follows/followers (graph
-  overlap only; does not analyze content or topics)
-- `discover_communities` - Discover communities around topics
-
-#### Composite Operations
-
-- `get_user_summary` - Get complete user profile with stats and analysis
-- `get_post_context` - Get post with thread, author, engagement, and media data
-  (replaces the former `get_thread` and `extract_media_from_post`)
-
-#### Rich Media
-
-- `analyze_image` - Report an image blob's declared size and MIME type (does not
-  decode pixels, so no dimensions or aspect ratio)
 
 ## Tool Usage Patterns
 
@@ -190,7 +189,7 @@ Each tool has an authentication mode:
 
 - Works without authentication
 - Access to public data only
-- Example: `get_user_profile`, `analyze_image`
+- Example: `analyze_image` (the only PUBLIC-mode tool)
 
 ### PRIVATE Mode
 
