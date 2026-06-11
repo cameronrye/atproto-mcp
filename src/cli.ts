@@ -5,9 +5,9 @@
  */
 
 import { parseArgs } from 'node:util';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
 import { AtpMcpServer } from './index.js';
 import { LogLevel, Logger } from './utils/logger.js';
@@ -353,8 +353,26 @@ async function main(): Promise<void> {
   }
 }
 
+/**
+ * Detect whether a module is the process entry point. Node realpath-resolves
+ * import.meta.url for the main module, but argv[1] stays the literal invoked
+ * path — and npm installs bins as symlinks — so a naive string comparison
+ * against `file://${argv[1]}` breaks symlinked, relative, and space-containing
+ * paths. Compare realpath-resolved file URLs instead.
+ */
+export function isMainModule(importMetaUrl: string, argv1: string | undefined): boolean {
+  if (argv1 == null || argv1 === '') {
+    return false;
+  }
+  try {
+    return importMetaUrl === pathToFileURL(realpathSync(argv1)).href;
+  } catch {
+    return false;
+  }
+}
+
 // Run CLI if this file is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url, process.argv[1])) {
   main().catch(error => {
     console.error('Fatal error:', error);
     process.exit(1);

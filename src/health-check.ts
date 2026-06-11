@@ -12,6 +12,7 @@
  * and reporting them would be misleading.
  */
 
+import { isMainModule } from './cli.js';
 import { AtpMcpServer } from './index.js';
 
 function healthCheck(): void {
@@ -54,6 +55,6 @@ function healthCheck(): void {
 }
 
 // Run health check if this script is executed directly
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (isMainModule(import.meta.url, process.argv[1])) {
   void healthCheck();
 }
