@@ -212,8 +212,16 @@ export class AnalyzeAccountTool extends BaseTool {
         { actor, limit: params.limit }
       );
 
+      // getAuthorFeed includes the actor's reposts, where `post` is the ORIGINAL
+      // post by a different author carrying that author's counts. The repost
+      // indicator lives on the feed item's `reason`
+      // (app.bsky.feed.defs#reasonRepost), so drop those before aggregating.
+      const ownFeedItems = response.data.feed.filter(
+        (feedItem: any) => feedItem.reason?.$type !== 'app.bsky.feed.defs#reasonRepost'
+      );
+
       // Transform and analyze posts
-      const posts: IPostEngagement[] = response.data.feed.map((feedItem: any) => {
+      const posts: IPostEngagement[] = ownFeedItems.map((feedItem: any) => {
         const post = feedItem.post;
         const text = post.record.text || '';
         const hashtags = this.extractHashtags(text);
@@ -847,7 +855,13 @@ export class AnalyzeAccountTool extends BaseTool {
         { actor, limit: analyzePosts }
       );
 
-      const posts = postsResponse.data.feed.map((item: any) => ({
+      // Same repost exclusion as the engagement dimension: a repost's `post`
+      // belongs to a different author, so it must not feed the strategy stats.
+      const ownFeedItems = postsResponse.data.feed.filter(
+        (item: any) => item.reason?.$type !== 'app.bsky.feed.defs#reasonRepost'
+      );
+
+      const posts = ownFeedItems.map((item: any) => ({
         uri: item.post.uri,
         cid: item.post.cid,
         text: item.post.record.text || '',
