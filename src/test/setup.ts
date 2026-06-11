@@ -129,7 +129,7 @@ export function rejectAfter(ms: number, error: Error): Promise<never> {
  * Assert that a function throws an error with specific properties
  */
 export async function expectToThrow<T extends Error>(
-  fn: () => Promise<unknown> | unknown,
+  fn: () => unknown,
   errorClass: new (...args: any[]) => T,
   message?: string | RegExp
 ): Promise<T> {
@@ -158,35 +158,4 @@ export async function expectToThrow<T extends Error>(
 
     return error;
   }
-}
-
-/**
- * Mock AT Protocol API responses
- */
-export class MockAtpAgent {
-  public loginResponse: any = { success: true, data: createMockSession() };
-  public refreshResponse: any = { success: true };
-
-  async login(): Promise<any> {
-    return this.loginResponse;
-  }
-
-  async refreshSession(): Promise<any> {
-    return this.refreshResponse;
-  }
-
-  setLoginResponse(response: any): void {
-    this.loginResponse = response;
-  }
-
-  setRefreshResponse(response: any): void {
-    this.refreshResponse = response;
-  }
-}
-
-/**
- * Create a mock AT Protocol agent
- */
-export function createMockAtpAgent(): MockAtpAgent {
-  return new MockAtpAgent();
 }

@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import { type IAtpPost, type ISearchPostsParams, ValidationError } from '../../types/index.js';
+import type { IAtpPost, ISearchPostsParams } from '../../types/index.js';
 
 /**
  * Zod schema for search posts parameters
@@ -273,100 +273,6 @@ export class SearchPostsTool extends BaseTool {
     } catch (error) {
       this.logger.error('Failed to search posts', error);
       this.formatError(error);
-    }
-  }
-
-  /**
-   * Search posts by hashtag
-   */
-  public async searchByHashtag(
-    hashtag: string,
-    options?: {
-      limit?: number;
-      cursor?: string;
-      sort?: 'top' | 'latest';
-    }
-  ): Promise<{
-    success: boolean;
-    posts: IAtpPost[];
-    cursor?: string;
-    hasMore: boolean;
-    hashtag: string;
-  }> {
-    try {
-      // Ensure hashtag starts with #
-      const formattedHashtag = hashtag.startsWith('#') ? hashtag : `#${hashtag}`;
-
-      const result = await this.execute({
-        q: formattedHashtag,
-        limit: options?.limit || 25,
-        cursor: options?.cursor,
-        sort: options?.sort || 'latest',
-      });
-
-      return {
-        success: result.success,
-        posts: result.posts,
-        cursor: result.cursor,
-        hasMore: result.hasMore,
-        hashtag: formattedHashtag,
-      };
-    } catch (error) {
-      this.logger.error('Failed to search posts by hashtag', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Search posts by author
-   */
-  public async searchByAuthor(
-    author: string,
-    query?: string,
-    options?: {
-      limit?: number;
-      cursor?: string;
-      sort?: 'top' | 'latest';
-    }
-  ): Promise<{
-    success: boolean;
-    posts: IAtpPost[];
-    cursor?: string;
-    hasMore: boolean;
-    author: string;
-  }> {
-    try {
-      this.validateActor(author);
-
-      // AT Protocol search requires a non-empty query term and has no match-all
-      // wildcard ('*' would be searched literally and match nothing). To list an
-      // author's posts without a search term, use get_timeline / an author feed.
-      if (!query || query.trim() === '') {
-        throw new ValidationError(
-          "searchByAuthor requires a non-empty query term (AT Protocol search has no match-all wildcard). To list all of an author's posts, use an author-feed tool instead.",
-          'query',
-          query
-        );
-      }
-
-      const result = await this.execute({
-        q: query,
-        author,
-        limit: options?.limit || 25,
-        cursor: options?.cursor,
-        sort: options?.sort || 'latest',
-      });
-
-      return {
-        success: result.success,
-        posts: result.posts,
-        cursor: result.cursor,
-        hasMore: result.hasMore,
-        author,
-      };
-    } catch (error) {
-      this.logger.error('Failed to search posts by author', error);
-      throw error;
     }
   }
 }

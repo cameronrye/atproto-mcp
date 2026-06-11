@@ -298,8 +298,9 @@ export class AnalyzeAccountTool extends BaseTool {
                 avgEngagementRate: {
                   type: 'number',
                   description:
-                    'Mean weighted engagement (likes + 2×replies + 3×reposts) per hour since ' +
-                    'posting, rounded to 2 decimals.',
+                    'Mean weighted engagement (likes + 2×replies + 3×reposts) per hour of post ' +
+                    'age, rounded to 2 decimals; each post’s age is floored at 24 hours so ' +
+                    'brand-new posts do not dominate.',
                 },
                 bestPerformingPosts: {
                   type: 'array',
@@ -1266,12 +1267,15 @@ export class AnalyzeAccountTool extends BaseTool {
         throw new Error('No posts found to analyze');
       }
 
-      // Calculate engagement for each post
+      // Calculate engagement for each post. Same age floor as the engagement
+      // dimension: the per-hour denominator is floored at 24h so a minutes-old
+      // post (tiny denominator) cannot dominate the rate-based averages and
+      // rankings (avgEngagementRate, bestPostingTimes, contentTypes, topics).
       const postsWithEngagement = posts.map((post: any) => {
         const engagement = post.likeCount + post.replyCount * 2 + post.repostCount * 3;
         const createdAt = new Date(post.createdAt);
         const hoursSincePost = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-        const engagementRate = hoursSincePost > 0 ? engagement / hoursSincePost : engagement;
+        const engagementRate = engagement / Math.max(hoursSincePost, 24);
 
         return {
           ...post,
