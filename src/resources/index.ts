@@ -9,6 +9,16 @@ import { BaseResource, type IResourceContent } from './base.js';
 // Export base classes and interfaces
 export { BaseResource, type IMcpResource, type IResourceContent } from './base.js';
 
+// Export parameterized resource templates and the URI resolver
+export {
+  ActorFeedTemplate,
+  ActorProfileTemplate,
+  createResourceTemplates,
+  resolveResourceUri,
+  type IResolvedResource,
+  type IResourceTemplate,
+} from './templates.js';
+
 /**
  * Timeline resource - exposes user's timeline as JSON
  */
