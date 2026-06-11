@@ -9,10 +9,45 @@ and this project adheres to
 
 ## [Unreleased]
 
+This release expands the server's surface: direct messages, bookmarks,
+starter packs, reply/quote controls, parameterized resources, argument
+completions, and an HTTP transport option. The tool count goes from 43 to 51.
+
+### Added
+
+- **Direct messages** — `list_conversations`, `get_conversation_messages`,
+  and `send_direct_message` via the Bluesky chat service. Messages can be
+  sent to a conversation id or straight to a handle/DID. Requires an app
+  password created with direct-message access; the error message says so
+  when it isn't.
+- **Bookmarks** — `add_bookmark`, `remove_bookmark`, and `get_bookmarks`
+  for the private bookmark stash, with honest already-bookmarked flags.
+- **Starter packs** — `search_starter_packs` and `get_starter_pack`
+  (accepts `at://` URIs and `bsky.app` share links); both work
+  unauthenticated.
+- **Reply and quote controls** — `create_post` accepts `replyControls`
+  (mentioned/following/followers/list rules) and `quoteControls`, written
+  as threadgate/postgate records; `create_thread` applies reply controls
+  to the root post.
+- **Resource templates** — `atproto://profile/{actor}` and
+  `atproto://feed/{actor}` let MCP clients read any actor's public profile
+  or feed as a resource, unauthenticated.
+- **Completions** — the server declares the completions capability and
+  serves suggestions for prompt arguments and the template `{actor}`.
+- **Streamable HTTP transport** — `--transport http` serves MCP over
+  `/mcp` with per-session transports and DNS-rebinding protection,
+  binding loopback by default; stdio remains the default.
+
+### Removed
+
+- The dead `FirehoseClient` and the `ws` production dependency. Frame
+  decoding was never implemented and the streaming tools were already
+  removed in 0.4.0; a future Jetstream integration would be written fresh.
+
 ### Planned
 
 - OAuth token exchange (the `oauth-client` scaffolding is in place)
-- Direct messaging support (`chat.bsky.convo`)
+- DM rich text, embeds, and conversation management (mute/accept/leave)
 - Group/community features
 - Custom feed generator integration
 - Multi-account management
