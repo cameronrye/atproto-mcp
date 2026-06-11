@@ -9,6 +9,11 @@ on:
   pull_request:
     branches: [main, develop]
 
+# Least privilege: every job only checks out code and runs local tooling.
+# Codecov authenticates with CODECOV_TOKEN, not the GITHUB_TOKEN.
+permissions:
+  contents: read
+
 jobs:
   test:
     name: Test on Node.js ${{ matrix.node-version }}
@@ -70,6 +75,9 @@ jobs:
           fail_ci_if_error: false
 
   build:
+    # Branch protection on main requires the "Build" status check, so this job
+    # stays even though the test job also builds. It uploads no artifacts —
+    # nothing consumed them; npm is the canonical artifact (see publish.yml).
     name: Build
     runs-on: ubuntu-latest
     needs: test
@@ -92,9 +100,3 @@ jobs:
 
       - name: Build
         run: pnpm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
-        with:
-          name: dist
-          path: dist/

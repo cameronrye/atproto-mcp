@@ -43,6 +43,11 @@ jobs:
           # job needs to push the tag and create the release. (A stale
           # RELEASE_TOKEN PAT previously broke checkout with an auth failure.)
           token: ${{ github.token }}
+          # Full history + tags: the changelog step diffs against the previous
+          # tag via `git describe --tags HEAD^`. With the default shallow clone
+          # neither HEAD^ nor any tag exists, so every release degraded to
+          # "- Initial release". fetch-depth: 0 also fetches refs/tags/*.
+          fetch-depth: 0
 
       - name: Setup pnpm
         # Pinned to a commit SHA (this workflow holds id-token:write / OIDC publish
@@ -68,7 +73,9 @@ jobs:
         # The Node 22 runner ships npm 10.x; OIDC trusted publishing needs >= 11.5.1.
         # We publish the final tarball with `npm publish` (pnpm has no native OIDC
         # support — its publish just shells out to npm), so npm itself must be recent.
-        run: npm install -g npm@latest
+        # Pinned to the 11.x major (not @latest): this job holds OIDC publish
+        # authority, so it must not auto-adopt a future npm major sight unseen.
+        run: npm install -g npm@11
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -78,6 +85,9 @@ jobs:
 
       - name: Lint
         run: pnpm run lint
+
+      - name: Format check
+        run: pnpm run format:check
 
       - name: Build
         run: pnpm run build

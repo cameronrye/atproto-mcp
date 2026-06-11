@@ -1,0 +1,24 @@
+# Dependency update automation.
+# npm: weekly, with minor/patch bumps batched into a single PR to keep noise
+# down — majors still arrive individually so breaking changes get a focused
+# review. github-actions: weekly; updates the pinned commit SHAs (and their
+# version comments) used across the workflows.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        applies-to: version-updates
+        patterns:
+          - '*'
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

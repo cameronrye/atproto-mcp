@@ -20,6 +20,11 @@ on:
           - authenticated
           - all
 
+# Least privilege: both jobs only check out code, run tests against the live
+# network, and upload artifacts. No GITHUB_TOKEN writes anywhere.
+permissions:
+  contents: read
+
 jobs:
   # Unauthenticated integration tests (public endpoints only)
   unauthenticated-tests:
@@ -85,6 +90,21 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Verify test credentials are configured
+        # Without this guard, missing secrets yield an empty .env.test, the test
+        # runner skips every authenticated test, and the scheduled run goes green
+        # without exercising credentials — its entire reason to exist. Fail loudly.
+        env:
+          BSKY_TEST_HANDLE: ${{ secrets.BSKY_TEST_HANDLE }}
+          BSKY_TEST_PASSWORD: ${{ secrets.BSKY_TEST_PASSWORD }}
+        run: |
+          if [ -z "$BSKY_TEST_HANDLE" ] || [ -z "$BSKY_TEST_PASSWORD" ]; then
+            echo "::error::BSKY_TEST_HANDLE and/or BSKY_TEST_PASSWORD secrets are not configured. Authenticated integration tests cannot run — configure both repository secrets."
+            echo "❌ **Authenticated integration tests failed**: \`BSKY_TEST_HANDLE\` / \`BSKY_TEST_PASSWORD\` secrets are missing." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "Test credentials are configured."
 
       - name: Create .env.test
         run: |

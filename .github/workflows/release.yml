@@ -10,9 +10,10 @@ jobs:
     name: Create Release and Publish
     runs-on: ubuntu-latest
     permissions:
+      # contents: write is all this job needs — it only creates the GitHub
+      # Release. npm publishing (which needed id-token: write for OIDC) is
+      # owned by the Manual Publish workflow; see the note below.
       contents: write
-      packages: write
-      id-token: write # Required for npm provenance
 
     steps:
       - name: Checkout code
@@ -39,6 +40,9 @@ jobs:
 
       - name: Lint
         run: pnpm run lint
+
+      - name: Format check
+        run: pnpm run format:check
 
       - name: Run tests with coverage
         run: pnpm run test:coverage
