@@ -15,7 +15,7 @@ import {
   ValidationError,
 } from '../types/index.js';
 import { Logger } from './logger.js';
-import type { IOAuthSession } from './oauth-client.js';
+import type { AtpOAuthClient, IOAuthSession } from './oauth-client.js';
 
 /**
  * AT Protocol client wrapper with comprehensive authentication and session management
@@ -28,6 +28,8 @@ export class AtpClient {
   private session: IAtpSession | null = null;
   private config: IAtpConfig;
   private sessionRefreshPromise: Promise<void> | null = null;
+  private authenticationPromise: Promise<void> | null = null;
+  private oauthClient: AtpOAuthClient | null = null;
   private isAuthenticationRequired: boolean;
 
   constructor(config: IAtpConfig) {
@@ -89,9 +91,28 @@ export class AtpClient {
   }
 
   /**
-   * Authenticate with AT Protocol using configured method
+   * Authenticate with AT Protocol using configured method.
+   * Single-flighted (same pattern as refreshSession): concurrent callers share
+   * one in-flight attempt instead of racing parallel logins.
    */
   private async authenticate(): Promise<void> {
+    if (this.authenticationPromise) {
+      return this.authenticationPromise;
+    }
+
+    this.authenticationPromise = this.performAuthentication();
+
+    try {
+      await this.authenticationPromise;
+    } finally {
+      this.authenticationPromise = null;
+    }
+  }
+
+  /**
+   * Perform the actual authentication for the configured method
+   */
+  private async performAuthentication(): Promise<void> {
     if (this.config.authMethod === 'app-password') {
       await this.authenticateWithAppPassword();
     } else if (this.config.authMethod === 'oauth') {
@@ -162,8 +183,7 @@ export class AtpClient {
     try {
       this.logger.debug('Authenticating with OAuth');
 
-      const { AtpOAuthClient } = await import('./oauth-client.js');
-      const oauthClient = new AtpOAuthClient(this.config);
+      const oauthClient = await this.getOAuthClient();
 
       // For server environments, we need a different flow
       // This implementation supports both interactive and programmatic flows
@@ -249,6 +269,19 @@ export class AtpClient {
   }
 
   /**
+   * Lazily create and reuse a single OAuth client. Each AtpOAuthClient owns a
+   * 10-minute cleanup interval, so a fresh instance per authenticate attempt
+   * would leak timers and pending-authorization state.
+   */
+  private async getOAuthClient(): Promise<AtpOAuthClient> {
+    if (!this.oauthClient) {
+      const { AtpOAuthClient } = await import('./oauth-client.js');
+      this.oauthClient = new AtpOAuthClient(this.config);
+    }
+    return this.oauthClient;
+  }
+
+  /**
    * Handle session events from AtpAgent
    */
   private handleSessionEvent(event: AtpSessionEvent, sessionData?: AtpSessionData): void {
@@ -278,6 +311,13 @@ export class AtpClient {
         break;
       case 'expired':
         this.logger.warn('Session expired, attempting refresh');
+        // Invalidate the session immediately so callers stop treating it as
+        // active. Authenticated calls arriving during recovery wait for the
+        // in-flight refresh (see executeRequest); if recovery fails, the next
+        // call re-attempts authentication instead of staying wedged.
+        if (this.session) {
+          this.session = { ...this.session, active: false };
+        }
         this.refreshSession().catch((error: unknown) => {
           this.logger.error('Failed to refresh expired session', error);
         });
@@ -309,12 +349,16 @@ export class AtpClient {
     try {
       this.logger.debug('Refreshing session');
 
-      if ('refreshSession' in this.agent && typeof this.agent.refreshSession === 'function') {
-        // AtpAgent.refreshSession() returns Promise<void> and throws on failure;
-        // it does NOT resolve to a { success } envelope. Awaiting it is the whole
-        // contract — inspecting a `.success` field would throw a TypeError and
-        // force a needless full re-login on every token refresh.
-        await this.agent.refreshSession();
+      // Token refresh lives on the agent's session manager (CredentialSession),
+      // not on AtpAgent itself. CredentialSession.refreshSession() returns
+      // Promise<void> and throws on failure — it does NOT resolve to a
+      // { success } envelope. On success it fires the 'update' session event,
+      // which re-marks our session as active.
+      const sessionManager = this.agent.sessionManager as
+        | { refreshSession?: () => Promise<void> }
+        | undefined;
+      if (typeof sessionManager?.refreshSession === 'function') {
+        await sessionManager.refreshSession();
         this.logger.info('Session refreshed successfully');
       } else {
         // Fallback: re-authenticate if refresh is not available
@@ -427,7 +471,18 @@ export class AtpClient {
         }
 
         if (!this.isAuthenticated()) {
-          await this.authenticate();
+          // If a background session recovery is in flight (e.g. triggered by an
+          // 'expired' event), wait for it instead of racing a parallel login.
+          if (this.sessionRefreshPromise) {
+            try {
+              await this.sessionRefreshPromise;
+            } catch {
+              // Recovery failed; fall through to a fresh authentication attempt.
+            }
+          }
+          if (!this.isAuthenticated()) {
+            await this.authenticate();
+          }
         }
       }
 
@@ -613,6 +668,10 @@ export class AtpClient {
       if (this.sessionRefreshPromise) {
         await this.sessionRefreshPromise;
       }
+
+      // Stop the OAuth client's background cleanup interval
+      this.oauthClient?.destroy();
+      this.oauthClient = null;
 
       this.session = null;
       this.logger.info('AT Protocol client cleanup completed');

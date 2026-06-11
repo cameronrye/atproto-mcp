@@ -13,12 +13,14 @@ import {
   createMockSession,
 } from '../../test/setup.js';
 
-// Mock the @atproto/api module
+// Mock the @atproto/api module. Note: the real AtpAgent does NOT expose
+// refreshSession() itself — token refresh lives on agent.sessionManager
+// (CredentialSession.refreshSession()), so the mock mirrors that shape.
 vi.mock('@atproto/api', () => ({
   AtpAgent: vi.fn().mockImplementation(function () {
     return {
       login: vi.fn(),
-      refreshSession: vi.fn(),
+      sessionManager: { refreshSession: vi.fn() },
     };
   }),
 }));
@@ -30,10 +32,10 @@ describe('AtpClient', () => {
   beforeEach(async () => {
     mockConsole();
 
-    // Create mock agent
+    // Create mock agent (refresh lives on sessionManager, as in the real SDK)
     mockAgent = {
       login: vi.fn(),
-      refreshSession: vi.fn(),
+      sessionManager: { refreshSession: vi.fn() },
     };
 
     // Mock AtpAgent constructor
@@ -134,10 +136,11 @@ describe('AtpClient', () => {
         success: true,
         data: mockSession,
       });
-      // The real @atproto/api AtpAgent.refreshSession() returns Promise<void>.
-      // The client must NOT inspect a (non-existent) `.success` field on the
-      // result — doing so throws a TypeError that forces a needless full re-login.
-      mockAgent.refreshSession.mockResolvedValue(undefined);
+      // The real @atproto/api refresh path is agent.sessionManager.refreshSession()
+      // (CredentialSession), which returns Promise<void>. The client must call
+      // that — AtpAgent itself has no refreshSession() — and must NOT inspect a
+      // (non-existent) `.success` field on the void result.
+      mockAgent.sessionManager.refreshSession.mockResolvedValue(undefined);
 
       await client.initialize();
 
@@ -154,7 +157,7 @@ describe('AtpClient', () => {
       // Wait for refresh to complete
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      expect(mockAgent.refreshSession).toHaveBeenCalled();
+      expect(mockAgent.sessionManager.refreshSession).toHaveBeenCalled();
       // login was called exactly once (initial auth) — the void refresh result
       // must not be misread as a failure that triggers re-authentication.
       expect(mockAgent.login).toHaveBeenCalledTimes(1);

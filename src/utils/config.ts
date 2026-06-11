@@ -264,7 +264,7 @@ export class ConfigManager {
   private validateConfig(): void {
     try {
       McpServerConfigSchema.parse(this.config);
-      this.validateAuthConfiguration();
+      this.validateAuthConfiguration(this.config);
     } catch (error) {
       if (error instanceof z.ZodError) {
         const issues = error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);
@@ -295,8 +295,8 @@ export class ConfigManager {
    * Validate authentication configuration
    * Authentication is now optional - only validate if auth method is specified
    */
-  private validateAuthConfiguration(): void {
-    const { atproto } = this.config;
+  private validateAuthConfiguration(config: IMcpServerConfig): void {
+    const { atproto } = config;
 
     // If no auth method is specified, we're in unauthenticated mode - no validation needed
     if (!atproto.authMethod) {
@@ -324,10 +324,12 @@ export class ConfigManager {
   }
 
   /**
-   * Get the current configuration
+   * Get the current configuration.
+   * Returns a copy that also clones the nested atproto credentials object, so
+   * callers cannot mutate the live configuration through the snapshot.
    */
   public getConfig(): IMcpServerConfig {
-    return { ...this.config };
+    return { ...this.config, atproto: { ...this.config.atproto } };
   }
 
   /**
@@ -343,9 +345,11 @@ export class ConfigManager {
   public updateConfig(updates: Partial<IMcpServerConfig>): void {
     const newConfig = this.mergeConfig(this.config, updates);
 
-    // Validate the new configuration
+    // Validate the new configuration with the same checks the constructor
+    // enforces: schema shape AND auth-credential requirements.
     try {
       McpServerConfigSchema.parse(newConfig);
+      this.validateAuthConfiguration(newConfig);
     } catch (error) {
       if (error instanceof z.ZodError) {
         const issues = error.issues.map(issue => `${issue.path.join('.')}: ${issue.message}`);

@@ -18,10 +18,10 @@ import { EventEmitter } from 'events';
  * session from any input (an auth-bypass hazard), so these paths fail loudly.
  */
 const OAUTH_NOT_IMPLEMENTED =
-  'OAuth token exchange is not implemented. Use app-password authentication ' +
-  '(ATPROTO_IDENTIFIER + ATPROTO_PASSWORD), or complete the OAuth flow with a ' +
-  'real AT Protocol authorization server. This server can generate an authorization ' +
-  'URL (start_oauth_flow) but cannot yet exchange the authorization code for tokens.';
+  'OAuth authentication is not yet supported: the token exchange is not ' +
+  'implemented. Use app-password authentication instead (ATPROTO_IDENTIFIER + ' +
+  'ATPROTO_PASSWORD) — it is the supported path. This server can generate an ' +
+  'OAuth authorization URL but cannot yet exchange the authorization code for tokens.';
 
 export interface IOAuthSession {
   accessToken: string;

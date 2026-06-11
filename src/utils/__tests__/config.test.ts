@@ -196,6 +196,26 @@ describe('ConfigManager', () => {
     });
   });
 
+  describe('getConfig', () => {
+    it('returns a copy whose nested atproto object cannot mutate live config', () => {
+      const config = new ConfigManager({
+        atproto: {
+          service: 'https://bsky.social',
+          authMethod: 'app-password',
+          identifier: 'test.bsky.social',
+          password: 'test-password',
+        },
+      });
+
+      const snapshot = config.getConfig();
+      snapshot.atproto.identifier = 'attacker.example.com';
+      snapshot.atproto.password = 'tampered';
+
+      expect(config.getConfig().atproto.identifier).toBe('test.bsky.social');
+      expect(config.getConfig().atproto.password).toBe('test-password');
+    });
+  });
+
   describe('getAtpConfig', () => {
     it('should return AT Protocol configuration', () => {
       const config = new ConfigManager({
@@ -257,6 +277,39 @@ describe('ConfigManager', () => {
         ConfigurationError,
         /validation failed/
       );
+    });
+
+    it('enforces the same auth-credential validation as the constructor', async () => {
+      // Temporarily set NODE_ENV to production to test validation
+      const originalEnv = process.env['NODE_ENV'];
+      process.env['NODE_ENV'] = 'production';
+
+      try {
+        const config = new ConfigManager({
+          atproto: {
+            service: 'https://bsky.social',
+            authMethod: 'app-password',
+            identifier: 'test.bsky.social',
+            password: 'test-password',
+          },
+        });
+
+        // Switching to oauth without clientId/clientSecret must be rejected,
+        // exactly as the constructor would reject it.
+        await expectToThrow(
+          () =>
+            config.updateConfig({
+              atproto: { service: 'https://bsky.social', authMethod: 'oauth' },
+            }),
+          ConfigurationError,
+          /requires both clientId and clientSecret/
+        );
+
+        // The invalid update must not have been applied.
+        expect(config.getConfig().atproto.authMethod).toBe('app-password');
+      } finally {
+        process.env['NODE_ENV'] = originalEnv;
+      }
     });
   });
 

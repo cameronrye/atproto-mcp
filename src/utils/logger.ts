@@ -109,6 +109,22 @@ export class Logger {
   }
 
   /**
+   * Serialize structured log data defensively. Data can contain circular
+   * references or BigInt values, and an unguarded JSON.stringify would throw —
+   * turning a log call into a crash. JSON.stringify escapes newlines inside
+   * string values, so serialized data cannot inject extra log lines; the
+   * fallback reason is sanitized for the same guarantee.
+   */
+  private safeStringify(data: unknown): string {
+    try {
+      return JSON.stringify(data, null, 2) ?? String(data);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      return `[unserializable: ${this.sanitizeForLog(reason)}]`;
+    }
+  }
+
+  /**
    * Format log entry for output
    */
   private formatLogEntry(entry: ILogEntry): string {
@@ -120,9 +136,7 @@ export class Logger {
     let formatted = `[${timestamp}] ${levelName.padEnd(5)} [${component}] ${message}`;
 
     if (entry.data) {
-      // JSON.stringify escapes newlines inside string values, so data cannot
-      // inject extra log lines.
-      formatted += `\n  Data: ${JSON.stringify(entry.data, null, 2)}`;
+      formatted += `\n  Data: ${this.safeStringify(entry.data)}`;
     }
 
     if (entry.error) {

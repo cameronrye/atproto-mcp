@@ -33,6 +33,28 @@ describe('Logger stdio safety', () => {
     expect(errSpy).toHaveBeenCalledTimes(1);
   });
 
+  it('survives circular and BigInt data, falling back to a placeholder on stderr', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => undefined);
+    const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    const log = new Logger('Test', LogLevel.INFO);
+    log.setLogLevel(LogLevel.INFO); // override any LOG_LEVEL set by the test env
+
+    const circular: { name: string; self?: unknown } = { name: 'loop' };
+    circular.self = circular;
+
+    // A log call must never throw because its data is unserializable.
+    expect(() => log.info('circular data', circular)).not.toThrow();
+    expect(() => log.info('bigint data', { big: BigInt(10) })).not.toThrow();
+
+    const output = errSpy.mock.calls.map(call => String(call[0])).join('\n');
+    expect(output).toContain('[unserializable:');
+    // Both entries still reached stderr — and nothing touched stdout, which is
+    // reserved for the MCP JSON-RPC stream.
+    expect(errSpy).toHaveBeenCalledTimes(2);
+    expect(logSpy).not.toHaveBeenCalled();
+  });
+
   it('strips control chars from a logged stack trace but preserves newlines', () => {
     const errSpy = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
