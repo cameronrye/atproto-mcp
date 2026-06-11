@@ -144,7 +144,11 @@ jobs:
           if git describe --tags --abbrev=0 HEAD^ >/dev/null 2>&1; then
             LAST_TAG=$(git describe --tags --abbrev=0 HEAD^)
             echo "Changes since $LAST_TAG:" >> $GITHUB_OUTPUT
+            # `git log --pretty=format:` emits no trailing newline; without one
+            # the closing EOF delimiter glues to the last line and the output
+            # file command fails ("Matching delimiter not found").
             git log $LAST_TAG..HEAD --pretty=format:"- %s (%h)" >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
           else
             echo "- Initial release" >> $GITHUB_OUTPUT
           fi
