@@ -73,7 +73,7 @@ features:
       guides, and best practices for integration.
 ---
 
-## What's New
+## What's New in v0.6.0
 
 The latest release grows the roster from 43 to 51 tools and broadens the MCP
 surface:

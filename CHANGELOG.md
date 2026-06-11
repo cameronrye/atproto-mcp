@@ -9,6 +9,16 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Planned
+
+- OAuth token exchange (the `oauth-client` scaffolding is in place)
+- DM rich text, embeds, and conversation management (mute/accept/leave)
+- Group/community features
+- Custom feed generator integration
+- Multi-account management
+
+## [0.6.0] - 2026-06-11
+
 This release expands the server's surface: direct messages, bookmarks,
 starter packs, reply/quote controls, parameterized resources, argument
 completions, and an HTTP transport option. The tool count goes from 43 to 51.
@@ -37,6 +47,13 @@ completions, and an HTTP transport option. The tool count goes from 43 to 51.
 - **Streamable HTTP transport** — `--transport http` serves MCP over
   `/mcp` with per-session transports and DNS-rebinding protection,
   binding loopback by default; stdio remains the default.
+
+### Changed
+
+- Dependency refresh: `@atproto/api` 0.17.7 → 0.20.14 (one internal cast
+  loosened; no behavioral changes surfaced by the suite), plus minor/patch
+  updates across the toolchain (TypeScript 5.9.3, typescript-eslint 8.61,
+  prettier 3.8, lint-staged 17, `@types/node` 25).
 
 ### Removed
 
