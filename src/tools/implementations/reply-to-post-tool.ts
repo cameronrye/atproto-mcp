@@ -5,7 +5,12 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { ATURI, CID, IReplyToPostParams } from '../../types/index.js';
+import {
+  type ATURI,
+  type CID,
+  type IReplyToPostParams,
+  ValidationError,
+} from '../../types/index.js';
 
 /**
  * Zod schema for reply to post parameters
@@ -121,9 +126,13 @@ export class ReplyToPostTool extends BaseTool {
         langs: params.langs,
       });
 
-      // Validate the URIs
+      // Validate the URIs and pin their collection: a reply's root/parent must
+      // be app.bsky.feed.post records — referencing any other record type (a
+      // like, a follow, …) produces a structurally invalid reply.
       this.validateAtUri(params.root);
       this.validateAtUri(params.parent);
+      this.assertPostCollection('root', params.root);
+      this.assertPostCollection('parent', params.parent);
 
       // Get CIDs for the root and parent posts
       const [rootCid, parentCid] = await Promise.all([
@@ -194,6 +203,20 @@ export class ReplyToPostTool extends BaseTool {
     } catch (error) {
       this.logger.error('Failed to create reply', error);
       this.formatError(error);
+    }
+  }
+
+  /**
+   * Reject a reply ref whose collection is not app.bsky.feed.post.
+   */
+  private assertPostCollection(field: 'root' | 'parent', uri: string): void {
+    const { collection } = this.parseAtUri(uri);
+    if (collection !== 'app.bsky.feed.post') {
+      throw new ValidationError(
+        `${field} must reference a post record (collection "${collection}" is not app.bsky.feed.post)`,
+        field,
+        uri
+      );
     }
   }
 

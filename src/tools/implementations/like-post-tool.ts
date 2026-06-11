@@ -41,9 +41,18 @@ export class LikePostTool extends BaseTool {
           type: 'string',
           description: 'AT-URI of the newly created (or existing) like record.',
         },
-        cid: { type: 'string', description: 'CID of the like record.' },
+        cid: {
+          type: 'string',
+          description:
+            'CID of the newly created like record. Absent when the post was already liked (alreadyLiked=true): the existing record is reused and its CID is not re-fetched.',
+        },
         success: { type: 'boolean', description: 'Whether the like operation succeeded.' },
         message: { type: 'string', description: 'Human-readable status message.' },
+        alreadyLiked: {
+          type: 'boolean',
+          description:
+            'True when the post was already liked; the existing like record URI is returned and no duplicate is created.',
+        },
         likedPost: {
           type: 'object',
           description: 'The post that was liked.',
@@ -54,7 +63,7 @@ export class LikePostTool extends BaseTool {
           required: ['uri', 'cid'],
         },
       },
-      required: ['uri', 'cid', 'success', 'message', 'likedPost'],
+      required: ['uri', 'success', 'message', 'alreadyLiked', 'likedPost'],
     },
   };
 
@@ -64,9 +73,12 @@ export class LikePostTool extends BaseTool {
 
   protected async execute(params: ILikePostParams): Promise<{
     uri: ATURI;
-    cid: CID;
+    // Absent on the already-liked branch: the existing record's CID is unknown
+    // without an extra fetch, and an empty-string placeholder would be a lie.
+    cid?: CID;
     success: boolean;
     message: string;
+    alreadyLiked: boolean;
     likedPost: {
       uri: ATURI;
       cid: CID;
@@ -92,9 +104,9 @@ export class LikePostTool extends BaseTool {
 
         return {
           uri: existingLike.uri as ATURI,
-          cid: existingLike.cid as CID,
           success: true,
           message: 'Post was already liked',
+          alreadyLiked: true,
           likedPost: {
             uri: params.uri,
             cid: params.cid,
@@ -140,6 +152,7 @@ export class LikePostTool extends BaseTool {
         cid: response.data.cid as CID,
         success: true,
         message: 'Post liked successfully',
+        alreadyLiked: false,
         likedPost: {
           uri: params.uri,
           cid: params.cid,
@@ -152,9 +165,11 @@ export class LikePostTool extends BaseTool {
   }
 
   /**
-   * Check if the post is already liked by the current user
+   * Check if the post is already liked by the current user. viewer.like only
+   * carries the existing record's URI — its CID is deliberately NOT fetched
+   * (that would cost an extra call), so the caller must treat cid as absent.
    */
-  private async checkExistingLike(postUri: string): Promise<{ uri: string; cid: string } | null> {
+  private async checkExistingLike(postUri: string): Promise<{ uri: string } | null> {
     try {
       // Use the post's viewer.like (authoritative, single call) rather than
       // scanning the first 100 like records — that scan missed likes on accounts
@@ -169,7 +184,7 @@ export class LikePostTool extends BaseTool {
       );
 
       const likeUri = response.data.posts[0]?.viewer?.like;
-      return likeUri ? { uri: likeUri, cid: '' } : null;
+      return likeUri ? { uri: likeUri } : null;
     } catch (error) {
       this.logger.warn('Could not check for existing like', error);
       return null;

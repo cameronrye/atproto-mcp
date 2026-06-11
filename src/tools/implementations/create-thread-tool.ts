@@ -5,7 +5,7 @@
 import { z } from 'zod';
 import { BaseTool, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
-import type { ATURI, CID } from '../../types/index.js';
+import { type ATURI, type CID, ValidationError } from '../../types/index.js';
 
 /**
  * Zod schema for create thread parameters
@@ -190,6 +190,27 @@ export class CreateThreadTool extends BaseTool {
       this.logger.info('Creating thread', {
         postCount: params.posts.length,
         totalCharacters: params.posts.reduce((sum, p) => sum + p.text.length, 0),
+      });
+
+      // Validate EVERY post's text limits upfront, before creating any record.
+      // A 300-grapheme/3000-byte violation is fully predictable, so letting post
+      // N fail inside the loop would orphan posts 1..N-1 on the network for no
+      // reason. (Unpredictable mid-loop failures, e.g. network errors, still use
+      // the partial-failure recovery path below.)
+      params.posts.forEach((post, i) => {
+        try {
+          this.assertPostTextWithinLimits(post.text);
+        } catch (error) {
+          if (error instanceof ValidationError) {
+            throw new ValidationError(
+              `Post ${i + 1} of ${params.posts.length}: ${error.message}`,
+              'posts',
+              undefined,
+              { position: i + 1 }
+            );
+          }
+          throw error;
+        }
       });
 
       let previousUri: ATURI | null = null;

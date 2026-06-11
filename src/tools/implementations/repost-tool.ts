@@ -51,7 +51,8 @@ export class RepostTool extends BaseTool {
         },
         cid: {
           type: 'string',
-          description: 'CID of the newly created repost or quote-post record.',
+          description:
+            'CID of the newly created repost or quote-post record. Absent when alreadyReposted=true: the existing record is reused and its CID is not re-fetched.',
         },
         success: {
           type: 'boolean',
@@ -81,15 +82,7 @@ export class RepostTool extends BaseTool {
             'True when a plain repost already existed; the existing record URI/CID is returned.',
         },
       },
-      required: [
-        'uri',
-        'cid',
-        'success',
-        'message',
-        'repostedPost',
-        'isQuotePost',
-        'alreadyReposted',
-      ],
+      required: ['uri', 'success', 'message', 'repostedPost', 'isQuotePost', 'alreadyReposted'],
     },
   };
 
@@ -99,7 +92,9 @@ export class RepostTool extends BaseTool {
 
   protected async execute(params: IRepostParams): Promise<{
     uri: ATURI;
-    cid: CID;
+    // Absent on the already-reposted branch: the existing record's CID is
+    // unknown without an extra fetch, and an empty string would be a lie.
+    cid?: CID;
     success: boolean;
     message: string;
     repostedPost: {
@@ -136,7 +131,6 @@ export class RepostTool extends BaseTool {
           });
           return {
             uri: existingRepost.uri as ATURI,
-            cid: existingRepost.cid as CID,
             success: true,
             message: 'Post is already reposted',
             repostedPost: {
@@ -196,8 +190,10 @@ export class RepostTool extends BaseTool {
   /**
    * Return the authoritative existing repost for a post (viewer.repost), or null.
    * Uses getPosts so there is no 100-record scan limit, mirroring BatchRepostTool.
+   * viewer.repost only carries the record URI — its CID is deliberately NOT
+   * fetched (that would cost an extra call), so the caller treats cid as absent.
    */
-  private async checkExistingRepost(postUri: string): Promise<{ uri: string; cid: string } | null> {
+  private async checkExistingRepost(postUri: string): Promise<{ uri: string } | null> {
     try {
       const response = await this.executeAtpOperation(
         async () => {
@@ -208,7 +204,7 @@ export class RepostTool extends BaseTool {
         { postUri }
       );
       const repostUri = response.data.posts[0]?.viewer?.repost;
-      return repostUri ? { uri: repostUri, cid: '' } : null;
+      return repostUri ? { uri: repostUri } : null;
     } catch (error) {
       // A failed viewer-state lookup must not block the repost; fall through to create.
       this.logger.warn('Could not check for existing repost', error);

@@ -77,6 +77,9 @@ const CreatePostSchema = z.object({
             .string()
             .max(1000, 'Description cannot exceed 1000 characters')
             .describe('Description shown on the external link card (max 1000 characters).'),
+          thumb: BlobDescriptorSchema.optional().describe(
+            'Optional thumbnail for the link card as a pre-uploaded blob descriptor: pass the `preview.thumb.blob` object from generate_link_preview (or the `image.blob` from upload_image) verbatim. Omit for a card without a thumbnail.'
+          ),
         })
         .describe('An external link card to attach. Mutually exclusive with `images` and `quote`.')
         .optional(),
@@ -109,7 +112,7 @@ const CreatePostSchema = z.object({
               value: z
                 .string()
                 .describe(
-                  'For a mention: a handle or DID; for a link: the URL; for a hashtag: the tag without the leading #.'
+                  'For a mention: a handle or DID (a leading @ is stripped); for a link: the URL; for a hashtag: the tag (a leading # is stripped).'
                 ),
             })
           )
@@ -300,7 +303,12 @@ export class CreatePostTool extends BaseTool {
     text: string,
     facets: NonNullable<ICreatePostParams['facets']>
   ): Promise<any[]> {
-    const textByteLength = Buffer.byteLength(text, 'utf8');
+    const textBytes = Buffer.from(text, 'utf8');
+    const textByteLength = textBytes.length;
+    // A byte offset is a UTF-8 codepoint boundary iff it is the end of the text
+    // or the byte it points at is not a continuation byte (10xxxxxx).
+    const isCodepointBoundary = (offset: number): boolean =>
+      offset === textByteLength || ((textBytes[offset] ?? 0) & 0xc0) !== 0x80;
     const builtFacets: any[] = [];
     for (const facet of facets) {
       const { byteStart, byteEnd } = facet.index;
@@ -311,13 +319,22 @@ export class CreatePostTool extends BaseTool {
           'facets'
         );
       }
+      if (!isCodepointBoundary(byteStart) || !isCodepointBoundary(byteEnd)) {
+        throw new ValidationError(
+          `Invalid facet byte range [${byteStart}, ${byteEnd}): offsets split a ` +
+            `multi-byte UTF-8 character. Facet offsets are UTF-8 byte positions ` +
+            `and must fall on codepoint boundaries.`,
+          'facets'
+        );
+      }
       const features: any[] = [];
       for (const feature of facet.features) {
         switch (feature.type) {
           case 'mention': {
-            const did = feature.value.startsWith('did:')
-              ? feature.value
-              : await this.resolveDid(feature.value);
+            // Normalize a leading '@' (callers copy it from the rendered text);
+            // '@bob.test' is not a resolvable handle.
+            const value = feature.value.replace(/^@/, '');
+            const did = value.startsWith('did:') ? value : await this.resolveDid(value);
             features.push({ $type: 'app.bsky.richtext.facet#mention', did });
             break;
           }
@@ -325,7 +342,12 @@ export class CreatePostTool extends BaseTool {
             features.push({ $type: 'app.bsky.richtext.facet#link', uri: feature.value });
             break;
           case 'hashtag':
-            features.push({ $type: 'app.bsky.richtext.facet#tag', tag: feature.value });
+            // Normalize a leading '#': the lexicon tag is recorded WITHOUT it,
+            // so '#tag' would produce a literal "#tag" tag.
+            features.push({
+              $type: 'app.bsky.richtext.facet#tag',
+              tag: feature.value.replace(/^#/, ''),
+            });
             break;
           default:
             features.push(feature);
@@ -392,12 +414,19 @@ export class CreatePostTool extends BaseTool {
     if (hasExternal && embed?.external) {
       this.logger.debug('Processing external link embed', { uri: embed.external.uri });
 
+      // The validated params carry an optional pre-uploaded thumb descriptor
+      // (generate_link_preview's preview.thumb.blob); ICreatePostParams predates
+      // the field, hence the cast. Without wiring it into the lexicon record the
+      // uploaded thumbnail blob would be orphaned.
+      const thumb = (embed.external as { thumb?: BlobDescriptor }).thumb;
+
       return {
         $type: 'app.bsky.embed.external',
         external: {
           uri: embed.external.uri,
           title: embed.external.title,
           description: embed.external.description,
+          ...(thumb ? { thumb: blobDescriptorToLex(thumb) } : {}),
         },
       };
     }

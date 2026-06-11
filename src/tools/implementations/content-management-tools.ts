@@ -3,6 +3,7 @@
  */
 
 import { z } from 'zod';
+import { RichText } from '@atproto/api';
 import {
   BaseTool,
   type BlobDescriptor,
@@ -12,6 +13,7 @@ import {
 import type { AtpClient } from '../../utils/atp-client.js';
 import {
   type ATURI,
+  AtpError,
   type IDeletePostParams,
   type IUpdateProfileParams,
   ValidationError,
@@ -30,19 +32,30 @@ const DeletePostSchema = z.object({
 });
 
 /**
+ * Count GRAPHEMES the way the lexicon does (same counter as the post-text
+ * limits in BaseTool) — String.length counts UTF-16 code units, which falsely
+ * rejects emoji-heavy values (an emoji is 1 grapheme but 2+ code units).
+ */
+const graphemeLength = (text: string): number => new RichText({ text }).graphemeLength;
+
+/**
  * Zod schema for update profile parameters
  */
 const UpdateProfileSchema = z.object({
   displayName: z
     .string()
-    .max(64, 'Display name cannot exceed 64 characters')
+    .refine(text => graphemeLength(text) <= 64, 'Display name cannot exceed 64 graphemes')
     .optional()
-    .describe('New display name for the profile (max 64 characters). Omit to leave unchanged.'),
+    .describe(
+      'New display name for the profile (max 64 graphemes; emoji count as one). Omit to leave unchanged.'
+    ),
   description: z
     .string()
-    .max(256, 'Description cannot exceed 256 characters')
+    .refine(text => graphemeLength(text) <= 256, 'Description cannot exceed 256 graphemes')
     .optional()
-    .describe('New bio/description for the profile (max 256 characters). Omit to leave unchanged.'),
+    .describe(
+      'New bio/description for the profile (max 256 graphemes; emoji count as one). Omit to leave unchanged.'
+    ),
   avatar: BlobDescriptorSchema.optional().describe(
     'New avatar image as a pre-uploaded blob descriptor: pass the `image.blob` object returned by upload_image verbatim. Omit to keep the existing avatar.'
   ),
@@ -162,7 +175,7 @@ export class DeletePostTool extends BaseTool {
 
       // Parse and pin the collection: delete_post must only ever delete a post
       // record, never some other record type named by an untrusted URI.
-      const { repo: postOwnerDid, collection, rkey } = this.parseAtUri(uri);
+      const { repo: postOwnerAuthority, collection, rkey } = this.parseAtUri(uri);
       if (collection !== 'app.bsky.feed.post') {
         throw new ValidationError(
           `delete_post can only delete post records (collection "${collection}" is not app.bsky.feed.post)`,
@@ -171,6 +184,9 @@ export class DeletePostTool extends BaseTool {
         );
       }
 
+      // The URI authority may be a handle (at://alice.test/...): resolve it to a
+      // DID before comparing, otherwise the user's own post is falsely rejected.
+      const postOwnerDid = await this.resolveDid(postOwnerAuthority);
       if (postOwnerDid !== currentUserDid) {
         throw new Error('Cannot delete post: post belongs to another user');
       }
@@ -380,11 +396,40 @@ export class UpdateProfileTool extends BaseTool {
         value: response.data.value || {},
         ...(response.data.cid ? { cid: response.data.cid } : {}),
       };
-    } catch {
-      // If profile doesn't exist, return empty value (a first-time create has no
-      // prior CID to swap against).
-      this.logger.debug('No existing profile found, creating new one');
-      return { value: {} };
+    } catch (error) {
+      // Only a genuine RecordNotFound means "no profile yet" — return an empty
+      // value (a first-time create has no prior CID to swap against). ANY other
+      // failure (network, 5xx, auth) must abort the update: proceeding would
+      // rebuild the record from {} and silently wipe the existing profile.
+      if (this.isRecordNotFound(error)) {
+        this.logger.debug('No existing profile found, creating new one');
+        return { value: {} };
+      }
+      throw new AtpError(
+        `Could not read the current profile; aborting the update so existing profile fields are not wiped: ${
+          error instanceof Error ? error.message : 'Unknown error'
+        }`,
+        'PROFILE_READ_FAILED',
+        undefined,
+        error,
+        { tool: this.schema.method }
+      );
     }
+  }
+
+  /**
+   * Detect the XRPC RecordNotFound error getRecord raises for a missing record
+   * (error name "RecordNotFound", or its "Could not locate record" message).
+   */
+  private isRecordNotFound(error: unknown): boolean {
+    if (typeof error !== 'object' || error === null) {
+      return false;
+    }
+    const candidate = error as { error?: unknown; message?: unknown };
+    return (
+      candidate.error === 'RecordNotFound' ||
+      (typeof candidate.message === 'string' &&
+        candidate.message.includes('Could not locate record'))
+    );
   }
 }
