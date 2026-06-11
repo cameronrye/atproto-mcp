@@ -29,8 +29,18 @@ export {
   MarkNotificationsSeenTool,
 } from './social-graph-tools.js';
 
+// Direct messages (Bluesky chat service)
+export {
+  ListConversationsTool,
+  GetConversationMessagesTool,
+  SendDirectMessageTool,
+} from './dm-tools.js';
+
 // Content management
 export { DeletePostTool, UpdateProfileTool } from './content-management-tools.js';
+
+// Private bookmarks
+export { AddBookmarkTool, RemoveBookmarkTool, GetBookmarksTool } from './bookmark-tools.js';
 
 // Content moderation
 export {
@@ -64,6 +74,9 @@ export { FindSimilarUsersTool, DiscoverCommunitiesTool } from './content-discove
 
 // Faceted timeline-driven discovery (trending + recommended)
 export { DiscoverTool } from './discover-tool.js';
+
+// Starter packs
+export { SearchStarterPacksTool, GetStarterPackTool } from './starter-pack-tools.js';
 
 // Batch operations
 export { BatchActionTool } from './batch-operations-tools.js';

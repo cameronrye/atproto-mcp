@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { spawn } from 'child_process';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
+import { parseCliArgs } from '../cli.js';
+import { ConfigurationError } from '../types/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -128,6 +130,58 @@ describe('CLI - Real-world Usage', () => {
       const output = await runCLI(['-a', 'oauth', '--help']);
 
       expect(output).toContain('AT Protocol MCP Server');
+    });
+  });
+
+  describe('Transport Option Parsing', () => {
+    it('should default to stdio transport', () => {
+      const { transport } = parseCliArgs([]);
+
+      expect(transport).toBe('stdio');
+    });
+
+    it('should accept --transport stdio', () => {
+      const { transport } = parseCliArgs(['--transport', 'stdio']);
+
+      expect(transport).toBe('stdio');
+    });
+
+    it('should accept --transport http', () => {
+      const { transport } = parseCliArgs(['--transport', 'http']);
+
+      expect(transport).toBe('http');
+    });
+
+    it('should accept -t as short option for transport', () => {
+      const { transport } = parseCliArgs(['-t', 'http']);
+
+      expect(transport).toBe('http');
+    });
+
+    it('should reject invalid transport values', () => {
+      expect(() => parseCliArgs(['--transport', 'websocket'])).toThrow(ConfigurationError);
+      expect(() => parseCliArgs(['--transport', 'websocket'])).toThrow(/Invalid transport/);
+    });
+
+    it('should reuse --port/--host for the http binding', () => {
+      const { config, transport } = parseCliArgs([
+        '--transport',
+        'http',
+        '--port',
+        '8080',
+        '-H',
+        '0.0.0.0',
+      ]);
+
+      expect(transport).toBe('http');
+      expect(config.port).toBe(8080);
+      expect(config.host).toBe('0.0.0.0');
+    });
+
+    it('should still validate ports when used with http transport', () => {
+      expect(() => parseCliArgs(['--transport', 'http', '--port', '70000'])).toThrow(
+        ConfigurationError
+      );
     });
   });
 

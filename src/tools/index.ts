@@ -8,6 +8,7 @@ import type { z } from 'zod';
 import type { AtpClient } from '../utils/atp-client.js';
 import { Logger } from '../utils/logger.js';
 import {
+  AddBookmarkTool,
   AddToListTool,
   AnalyzeAccountTool,
   AnalyzeImageTool,
@@ -25,17 +26,22 @@ import {
   FollowUserTool,
   GenerateLinkPreviewTool,
   GetAuthorFeedTool,
+  GetBookmarksTool,
+  GetConversationMessagesTool,
   GetCustomFeedTool,
   GetListTool,
   GetNotificationsTool,
   GetPostContextTool,
+  GetStarterPackTool,
   GetTimelineTool,
   GetUserConnectionsTool,
   GetUserProfileTool,
   GetUserSummaryTool,
   LikePostTool,
+  ListConversationsTool,
   MarkNotificationsSeenTool,
   MuteUserTool,
+  RemoveBookmarkTool,
   RemoveFromListTool,
   ReplyToPostTool,
   ReportContentTool,
@@ -43,6 +49,8 @@ import {
   RepostTool,
   SearchActorsTool,
   SearchPostsTool,
+  SearchStarterPacksTool,
+  SendDirectMessageTool,
   UnblockUserTool,
   UnfollowUserTool,
   UnlikePostTool,
@@ -114,9 +122,19 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new GetNotificationsTool(atpClient),
     () => new MarkNotificationsSeenTool(atpClient),
 
+    // Direct messages (chat.bsky.convo via the bsky.chat service proxy)
+    () => new ListConversationsTool(atpClient),
+    () => new GetConversationMessagesTool(atpClient),
+    () => new SendDirectMessageTool(atpClient),
+
     // Content management
     () => new DeletePostTool(atpClient),
     () => new UpdateProfileTool(atpClient),
+
+    // Private bookmarks
+    () => new AddBookmarkTool(atpClient),
+    () => new RemoveBookmarkTool(atpClient),
+    () => new GetBookmarksTool(atpClient),
 
     // Content moderation
     () => new MuteUserTool(atpClient),
@@ -147,6 +165,10 @@ export function createTools(atpClient: AtpClient): IMcpTool[] {
     () => new DiscoverTool(atpClient),
     () => new FindSimilarUsersTool(atpClient),
     () => new DiscoverCommunitiesTool(atpClient),
+
+    // Starter packs
+    () => new SearchStarterPacksTool(atpClient),
+    () => new GetStarterPackTool(atpClient),
 
     // Batch operations
     () => new BatchActionTool(atpClient),

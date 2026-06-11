@@ -9,7 +9,7 @@ import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
-import { AtpMcpServer } from './index.js';
+import { AtpMcpServer, type McpTransportKind } from './index.js';
 import { LogLevel, Logger } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -72,6 +72,11 @@ function loadEnvFile(): void {
  * CLI argument definitions
  */
 const CLI_OPTIONS = {
+  transport: {
+    type: 'string' as const,
+    short: 't',
+    description: 'Transport: stdio|http (default: stdio)',
+  },
   port: {
     type: 'string' as const,
     short: 'p',
@@ -120,13 +125,18 @@ AT Protocol MCP Server - Comprehensive interface for LLMs to interact with AT Pr
 
 Usage: atproto-mcp [options]
 
-Transport: this server communicates over stdio (for MCP clients such as Claude
-Desktop). It does not listen on a TCP port; --port/--host are accepted but
-currently have no effect.
+Transport: by default this server communicates over stdio (for MCP clients
+such as Claude Desktop). With --transport http it serves the MCP Streamable
+HTTP transport at http://<host>:<port>/mcp instead. The default binding is the
+loopback interface (127.0.0.1), so only local clients can connect; binding any
+other host (e.g. --host 0.0.0.0) exposes the server to the network, and
+securing that exposure (firewalling, reverse proxy, authentication) is the
+operator's responsibility.
 
 Options:
-  -p, --port <number>        Server port (reserved; stdio transport ignores it)
-  -H, --host <string>        Server host (reserved; stdio transport ignores it)
+  -t, --transport <mode>     Transport: stdio|http (default: stdio)
+  -p, --port <number>        HTTP port for --transport http (default: 3000; stdio ignores it)
+  -H, --host <string>        HTTP bind host for --transport http (default: 127.0.0.1, loopback; stdio ignores it)
   -s, --service <url>        AT Protocol service URL (default: https://bsky.social)
   -a, --auth <method>        Authentication method: app-password|oauth (optional)
   -l, --log-level <level>    Log level: debug|info|warn|error (default: info)
@@ -162,8 +172,8 @@ Examples:
   # Start in unauthenticated mode (works immediately!)
   atproto-mcp
 
-  # Start with custom port and debug logging
-  atproto-mcp --port 8080 --log-level debug
+  # Serve the Streamable HTTP transport on loopback port 8080
+  atproto-mcp --transport http --port 8080 --log-level debug
 
   # Enable authentication with app password
   export ATPROTO_IDENTIFIER="your-handle.bsky.social"
@@ -197,11 +207,23 @@ function showVersion(): void {
 }
 
 /**
- * Parse command line arguments
+ * Result of CLI argument parsing: configuration overrides plus the selected
+ * transport. The transport is deliberately NOT part of IMcpServerConfig — it
+ * is a process-level startup choice, passed to AtpMcpServer.start().
  */
-function parseCliArgs(): Partial<IMcpServerConfig> {
+export interface ICliArgs {
+  config: Partial<IMcpServerConfig>;
+  transport: McpTransportKind;
+}
+
+/**
+ * Parse command line arguments. `argv` defaults to the process arguments and
+ * is injectable for tests.
+ */
+export function parseCliArgs(argv: string[] = process.argv.slice(2)): ICliArgs {
   try {
     const { values } = parseArgs({
+      args: argv,
       options: CLI_OPTIONS,
       allowPositionals: false,
     });
@@ -227,6 +249,18 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
           `Invalid log level: ${values['log-level']}. Must be one of: debug, info, warn, error`
         );
       }
+    }
+
+    // Validate the transport selection. stdio stays the default; http serves
+    // the Streamable HTTP transport using the --port/--host binding.
+    let transport: McpTransportKind = 'stdio';
+    if (values.transport != null && values.transport !== '') {
+      if (values.transport !== 'stdio' && values.transport !== 'http') {
+        throw new ConfigurationError(
+          `Invalid transport: ${values.transport}. Must be 'stdio' or 'http'`
+        );
+      }
+      transport = values.transport;
     }
 
     // Build configuration from CLI arguments
@@ -274,7 +308,7 @@ function parseCliArgs(): Partial<IMcpServerConfig> {
       config.atproto = atproto as IMcpServerConfig['atproto'];
     }
 
-    return config;
+    return { config, transport };
   } catch (error) {
     if (error instanceof ConfigurationError) {
       throw error;
@@ -299,7 +333,7 @@ async function main(): Promise<void> {
     loadEnvFile();
 
     // Parse command line arguments
-    const cliConfig = parseCliArgs();
+    const { config: cliConfig, transport } = parseCliArgs();
 
     // Create and start server
     const server = new AtpMcpServer(cliConfig);
@@ -338,7 +372,7 @@ async function main(): Promise<void> {
     });
 
     // Start the server
-    await server.start();
+    await server.start({ transport });
 
     // Keep the process running
     logger.info('AT Protocol MCP Server is running. Press Ctrl+C to stop.');

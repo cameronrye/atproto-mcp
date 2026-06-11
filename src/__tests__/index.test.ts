@@ -266,20 +266,20 @@ describe('AtpMcpServer', () => {
 
     // Note: 'initialize' and 'ping' are handled natively by the SDK Server/Protocol
     // and are no longer registered by our code (see tool-dispatch.test.ts for the
-    // real handshake). Our code registers exactly seven handlers: tools/list,
+    // real handshake). Our code registers exactly eight handlers: tools/list,
     // tools/call, resources/list, resources/templates/list, resources/read,
-    // prompts/list, prompts/get.
+    // prompts/list, prompts/get, completion/complete.
 
     it('should register a single tools/call handler that routes by name', async () => {
       const server = new AtpMcpServer();
       void server;
 
       // Exactly one handler is registered per method (the dispatch bug was many
-      // tools/call handlers overwriting each other). Seven handlers total.
-      expect(mockServer.setRequestHandler.mock.calls.length).toBe(7);
+      // tools/call handlers overwriting each other). Eight handlers total.
+      expect(mockServer.setRequestHandler.mock.calls.length).toBe(8);
     });
 
-    it('should register resources/templates/list handler returning an empty list', async () => {
+    it('should register resources/templates/list handler advertising the URI templates', async () => {
       const server = new AtpMcpServer();
       void server;
 
@@ -289,7 +289,15 @@ describe('AtpMcpServer', () => {
       expect(templatesCall).toBeDefined();
 
       const result = await templatesCall![1]({ method: 'resources/templates/list' });
-      expect(result).toEqual({ resourceTemplates: [] });
+      expect(result.resourceTemplates.map((t: any) => t.uriTemplate)).toEqual([
+        'atproto://profile/{actor}',
+        'atproto://feed/{actor}',
+      ]);
+      for (const template of result.resourceTemplates) {
+        expect(typeof template.name).toBe('string');
+        expect(typeof template.description).toBe('string');
+        expect(template.mimeType).toBe('application/json');
+      }
     });
 
     it('should register tools/list handler', async () => {

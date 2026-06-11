@@ -38,11 +38,29 @@ export abstract class BasePrompt implements IMcpPrompt {
 
   protected logger: Logger;
 
+  /**
+   * Candidate completion values per enumerable argument, served via
+   * completion/complete. Free-text arguments simply have no entry here and
+   * complete to an empty list.
+   */
+  protected readonly argumentCompletions: Readonly<Record<string, readonly string[]>> = {};
+
   constructor(
     protected atpClient: AtpClient,
     loggerName: string
   ) {
     this.logger = new Logger(loggerName);
+  }
+
+  /**
+   * Case-insensitive prefix filter over the declared candidate values for an
+   * argument. Unknown or free-text arguments yield an empty list — per the MCP
+   * completion contract this is a valid "no suggestions" answer, not an error.
+   */
+  public getArgumentCompletions(argumentName: string, value: string): string[] {
+    const candidates = this.argumentCompletions[argumentName] ?? [];
+    const prefix = value.toLowerCase();
+    return candidates.filter(candidate => candidate.toLowerCase().startsWith(prefix));
   }
 
   /**
@@ -107,6 +125,13 @@ export class ContentCompositionPrompt extends BasePrompt {
       required: false,
     },
   ];
+
+  // Candidates mirror the guidance tables in get(); topic stays free text.
+  protected override readonly argumentCompletions: Readonly<Record<string, readonly string[]>> = {
+    tone: ['casual', 'professional', 'humorous', 'informative'],
+    length: ['short', 'medium', 'long'],
+    include_hashtags: ['true', 'false'],
+  };
 
   constructor(atpClient: AtpClient) {
     super(atpClient, 'ContentCompositionPrompt');
@@ -184,6 +209,12 @@ export class ReplyTemplatePrompt extends BasePrompt {
       required: false,
     },
   ];
+
+  // Candidates mirror the guidance tables in get(); original_post is free text.
+  protected override readonly argumentCompletions: Readonly<Record<string, readonly string[]>> = {
+    reply_type: ['supportive', 'questioning', 'informative', 'humorous'],
+    relationship: ['friend', 'colleague', 'stranger'],
+  };
 
   constructor(atpClient: AtpClient) {
     super(atpClient, 'ReplyTemplatePrompt');

@@ -8,7 +8,7 @@
  * 1. Unauthenticated Mode (default): Tests public endpoints only
  *    - Run with: RUN_INTEGRATION_TESTS=true npm run test:integration
  *
- * 2. Authenticated Mode: Tests all 43 tools with real account
+ * 2. Authenticated Mode: Tests all 51 tools with real account
  *    - Requires: .env.test with test account credentials
  *    - Run with: npm run test:integration:auth
  *
@@ -20,7 +20,7 @@
  *
  * COVERAGE:
  * - Unauthenticated: 10 tests (profile retrieval, public data)
- * - Authenticated: 100+ tests (all 60 tools, write operations, media, etc.)
+ * - Authenticated: 100+ tests (all 51 tools, write operations, media, etc.)
  */
 
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';

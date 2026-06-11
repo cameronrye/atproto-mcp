@@ -8,12 +8,22 @@
  * AT Protocol-based social networks.
  */
 
+import {
+  type IncomingMessage,
+  type Server as NodeHttpServer,
+  type ServerResponse,
+  createServer as createNodeHttpServer,
+} from 'node:http';
+import { randomUUID } from 'node:crypto';
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import {
+  CompleteRequestSchema,
   ErrorCode,
   ListResourceTemplatesRequestSchema,
   McpError,
+  isInitializeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
 import { zodToJsonSchema } from 'zod-to-json-schema';
@@ -22,7 +32,13 @@ import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
 import { ConfigManager } from './utils/config.js';
 import { type IMcpTool, type IToolAnnotations, createTools } from './tools/index.js';
-import { type BaseResource, createResources } from './resources/index.js';
+import {
+  type BaseResource,
+  type IResourceTemplate,
+  createResourceTemplates,
+  createResources,
+  resolveResourceUri,
+} from './resources/index.js';
 import { type BasePrompt, createPrompts } from './prompts/index.js';
 import { type IPerformanceMetrics, PerformanceMonitor } from './utils/performance.js';
 import { type ISecurityConfig, SecurityManager } from './utils/security.js';
@@ -64,19 +80,27 @@ const TOOL_ANNOTATIONS: Readonly<Record<string, IToolAnnotations>> = {
   find_similar_users: { readOnlyHint: true },
   generate_link_preview: { readOnlyHint: true },
   get_author_feed: { readOnlyHint: true },
+  get_bookmarks: { readOnlyHint: true },
   get_custom_feed: { readOnlyHint: true },
   get_list: { readOnlyHint: true },
   get_notifications: { readOnlyHint: true },
   get_post_context: { readOnlyHint: true },
+  get_starter_pack: { readOnlyHint: true },
   get_timeline: { readOnlyHint: true },
   get_user_connections: { readOnlyHint: true },
   get_user_profile: { readOnlyHint: true },
   get_user_summary: { readOnlyHint: true },
+  // chat.bsky.convo.listConvos is a pure read of the chat service.
+  list_conversations: { readOnlyHint: true },
   search_actors: { readOnlyHint: true },
   search_posts: { readOnlyHint: true },
+  search_starter_packs: { readOnlyHint: true },
 
   // Additive, reversible writes. Idempotency notes name the verified
   // dedup/no-op path in the implementation.
+  // Dedups via the authoritative viewer.bookmarked pre-check, and the server
+  // treats a duplicate createBookmark as a no-op anyway.
+  add_bookmark: { destructiveHint: false, idempotentHint: true },
   // add_to_list has no dedup: duplicate listitem records are possible.
   add_to_list: { destructiveHint: false, idempotentHint: false },
   // batch_action only supports follow/like/repost (no quote text), and every
@@ -87,6 +111,10 @@ const TOOL_ANNOTATIONS: Readonly<Record<string, IToolAnnotations>> = {
   create_thread: { destructiveHint: false, idempotentHint: false },
   // Dedups via viewer.following.
   follow_user: { destructiveHint: false, idempotentHint: true },
+  // Not read-only: markRead=true issues chat.bsky.convo.updateRead. That call
+  // has set semantics (marks the conversation read), so repeating with
+  // identical arguments has no additional effect.
+  get_conversation_messages: { destructiveHint: false, idempotentHint: true },
   // Dedups via viewer.like.
   like_post: { destructiveHint: false, idempotentHint: true },
   // seenAt defaults to "now", so repeated calls advance the seen marker.
@@ -94,6 +122,8 @@ const TOOL_ANNOTATIONS: Readonly<Record<string, IToolAnnotations>> = {
   // app.bsky.graph.muteActor sets server-side state; repeating it is a no-op.
   mute_user: { destructiveHint: false, idempotentHint: true },
   reply_to_post: { destructiveHint: false, idempotentHint: false },
+  // Each call delivers a new chat message; there is no dedup.
+  send_direct_message: { destructiveHint: false, idempotentHint: false },
   // Plain reposts dedup via viewer.repost, but quote text creates a new post
   // on every call, so the tool as a whole is not idempotent.
   repost: { destructiveHint: false, idempotentHint: false },
@@ -106,6 +136,9 @@ const TOOL_ANNOTATIONS: Readonly<Record<string, IToolAnnotations>> = {
   // (duplicate block records are possible).
   block_user: { destructiveHint: true, idempotentHint: false },
   delete_post: { destructiveHint: true, idempotentHint: false },
+  // "Not bookmarked" resolves to an explicit no-op (viewer.bookmarked
+  // pre-check), and the server treats deleting a missing bookmark as a no-op.
+  remove_bookmark: { destructiveHint: true, idempotentHint: true },
   // "Not in list" resolves to an explicit success:false no-op.
   remove_from_list: { destructiveHint: true, idempotentHint: true },
   // Reports are irreversible moderation actions against third parties; each
@@ -139,6 +172,41 @@ function computeToolAnnotations(method: string, override?: IToolAnnotations): IT
 }
 
 /**
+ * Transports the server can speak. stdio is the default (MCP clients such as
+ * Claude Desktop spawn the process and own its stdin/stdout); http serves the
+ * MCP Streamable HTTP transport on a TCP port at /mcp.
+ */
+export type McpTransportKind = 'stdio' | 'http';
+
+/**
+ * Options for {@link AtpMcpServer.start}. port/host apply to the http
+ * transport only and override the configured values (config.port/config.host),
+ * which lets tests bind an ephemeral port (0) that the config schema does not
+ * allow.
+ */
+export interface IServerStartOptions {
+  transport?: McpTransportKind;
+  port?: number;
+  host?: string;
+}
+
+/** One live Streamable HTTP session: its transport and dedicated MCP Server. */
+interface IHttpSession {
+  transport: StreamableHTTPServerTransport;
+  server: Server;
+}
+
+/**
+ * Cap on accepted HTTP request bodies. The SDK's web-standard transport parses
+ * the body with req.json()/JSON.parse and enforces no size limit of its own
+ * (verified against @modelcontextprotocol/sdk 1.29), so the server reads and
+ * bounds the body itself before handing the parsed message to the transport.
+ * 4 MiB mirrors the MAXIMUM_MESSAGE_SIZE the SDK's express-based transports
+ * historically enforced.
+ */
+const MAX_HTTP_BODY_BYTES = 4 * 1024 * 1024;
+
+/**
  * Main server class for AT Protocol MCP Server
  */
 export class AtpMcpServer {
@@ -150,6 +218,9 @@ export class AtpMcpServer {
   private securityManager: SecurityManager;
   private metricsInterval?: NodeJS.Timeout;
   private transport: StdioServerTransport | null = null;
+  private httpServer: NodeHttpServer | null = null;
+  private httpSessions = new Map<string, IHttpSession>();
+  private httpAllowedHosts: string[] = [];
   private isRunning = false;
   private isShuttingDown = false;
 
@@ -160,21 +231,6 @@ export class AtpMcpServer {
       // Initialize configuration
       this.configManager = new ConfigManager(configOverrides);
       const config = this.configManager.getConfig();
-
-      // Initialize MCP server
-      this.server = new Server(
-        {
-          name: config.name,
-          version: config.version,
-        },
-        {
-          capabilities: {
-            tools: {},
-            resources: {},
-            prompts: {},
-          },
-        }
-      );
 
       // Initialize AT Protocol client
       this.atpClient = new AtpClient(this.configManager.getAtpConfig());
@@ -198,8 +254,9 @@ export class AtpMcpServer {
 
       this.securityManager = new SecurityManager(securityConfig, this.logger);
 
-      // Setup server handlers
-      this.setupServer();
+      // Create the MCP server and register its handlers. The same factory
+      // builds one server per HTTP session in http transport mode.
+      this.server = this.createMcpServer();
 
       this.logger.info('AT Protocol MCP Server initialized', {
         name: config.name,
@@ -212,10 +269,42 @@ export class AtpMcpServer {
   }
 
   /**
+   * Construct an MCP Server instance with every handler registered.
+   *
+   * This is the single construction path for ALL transports: the constructor
+   * builds the stdio server through it, and the http transport builds one
+   * fresh Server per session through it (each Streamable HTTP session needs
+   * its own Server because the SDK Protocol binds 1:1 to a transport).
+   */
+  private createMcpServer(): Server {
+    const config = this.configManager.getConfig();
+
+    const server = new Server(
+      {
+        name: config.name,
+        version: config.version,
+      },
+      {
+        capabilities: {
+          tools: {},
+          resources: {},
+          prompts: {},
+          // completion/complete is served for prompt arguments and resource
+          // template variables (see registerCompletions).
+          completions: {},
+        },
+      }
+    );
+
+    this.setupServer(server);
+    return server;
+  }
+
+  /**
    * Set up the MCP server with basic handlers
    * Register tools, resources, and prompts with the MCP server
    */
-  private setupServer(): void {
+  private setupServer(server: Server): void {
     this.logger.info('Setting up MCP server handlers...');
 
     // Note: 'initialize' and 'ping' are handled natively by the SDK Server/Protocol
@@ -223,18 +312,21 @@ export class AtpMcpServer {
     // must NOT register our own handlers for them — doing so overrides the SDK's
     // negotiation and drops tracked client capabilities.
 
-    // Create and register tools, resources, and prompts
+    // Create and register tools, resources (static + templates), and prompts
     const tools = createTools(this.atpClient);
     const resources = createResources(this.atpClient);
+    const templates = createResourceTemplates(this.atpClient);
     const prompts = createPrompts(this.atpClient);
 
     // CRITICAL FIX: Register all tools with the MCP server
-    this.registerTools(tools);
-    this.registerResources(resources);
-    this.registerPrompts(prompts);
+    this.registerTools(server, tools);
+    this.registerResources(server, resources, templates);
+    this.registerPrompts(server, prompts);
+    this.registerCompletions(server, prompts, templates);
 
     this.logger.debug(
-      `Registered ${tools.length} tools, ${resources.length} resources, ${prompts.length} prompts`
+      `Registered ${tools.length} tools, ${resources.length} resources, ` +
+        `${templates.length} resource templates, ${prompts.length} prompts`
     );
     this.logger.info('MCP server handlers setup complete');
   }
@@ -242,9 +334,9 @@ export class AtpMcpServer {
   /**
    * Register MCP tools with the server
    */
-  private registerTools(tools: IMcpTool[]): void {
+  private registerTools(server: Server, tools: IMcpTool[]): void {
     // Register tools/list handler
-    this.server.setRequestHandler(z.object({ method: z.literal('tools/list') }), async () =>
+    server.setRequestHandler(z.object({ method: z.literal('tools/list') }), async () =>
       // Return all tools with static descriptions per MCP specification.
       // Tools should always be listed regardless of authentication state.
       // If a tool requires authentication, it will return an appropriate error when called.
@@ -281,7 +373,7 @@ export class AtpMcpServer {
     }
 
     // Register a single tools/call handler that routes by params.name.
-    this.server.setRequestHandler(
+    server.setRequestHandler(
       z.object({
         method: z.literal('tools/call'),
         params: z.object({
@@ -417,9 +509,13 @@ export class AtpMcpServer {
   /**
    * Register MCP resources with the server
    */
-  private registerResources(resources: BaseResource[]): void {
+  private registerResources(
+    server: Server,
+    resources: BaseResource[],
+    templates: IResourceTemplate[]
+  ): void {
     // Register resources/list handler
-    this.server.setRequestHandler(z.object({ method: z.literal('resources/list') }), async () => ({
+    server.setRequestHandler(z.object({ method: z.literal('resources/list') }), async () => ({
       resources: resources.map(resource => ({
         uri: resource.uri,
         name: resource.name,
@@ -428,16 +524,20 @@ export class AtpMcpServer {
       })),
     }));
 
-    // Register resources/templates/list handler. The declared resources
-    // capability invites clients to probe this method; without a handler the
-    // SDK answers -32601 Method not found. No URI templates are offered (all
-    // resources have fixed URIs), so the list is empty.
-    this.server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
-      resourceTemplates: [],
+    // Register resources/templates/list handler. Per the MCP spec, templates
+    // are advertised exclusively here (resources/list stays static-only); a
+    // client expands a uriTemplate and reads it via resources/read.
+    server.setRequestHandler(ListResourceTemplatesRequestSchema, async () => ({
+      resourceTemplates: templates.map(t => ({
+        uriTemplate: t.uriTemplate,
+        name: t.name,
+        description: t.description,
+        mimeType: t.mimeType,
+      })),
     }));
 
     // Register resources/read handler
-    this.server.setRequestHandler(
+    server.setRequestHandler(
       z.object({
         method: z.literal('resources/read'),
         params: z.object({
@@ -446,7 +546,11 @@ export class AtpMcpServer {
       }),
       async request => {
         try {
-          const resource = resources.find(r => r.uri === request.params.uri);
+          // Static resources resolve first; otherwise the URI is matched
+          // against the parameterized templates (atproto://profile/{actor},
+          // atproto://feed/{actor}). Syntactically invalid actors fail the
+          // template matchers and fall through to -32002 Resource not found.
+          const resource = resolveResourceUri(request.params.uri, resources, templates);
 
           if (!resource) {
             // The MCP spec reserves -32002 for "Resource not found"; the SDK's
@@ -497,15 +601,17 @@ export class AtpMcpServer {
       }
     );
 
-    this.logger.info(`Registered ${resources.length} MCP resources`);
+    this.logger.info(
+      `Registered ${resources.length} MCP resources and ${templates.length} resource templates`
+    );
   }
 
   /**
    * Register MCP prompts with the server
    */
-  private registerPrompts(prompts: BasePrompt[]): void {
+  private registerPrompts(server: Server, prompts: BasePrompt[]): void {
     // Register prompts/list handler
-    this.server.setRequestHandler(z.object({ method: z.literal('prompts/list') }), async () => ({
+    server.setRequestHandler(z.object({ method: z.literal('prompts/list') }), async () => ({
       prompts: prompts.map(prompt => ({
         name: prompt.name,
         description: prompt.description,
@@ -514,7 +620,7 @@ export class AtpMcpServer {
     }));
 
     // Register prompts/get handler
-    this.server.setRequestHandler(
+    server.setRequestHandler(
       z.object({
         method: z.literal('prompts/get'),
         params: z.object({
@@ -554,6 +660,63 @@ export class AtpMcpServer {
   }
 
   /**
+   * Register the completion/complete handler (declared via the `completions`
+   * capability).
+   *
+   * - ref/prompt: serves candidate values for enumerable prompt arguments
+   *   (each prompt declares its own candidates); free-text arguments complete
+   *   to an empty list, never an error. Unknown prompt names are invalid params.
+   * - ref/resource: serves the {actor} variable of the resource templates with
+   *   the authenticated user's handle when a session exists, else empty.
+   *   Unknown templates/arguments complete to an empty list.
+   */
+  private registerCompletions(
+    server: Server,
+    prompts: BasePrompt[],
+    templates: IResourceTemplate[]
+  ): void {
+    const completion = (
+      values: string[]
+    ): {
+      completion: { values: string[]; total: number; hasMore: boolean };
+    } => ({
+      completion: { values, total: values.length, hasMore: false },
+    });
+
+    server.setRequestHandler(CompleteRequestSchema, async request => {
+      const { ref, argument } = request.params;
+
+      if (ref.type === 'ref/prompt') {
+        const prompt = prompts.find(p => p.name === ref.name);
+        if (!prompt) {
+          throw new McpError(ErrorCode.InvalidParams, `Prompt not found: ${ref.name}`, {
+            name: ref.name,
+          });
+        }
+        return completion(prompt.getArgumentCompletions(argument.name, argument.value));
+      }
+
+      // ref/resource carries the RFC 6570 uriTemplate being completed.
+      const template = templates.find(t => t.uriTemplate === ref.uri);
+      if (!template || argument.name !== 'actor') {
+        return completion([]);
+      }
+
+      // The only candidate we can offer for {actor} is the authenticated
+      // user's own handle; unauthenticated servers have no candidates.
+      const handle = this.atpClient.getSession()?.handle;
+      if (typeof handle !== 'string') {
+        return completion([]);
+      }
+      return completion(
+        handle.toLowerCase().startsWith(argument.value.toLowerCase()) ? [handle] : []
+      );
+    });
+
+    this.logger.info('Registered MCP completion handler');
+  }
+
+  /**
    * Convert Zod schema to JSON Schema for MCP compatibility
    *
    * Uses the well-tested zod-to-json-schema library to ensure comprehensive
@@ -571,15 +734,22 @@ export class AtpMcpServer {
   }
 
   /**
-   * Start the MCP server
+   * Start the MCP server.
+   *
+   * By default the server speaks MCP over stdio. Pass
+   * `{ transport: 'http' }` to serve the Streamable HTTP transport instead:
+   * a node:http server routes POST/GET/DELETE on /mcp through per-session
+   * StreamableHTTPServerTransport instances, each backed by a fresh MCP
+   * Server built via the same construction path as the stdio server.
    */
-  public async start(): Promise<void> {
+  public async start(options: IServerStartOptions = {}): Promise<void> {
     if (this.isRunning) {
       this.logger.warn('Server is already running');
       return;
     }
 
     this.isShuttingDown = false;
+    const transportKind: McpTransportKind = options.transport ?? 'stdio';
 
     try {
       this.logger.info('Starting AT Protocol MCP Server...');
@@ -602,22 +772,26 @@ export class AtpMcpServer {
         }
       }
 
-      // Create and connect transport
-      this.transport = new StdioServerTransport();
+      if (transportKind === 'http') {
+        await this.startHttpTransport(options);
+      } else {
+        // Create and connect transport
+        this.transport = new StdioServerTransport();
 
-      // When the MCP client disconnects (stdin closes), the transport closes.
-      // Release resources so the server does not linger with open timers/sockets.
-      this.server.onclose = () => {
-        if (this.isShuttingDown) {
-          return;
-        }
-        this.logger.info('MCP transport closed (client disconnected); cleaning up');
-        void this.cleanup().catch(err =>
-          this.logger.error('Cleanup after transport close failed', err)
-        );
-      };
+        // When the MCP client disconnects (stdin closes), the transport closes.
+        // Release resources so the server does not linger with open timers/sockets.
+        this.server.onclose = () => {
+          if (this.isShuttingDown) {
+            return;
+          }
+          this.logger.info('MCP transport closed (client disconnected); cleaning up');
+          void this.cleanup().catch(err =>
+            this.logger.error('Cleanup after transport close failed', err)
+          );
+        };
 
-      await this.server.connect(this.transport);
+        await this.server.connect(this.transport);
+      }
 
       this.isRunning = true;
 
@@ -653,6 +827,249 @@ export class AtpMcpServer {
         error instanceof Error ? error.message : 'Unknown error'
       );
     }
+  }
+
+  /**
+   * Start the Streamable HTTP transport: a node:http server (no express
+   * dependency) that routes /mcp through per-session transports.
+   *
+   * Binding defaults to the configured host, with 'localhost' pinned to the
+   * IPv4 loopback 127.0.0.1 so the bind address (and the DNS-rebinding
+   * allowlist) is deterministic across platforms whose resolvers disagree
+   * about ::1 vs 127.0.0.1. Exposing the server beyond loopback (e.g.
+   * --host 0.0.0.0) is the operator's responsibility to secure.
+   */
+  private async startHttpTransport(options: IServerStartOptions): Promise<void> {
+    const config = this.configManager.getConfig();
+    const requestedPort = options.port ?? config.port;
+    const requestedHost = options.host ?? config.host;
+    const bindHost = requestedHost === 'localhost' ? '127.0.0.1' : requestedHost;
+
+    const httpServer = createNodeHttpServer((req, res) => {
+      void this.handleHttpRequest(req, res).catch((error: unknown) => {
+        this.logger.error('Unhandled HTTP request error', error);
+        this.writeJsonRpcError(res, 500, ErrorCode.InternalError, 'Internal server error');
+      });
+    });
+
+    await new Promise<void>((resolve, reject) => {
+      httpServer.once('error', reject);
+      httpServer.listen(requestedPort, bindHost, () => {
+        httpServer.removeListener('error', reject);
+        resolve();
+      });
+    });
+
+    this.httpServer = httpServer;
+
+    // The SDK's DNS-rebinding protection matches the raw Host header against
+    // allowedHosts verbatim (host:port, verified against SDK 1.29), so the
+    // allowlist must use the ACTUAL bound port (the requested port may be 0 =
+    // ephemeral) and cover the loopback aliases a local client may dial.
+    const address = httpServer.address();
+    const boundPort =
+      address !== null && typeof address === 'object' ? address.port : requestedPort;
+    const hostNames = new Set<string>([requestedHost, bindHost, 'localhost', '127.0.0.1', '[::1]']);
+    this.httpAllowedHosts = [...hostNames].map(name => `${name}:${boundPort}`);
+
+    this.logger.info('Streamable HTTP transport listening', {
+      host: bindHost,
+      port: boundPort,
+      path: '/mcp',
+    });
+  }
+
+  /**
+   * Route a single HTTP request. Only /mcp is served; the SDK transport does
+   * the MCP-level work (method dispatch, session validation, SSE streaming).
+   */
+  private async handleHttpRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
+    const url = new URL(req.url ?? '/', `http://${req.headers.host ?? 'localhost'}`);
+    if (url.pathname !== '/mcp') {
+      this.writeJsonRpcError(res, 404, -32000, 'Not Found');
+      return;
+    }
+
+    const rawSessionId = req.headers['mcp-session-id'];
+    const sessionId = Array.isArray(rawSessionId) ? rawSessionId[0] : rawSessionId;
+
+    if (req.method === 'POST') {
+      // The transport expects a pre-parsed body when the request stream has
+      // already been consumed (same contract as the SDK's express.json()
+      // examples); reading it here also lets us bound the body size, which
+      // the SDK transport does not (see MAX_HTTP_BODY_BYTES).
+      const body = await this.readJsonBody(req, res);
+      if (body === undefined) {
+        return; // readJsonBody already responded (413/400).
+      }
+
+      const existing = sessionId !== undefined ? this.httpSessions.get(sessionId) : undefined;
+      if (existing) {
+        await existing.transport.handleRequest(req, res, body);
+        return;
+      }
+      if (sessionId !== undefined) {
+        this.writeJsonRpcError(res, 404, -32001, 'Session not found');
+        return;
+      }
+      if (!isInitializeRequest(body)) {
+        this.writeJsonRpcError(res, 400, -32000, 'Bad Request: Mcp-Session-Id header is required');
+        return;
+      }
+
+      // New session: fresh MCP Server + transport pair.
+      const session = await this.createHttpSession();
+      await session.transport.handleRequest(req, res, body);
+      if (session.transport.sessionId === undefined) {
+        // Initialization was rejected (e.g. DNS-rebinding protection); the
+        // session was never registered, so release the server immediately.
+        await session.server.close();
+      }
+      return;
+    }
+
+    // GET (standalone SSE stream) and DELETE (session termination) — and any
+    // other method, which the transport answers with 405 — must address an
+    // established session.
+    const session = sessionId !== undefined ? this.httpSessions.get(sessionId) : undefined;
+    if (!session) {
+      if (sessionId === undefined) {
+        this.writeJsonRpcError(res, 400, -32000, 'Bad Request: Mcp-Session-Id header is required');
+      } else {
+        this.writeJsonRpcError(res, 404, -32001, 'Session not found');
+      }
+      return;
+    }
+    await session.transport.handleRequest(req, res);
+  }
+
+  /**
+   * Create a Streamable HTTP session: a stateful transport (server-minted
+   * session id) wired to a fresh MCP Server from the shared factory. The
+   * session registers itself in httpSessions once the SDK accepts the
+   * initialize request, and removes itself when the transport closes (DELETE,
+   * client disconnect, or shutdown).
+   */
+  private async createHttpSession(): Promise<IHttpSession> {
+    const server = this.createMcpServer();
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: () => randomUUID(),
+      // DNS-rebinding protection: reject requests whose Host header is not in
+      // the allowlist computed at bind time (403).
+      enableDnsRebindingProtection: true,
+      allowedHosts: this.httpAllowedHosts,
+      onsessioninitialized: (newSessionId: string) => {
+        this.httpSessions.set(newSessionId, { transport, server });
+        this.logger.info('Streamable HTTP session initialized', { sessionId: newSessionId });
+      },
+      onsessionclosed: (closedSessionId: string) => {
+        this.httpSessions.delete(closedSessionId);
+        this.logger.info('Streamable HTTP session closed', { sessionId: closedSessionId });
+      },
+    });
+
+    // Drop the session when the transport closes for any reason. Safe to set
+    // before connect(): Protocol.connect chains a pre-existing onclose handler
+    // (verified against SDK 1.29) instead of replacing it.
+    transport.onclose = (): void => {
+      const closedSessionId = transport.sessionId;
+      if (closedSessionId !== undefined) {
+        this.httpSessions.delete(closedSessionId);
+      }
+    };
+
+    await server.connect(transport);
+    return { transport, server };
+  }
+
+  /**
+   * Read and parse a JSON request body, bounding its size. Responds (413/400)
+   * and resolves to undefined when the body is unusable; the caller must stop
+   * processing the request in that case.
+   */
+  private readJsonBody(req: IncomingMessage, res: ServerResponse): Promise<unknown> {
+    return new Promise(resolve => {
+      const chunks: Buffer[] = [];
+      let received = 0;
+      let finished = false;
+
+      const fail = (status: number, code: number, message: string): void => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        this.writeJsonRpcError(res, status, code, message);
+        // Discard whatever else the client is still sending; the Connection:
+        // close header (set for 413) ends the socket once the response flushes.
+        req.resume();
+        resolve(undefined);
+      };
+
+      req.on('data', (chunk: Buffer) => {
+        if (finished) {
+          return;
+        }
+        received += chunk.length;
+        if (received > MAX_HTTP_BODY_BYTES) {
+          chunks.length = 0;
+          fail(413, -32000, `Payload Too Large: request body exceeds ${MAX_HTTP_BODY_BYTES} bytes`);
+          return;
+        }
+        chunks.push(chunk);
+      });
+
+      req.on('end', () => {
+        if (finished) {
+          return;
+        }
+        finished = true;
+        try {
+          resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
+        } catch {
+          this.writeJsonRpcError(res, 400, ErrorCode.ParseError, 'Parse error: Invalid JSON');
+          resolve(undefined);
+        }
+      });
+
+      req.on('error', () => {
+        fail(400, -32000, 'Bad Request: failed to read request body');
+      });
+    });
+  }
+
+  /**
+   * Write a JSON-RPC-shaped HTTP error response (the same shape the SDK
+   * transport uses for its own protocol-level rejections).
+   */
+  private writeJsonRpcError(
+    res: ServerResponse,
+    status: number,
+    code: number,
+    message: string
+  ): void {
+    if (res.headersSent) {
+      res.end();
+      return;
+    }
+    res.writeHead(status, {
+      'Content-Type': 'application/json',
+      // 413 responses must not leave the connection open mid-upload.
+      ...(status === 413 ? { Connection: 'close' } : {}),
+    });
+    res.end(JSON.stringify({ jsonrpc: '2.0', error: { code, message }, id: null }));
+  }
+
+  /**
+   * The address the http transport is bound to, or null when the http
+   * transport is not running. Exposed so callers (and tests binding port 0)
+   * can discover the actual ephemeral port.
+   */
+  public getHttpAddress(): { host: string; port: number } | null {
+    const address = this.httpServer?.address();
+    if (address == null || typeof address === 'string') {
+      return null;
+    }
+    return { host: address.address, port: address.port };
   }
 
   /**
@@ -693,6 +1110,33 @@ export class AtpMcpServer {
       this.securityManager.destroy();
     } catch (error) {
       errors.push(error instanceof Error ? error : new Error(String(error)));
+    }
+
+    // Close every live Streamable HTTP session. Closing the per-session MCP
+    // server also closes its transport, which unregisters the session from
+    // the map via the transport's onclose handler.
+    for (const [sessionId, session] of [...this.httpSessions]) {
+      try {
+        await session.server.close();
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
+      this.httpSessions.delete(sessionId);
+    }
+
+    // Stop the http listener. closeAllConnections() drops keep-alive and SSE
+    // sockets that would otherwise keep close() pending indefinitely.
+    if (this.httpServer) {
+      const httpServer = this.httpServer;
+      this.httpServer = null;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          httpServer.close(err => (err ? reject(err) : resolve()));
+          httpServer.closeAllConnections();
+        });
+      } catch (error) {
+        errors.push(error instanceof Error ? error : new Error(String(error)));
+      }
     }
 
     try {

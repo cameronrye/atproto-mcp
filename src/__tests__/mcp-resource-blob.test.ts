@@ -5,6 +5,7 @@
  */
 
 import { beforeAll, describe, expect, it, vi } from 'vitest';
+import type * as ResourcesModule from '../resources/index.js';
 import { AtpMcpServer } from '../index.js';
 
 const fixtures = vi.hoisted(() => ({
@@ -24,8 +25,12 @@ vi.mock('../utils/atp-client.js', () => ({
 // Replace the real resources with one binary and one text fixture so the
 // resources/read handler's content mapping is exercised for both shapes.
 // Plain async functions (not vi.fn) so the global beforeEach mock reset does
-// not strip their implementations between tests.
-vi.mock('../resources/index.js', () => ({
+// not strip their implementations between tests. The real resolveResourceUri
+// (and the other template exports) are kept via importOriginal; templates are
+// stubbed empty so only the fixtures resolve.
+vi.mock('../resources/index.js', async importOriginal => ({
+  ...(await importOriginal<typeof ResourcesModule>()),
+  createResourceTemplates: () => [],
   createResources: () => [
     {
       uri: 'atproto://test-blob',
