@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { UploadImageTool } from '../tools/implementations/media-tools.js';
+import { UploadImageTool, UploadVideoTool } from '../tools/implementations/media-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 
 // Routes an operation the way the real AtpClient does: success -> { success,
@@ -69,7 +69,7 @@ describe('UploadImageTool', () => {
     // The blob is uploaded with the MIME derived from the extension, and the
     // payload is the real file's bytes (not a string path).
     expect(uploadBlob).toHaveBeenCalledTimes(1);
-    const [blobArg, optsArg] = uploadBlob.mock.calls[0];
+    const [blobArg, optsArg] = uploadBlob.mock.calls[0]!;
     expect(Buffer.isBuffer(blobArg)).toBe(true);
     expect(blobArg.toString()).toBe('fake-jpeg-bytes');
     expect(optsArg).toEqual({ encoding: 'image/jpeg' });
@@ -92,7 +92,7 @@ describe('UploadImageTool', () => {
 
     const result = await tool.handler({ filePath: 'pic.png' });
 
-    expect(uploadBlob.mock.calls[0][1]).toEqual({ encoding: 'image/png' });
+    expect(uploadBlob.mock.calls[0]![1]).toEqual({ encoding: 'image/png' });
     expect(result.image.blob.mimeType).toBe('image/png');
     // No altText provided -> empty string, never undefined.
     expect(result.image.alt).toBe('');
@@ -119,5 +119,23 @@ describe('UploadImageTool', () => {
 
     await expect(tool.handler({ filePath: 'doc.txt' })).rejects.toThrow(/Unsupported image format/);
     expect(uploadBlob).not.toHaveBeenCalled();
+  });
+});
+
+describe('media tool descriptions are honest about where the output can be used', () => {
+  // create_thread has no embed support, so neither upload tool may claim its
+  // output is embeddable there; there is no video embed support at all.
+  it('upload_image points at create_post / update_profile, not create_thread', () => {
+    const tool = new UploadImageTool(makeClient({}));
+    expect(tool.schema.description).not.toMatch(/create_thread/);
+    expect(tool.schema.description).toMatch(/create_post/);
+    expect(tool.schema.description).toMatch(/update_profile/);
+  });
+
+  it('upload_video does not claim its output is ready to embed', () => {
+    const tool = new UploadVideoTool(makeClient({}));
+    expect(tool.schema.description).not.toMatch(/ready to embed/);
+    expect(tool.schema.description).not.toMatch(/create_thread/);
+    expect(tool.schema.description).toMatch(/not(?: yet)? support/i);
   });
 });

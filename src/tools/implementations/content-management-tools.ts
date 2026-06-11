@@ -3,7 +3,12 @@
  */
 
 import { z } from 'zod';
-import { BaseTool } from './base-tool.js';
+import {
+  BaseTool,
+  type BlobDescriptor,
+  BlobDescriptorSchema,
+  blobDescriptorToLex,
+} from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import {
   type ATURI,
@@ -38,18 +43,12 @@ const UpdateProfileSchema = z.object({
     .max(256, 'Description cannot exceed 256 characters')
     .optional()
     .describe('New bio/description for the profile (max 256 characters). Omit to leave unchanged.'),
-  avatar: z
-    .any()
-    .optional()
-    .describe(
-      'New avatar image as a Blob object. Omit to keep the existing avatar. Use upload_image to obtain a blob first.'
-    ),
-  banner: z
-    .any()
-    .optional()
-    .describe(
-      'New banner/header image as a Blob object. Omit to keep the existing banner. Use upload_image to obtain a blob first.'
-    ),
+  avatar: BlobDescriptorSchema.optional().describe(
+    'New avatar image as a pre-uploaded blob descriptor: pass the `image.blob` object returned by upload_image verbatim. Omit to keep the existing avatar.'
+  ),
+  banner: BlobDescriptorSchema.optional().describe(
+    'New banner/header image as a pre-uploaded blob descriptor: pass the `image.blob` object returned by upload_image verbatim. Omit to keep the existing banner.'
+  ),
 });
 
 /**
@@ -233,11 +232,11 @@ export class UpdateProfileTool extends BaseTool {
             },
             avatar: {
               type: 'string',
-              description: 'Set to "updated" when a new avatar was uploaded.',
+              description: 'Set to "updated" when a new avatar blob was set.',
             },
             banner: {
               type: 'string',
-              description: 'Set to "updated" when a new banner was uploaded.',
+              description: 'Set to "updated" when a new banner blob was set.',
             },
           },
         },
@@ -292,20 +291,18 @@ export class UpdateProfileTool extends BaseTool {
         updatedFields.push('description');
       }
 
-      // Handle avatar upload if provided (otherwise the existing avatar, spread
-      // from currentProfile above, is kept).
+      // The avatar/banner blobs were already uploaded via upload_image — set the
+      // record's lexicon blob form from the descriptor instead of re-uploading.
+      // Otherwise the existing values, spread from currentProfile above, are kept.
       if (params.avatar) {
-        this.logger.debug('Uploading new avatar');
-        const avatarBlob = await this.uploadBlob(params.avatar);
-        updatedProfile.avatar = avatarBlob.blob;
+        this.logger.debug('Setting new avatar from uploaded blob descriptor');
+        updatedProfile.avatar = blobDescriptorToLex(params.avatar as unknown as BlobDescriptor);
         updatedFields.push('avatar');
       }
 
-      // Handle banner upload if provided (otherwise the existing banner is kept).
       if (params.banner) {
-        this.logger.debug('Uploading new banner');
-        const bannerBlob = await this.uploadBlob(params.banner);
-        updatedProfile.banner = bannerBlob.blob;
+        this.logger.debug('Setting new banner from uploaded blob descriptor');
+        updatedProfile.banner = blobDescriptorToLex(params.banner as unknown as BlobDescriptor);
         updatedFields.push('banner');
       }
 
@@ -390,6 +387,4 @@ export class UpdateProfileTool extends BaseTool {
       return { value: {} };
     }
   }
-
-  // uploadBlob is provided by BaseTool.
 }

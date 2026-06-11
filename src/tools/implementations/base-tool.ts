@@ -17,6 +17,66 @@ import {
 } from '../../types/index.js';
 
 /**
+ * Schema for a pre-uploaded blob descriptor, the JSON shape upload_image /
+ * upload_video / generate_link_preview return (`ref` as a flat CID string) and
+ * the lexicon form found in existing records (`ref` as a { $link } object).
+ * MCP parameters arrive as JSON, so a binary Blob can never be transported —
+ * tools that attach media accept this descriptor and reference the
+ * already-uploaded blob instead of re-uploading.
+ */
+export const BlobDescriptorSchema = z.object({
+  type: z
+    .literal('blob')
+    .optional()
+    .describe('Discriminator emitted by upload_image; always "blob" when present. May be omitted.'),
+  ref: z
+    .union([
+      z
+        .string()
+        .min(1, 'Blob ref CID cannot be empty')
+        .describe('CID of the uploaded blob as a flat string (e.g. "bafkrei…").'),
+      z
+        .object({
+          $link: z
+            .string()
+            .min(1, 'Blob ref $link CID cannot be empty')
+            .describe('CID of the uploaded blob (e.g. "bafkrei…").'),
+        })
+        .describe('Lexicon blob-ref object wrapping the CID as { "$link": "<cid>" }.'),
+    ])
+    .describe(
+      'CID reference of the uploaded blob: either the flat string returned by upload_image, or the lexicon { "$link": "<cid>" } object form.'
+    ),
+  mimeType: z
+    .string()
+    .min(1, 'Blob mimeType is required')
+    .describe('MIME type of the uploaded blob (e.g. "image/jpeg").'),
+  size: z.number().int().positive().describe('Size of the uploaded blob in bytes.'),
+});
+
+export type BlobDescriptor = z.infer<typeof BlobDescriptorSchema>;
+
+/**
+ * Convert a pre-uploaded blob descriptor into the lexicon blob form required
+ * inside a record: { $type: 'blob', ref: { $link: <cid> }, mimeType, size }.
+ * The blob already lives on the PDS (upload_image et al. uploaded it), so this
+ * is a pure reshaping — no network call and no re-upload.
+ */
+export function blobDescriptorToLex(descriptor: BlobDescriptor): {
+  $type: 'blob';
+  ref: { $link: string };
+  mimeType: string;
+  size: number;
+} {
+  return {
+    $type: 'blob',
+    ref: { $link: typeof descriptor.ref === 'string' ? descriptor.ref : descriptor.ref.$link },
+    mimeType: descriptor.mimeType,
+    size: descriptor.size,
+  };
+}
+
+/**
  * Tool authentication requirements
  */
 export enum ToolAuthMode {
@@ -371,24 +431,6 @@ export abstract class BaseTool implements IMcpTool {
     }
 
     return { repo, collection, rkey };
-  }
-
-  /**
-   * Upload a Blob to the user's PDS and return the blob ref payload.
-   */
-  protected async uploadBlob(blob: Blob): Promise<{ blob: any }> {
-    return await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        // A Blob with no type yields an empty encoding (invalid Content-Type);
-        // fall back to a generic binary type so the upload is well-formed.
-        const encoding = blob.type || 'application/octet-stream';
-        const response = await agent.uploadBlob(blob, { encoding });
-        return response.data;
-      },
-      'uploadBlob',
-      { blobSize: blob.size, blobType: blob.type }
-    );
   }
 
   /**

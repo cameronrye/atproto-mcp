@@ -1,32 +1,14 @@
 import { z } from 'zod';
-import { BaseTool, ToolAuthMode } from './base-tool.js';
+import { BaseTool, type BlobDescriptor, BlobDescriptorSchema, ToolAuthMode } from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 
 /**
  * Zod schema for analyze image parameters
  */
 const AnalyzeImageSchema = z.object({
-  blob: z
-    .object({
-      ref: z
-        .object({
-          $link: z
-            .string()
-            .describe(
-              'CID link string of the uploaded blob, as returned by the upload_image tool (e.g. "bafkreigh2akiscaild...") .'
-            ),
-        })
-        .describe('Blob reference object containing the CID link.'),
-      mimeType: z
-        .string()
-        .describe(
-          'MIME type of the image blob (e.g. "image/jpeg", "image/png", "image/webp", "image/gif").'
-        ),
-      size: z.number().describe('Size of the blob in bytes, as reported by the upload response.'),
-    })
-    .describe(
-      'Blob metadata object as returned by upload_image; contains the ref, mimeType, and size fields.'
-    ),
+  blob: BlobDescriptorSchema.describe(
+    'Blob descriptor as returned by upload_image (the `image.blob` object in its output): ref (flat CID string or { "$link": "<cid>" } object), mimeType, and size.'
+  ),
   includeOptimizationSuggestions: z
     .boolean()
     .optional()
@@ -122,11 +104,7 @@ export class AnalyzeImageTool extends BaseTool {
   }
 
   protected async execute(params: {
-    blob: {
-      ref: { $link: string };
-      mimeType: string;
-      size: number;
-    };
+    blob: BlobDescriptor;
     includeOptimizationSuggestions?: boolean;
   }): Promise<{
     success: boolean;

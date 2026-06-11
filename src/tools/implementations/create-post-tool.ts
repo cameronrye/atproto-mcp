@@ -3,7 +3,13 @@
  */
 
 import { z } from 'zod';
-import { BaseTool, ToolAuthMode } from './base-tool.js';
+import {
+  BaseTool,
+  type BlobDescriptor,
+  BlobDescriptorSchema,
+  ToolAuthMode,
+  blobDescriptorToLex,
+} from './base-tool.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 import {
   type ATURI,
@@ -49,7 +55,9 @@ const CreatePostSchema = z.object({
               .string()
               .max(1000, 'Alt text cannot exceed 1000 characters')
               .describe('Accessibility alt text describing the image (max 1000 characters).'),
-            image: z.any().describe('The image as a Blob to upload and attach.'), // Blob type
+            image: BlobDescriptorSchema.describe(
+              'Pre-uploaded image blob descriptor: pass the `image.blob` object from a prior upload_image call verbatim. The image must already be uploaded — this tool does not accept raw image data.'
+            ),
           })
         )
         .max(4, 'Cannot attach more than 4 images')
@@ -367,19 +375,13 @@ export class CreatePostTool extends BaseTool {
     if (hasImages && embed?.images) {
       this.logger.debug('Processing image embeds', { count: embed.images.length });
 
-      const images = [];
-      for (const img of embed.images) {
-        try {
-          const uploadResult = await this.uploadBlob(img.image);
-          images.push({
-            alt: img.alt,
-            image: uploadResult.blob,
-          });
-        } catch (error) {
-          this.logger.error('Failed to upload image', error);
-          throw error;
-        }
-      }
+      // The blobs were already uploaded via upload_image — reference them in the
+      // record's lexicon form instead of re-uploading (a binary Blob can never
+      // arrive through JSON MCP params, only the descriptor can).
+      const images = embed.images.map(img => ({
+        alt: img.alt,
+        image: blobDescriptorToLex(img.image as unknown as BlobDescriptor),
+      }));
 
       return {
         $type: 'app.bsky.embed.images',
@@ -402,6 +404,4 @@ export class CreatePostTool extends BaseTool {
 
     return undefined;
   }
-
-  // uploadBlob is provided by BaseTool.
 }

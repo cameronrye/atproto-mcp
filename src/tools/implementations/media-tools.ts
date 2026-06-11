@@ -106,7 +106,7 @@ export class UploadImageTool extends BaseTool {
   public readonly schema = {
     method: 'upload_image',
     description:
-      'Upload an image file to AT Protocol for use in posts. Reads a local image file (JPEG, PNG, GIF, WebP, or AVIF; max 1 MB) and uploads it as an AT Protocol blob, returning a blob reference and alt text ready to embed in a create_post or create_thread call. Requires authentication (app password). Use upload_video instead for video files. Subject to per-tool rate limiting.',
+      'Upload an image file to AT Protocol for use in posts and profiles. Reads a local image file (JPEG, PNG, GIF, WebP, or AVIF; max 1 MB) and uploads it as an AT Protocol blob, returning a blob descriptor and alt text. Pass the returned `image.blob` object verbatim as `embed.images[].image` in create_post, as `avatar`/`banner` in update_profile, or to analyze_image. Requires authentication (app password). Use upload_video instead for video files. Subject to per-tool rate limiting.',
     params: UploadImageSchema,
     outputSchema: {
       type: 'object',
@@ -121,7 +121,8 @@ export class UploadImageTool extends BaseTool {
         },
         image: {
           type: 'object',
-          description: 'Uploaded image blob reference and metadata, ready to embed in a post.',
+          description:
+            'Uploaded image blob descriptor and metadata. Pass the `blob` object as create_post embed.images[].image or update_profile avatar/banner.',
           properties: {
             blob: {
               type: 'object',
@@ -253,7 +254,7 @@ export class UploadVideoTool extends BaseTool {
   public readonly schema = {
     method: 'upload_video',
     description:
-      'Upload a video file to AT Protocol for use in posts. Reads a local video file (MP4, MOV, or WebM; max 50 MB) and optionally attaches WebVTT caption tracks, then uploads the video and captions as AT Protocol blobs and returns blob references ready to embed in a create_post or create_thread call. Requires authentication (app password). Use upload_image instead for still images. Subject to per-tool rate limiting.',
+      'Upload a video file to AT Protocol. Reads a local video file (MP4, MOV, or WebM; max 50 MB) and optionally attaches WebVTT caption tracks, then uploads the video and captions as AT Protocol blobs and returns blob references. NOTE: this server does not yet support video embeds, so the returned blob cannot currently be attached to a post via create_post or any other tool — use this only to stage video blobs for external tooling. Requires authentication (app password). Use upload_image instead for still images. Subject to per-tool rate limiting.',
     params: UploadVideoSchema,
     outputSchema: {
       type: 'object',
@@ -268,7 +269,8 @@ export class UploadVideoTool extends BaseTool {
         },
         video: {
           type: 'object',
-          description: 'Uploaded video blob reference and metadata, ready to embed in a post.',
+          description:
+            'Uploaded video blob reference and metadata. Note: video embeds are not yet supported, so this blob cannot currently be attached to a post.',
           properties: {
             blob: {
               type: 'object',
