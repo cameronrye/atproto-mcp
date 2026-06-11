@@ -1053,7 +1053,7 @@ export class AnalyzeAccountTool extends BaseTool {
       } catch (error) {
         this.logger.warn(
           'Profile hydration failed for a chunk; ranking partially unhydrated',
-          error as Error
+          error
         );
       }
     }

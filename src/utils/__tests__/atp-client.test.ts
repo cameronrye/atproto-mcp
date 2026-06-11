@@ -292,7 +292,7 @@ describe('AtpClient', () => {
   describe('executeAuthenticatedRequest without credentials', () => {
     it('denies the operation without invoking it when no credentials are configured', async () => {
       // No authMethod/credentials -> the auth gate must fail closed.
-      const noCredClient = new AtpClient({ service: 'https://bsky.social' } as any);
+      const noCredClient = new AtpClient({ service: 'https://bsky.social' });
       const operation = vi.fn().mockResolvedValue('should not run');
 
       const result = await noCredClient.executeAuthenticatedRequest(operation);

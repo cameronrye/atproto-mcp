@@ -776,7 +776,7 @@ export class UploadVideoTool extends BaseTool {
           },
         });
       } catch (captionError) {
-        this.logger.warn('Failed to upload caption', captionError as Error);
+        this.logger.warn('Failed to upload caption', captionError);
       }
     }
     return processed;
@@ -957,7 +957,7 @@ export class GenerateLinkPreviewTool extends BaseTool {
             };
           }
         } catch (imageError) {
-          this.logger.warn('Failed to download thumbnail image', imageError as Error);
+          this.logger.warn('Failed to download thumbnail image', imageError);
         }
       }
 

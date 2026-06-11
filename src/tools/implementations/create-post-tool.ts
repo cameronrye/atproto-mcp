@@ -544,7 +544,7 @@ export class CreatePostTool extends BaseTool {
         );
         this.logger.info('Threadgate (reply controls) applied', { postUri, rkey });
       } catch (error) {
-        this.logger.warn('Post created but threadgate write failed', error as Error);
+        this.logger.warn('Post created but threadgate write failed', error);
         warnings.push(
           `Reply controls could not be applied (the app.bsky.feed.threadgate write failed: ` +
             `${error instanceof Error ? error.message : 'unknown error'}). The post itself was ` +
@@ -578,7 +578,7 @@ export class CreatePostTool extends BaseTool {
         );
         this.logger.info('Postgate (quote controls) applied', { postUri, rkey });
       } catch (error) {
-        this.logger.warn('Post created but postgate write failed', error as Error);
+        this.logger.warn('Post created but postgate write failed', error);
         warnings.push(
           `Quote controls could not be applied (the app.bsky.feed.postgate write failed: ` +
             `${error instanceof Error ? error.message : 'unknown error'}). The post itself was ` +

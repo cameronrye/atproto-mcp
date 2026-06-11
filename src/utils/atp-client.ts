@@ -350,12 +350,13 @@ export class AtpClient {
       this.logger.debug('Refreshing session');
 
       // Token refresh lives on the agent's session manager (CredentialSession),
-      // not on AtpAgent itself. CredentialSession.refreshSession() returns
-      // Promise<void> and throws on failure — it does NOT resolve to a
-      // { success } envelope. On success it fires the 'update' session event,
+      // not on AtpAgent itself. CredentialSession.refreshSession() throws on
+      // failure — it does NOT resolve to a { success } envelope (the resolved
+      // value is the raw XRPC response since @atproto/api 0.20 and is not
+      // meaningful here). On success it fires the 'update' session event,
       // which re-marks our session as active.
       const sessionManager = this.agent.sessionManager as
-        | { refreshSession?: () => Promise<void> }
+        | { refreshSession?: () => Promise<unknown> }
         | undefined;
       if (typeof sessionManager?.refreshSession === 'function') {
         await sessionManager.refreshSession();

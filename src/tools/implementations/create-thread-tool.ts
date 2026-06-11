@@ -439,7 +439,7 @@ export class CreateThreadTool extends BaseTool {
       this.logger.info('Threadgate (reply controls) applied to thread root', { rootUri, rkey });
       return { gateApplied: true };
     } catch (error) {
-      this.logger.warn('Thread created but root threadgate write failed', error as Error);
+      this.logger.warn('Thread created but root threadgate write failed', error);
       return {
         gateApplied: false,
         warning:

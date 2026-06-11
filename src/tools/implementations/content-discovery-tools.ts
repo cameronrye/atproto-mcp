@@ -511,7 +511,7 @@ export class FindSimilarUsersTool extends BaseTool {
           }
         }
       } catch (error) {
-        this.logger.warn('Candidate profile hydration failed for a chunk', error as Error);
+        this.logger.warn('Candidate profile hydration failed for a chunk', error);
       }
     });
   }
@@ -728,10 +728,7 @@ export class DiscoverCommunitiesTool extends BaseTool {
               }
             }
           } catch (error) {
-            this.logger.warn(
-              'Community member profile hydration failed for a chunk',
-              error as Error
-            );
+            this.logger.warn('Community member profile hydration failed for a chunk', error);
           }
         }
       }

@@ -311,7 +311,7 @@ export abstract class BaseTool implements IMcpTool {
     } catch (error) {
       // Facet detection requires network calls (handle resolution). If it fails,
       // fall back to posting the plain text rather than failing the whole post.
-      this.logger.warn('Facet detection failed; posting without facets', error as Error);
+      this.logger.warn('Facet detection failed; posting without facets', error);
     }
     return rt.facets && rt.facets.length > 0
       ? { text: rt.text, facets: rt.facets }
