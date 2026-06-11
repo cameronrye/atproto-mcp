@@ -90,6 +90,71 @@ describe('get_notifications with countOnly: true', () => {
   });
 });
 
+describe('get_notifications reason contract', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  // The reasons app.bsky.notification.listNotifications documents (the lexicon
+  // union is open — `(string & {})` — so new values can appear at any time).
+  const KNOWN_REASONS = [
+    'like',
+    'repost',
+    'follow',
+    'mention',
+    'reply',
+    'quote',
+    'starterpack-joined',
+    'verified',
+    'unverified',
+    'like-via-repost',
+    'repost-via-repost',
+    'subscribed-post',
+  ];
+
+  it('outputSchema accepts every documented notification reason (no narrow enum)', () => {
+    const { client } = mockClient();
+    const tool = new GetNotificationsTool(client);
+
+    const reasonSchema = (tool.schema.outputSchema as any).properties.notifications.items.properties
+      .reason;
+
+    expect(reasonSchema.type).toBe('string');
+    // The MCP SDK hard-fails structuredContent validation on out-of-enum
+    // values, so an enum narrower than what the API returns is runtime
+    // breakage. Either no enum at all, or one covering every known reason.
+    for (const reason of KNOWN_REASONS) {
+      if (Array.isArray(reasonSchema.enum)) {
+        expect(reasonSchema.enum, `enum must include '${reason}'`).toContain(reason);
+      }
+    }
+  });
+
+  it('passes a non-classic reason through unchanged', async () => {
+    const { client, listNotifications } = mockClient();
+    listNotifications.mockResolvedValueOnce({
+      data: {
+        notifications: [
+          {
+            uri: 'at://did:plc:joiner/app.bsky.graph.starterpack/abc',
+            cid: 'cidsp',
+            author: { did: 'did:plc:joiner', handle: 'joiner.bsky.social' },
+            reason: 'starterpack-joined',
+            record: {},
+            isRead: false,
+            indexedAt: '2026-02-02T00:00:00.000Z',
+          },
+        ],
+        cursor: undefined,
+        seenAt: undefined,
+      },
+    });
+    const tool = new GetNotificationsTool(client);
+
+    const result = await tool.handler({});
+
+    expect(result.notifications[0]?.reason).toBe('starterpack-joined');
+  });
+});
+
 describe('get_notifications (full list)', () => {
   beforeEach(() => vi.clearAllMocks());
 

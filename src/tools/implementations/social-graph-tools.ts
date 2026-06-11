@@ -265,8 +265,12 @@ export class GetNotificationsTool extends BaseTool {
               },
               reason: {
                 type: 'string',
-                enum: ['like', 'repost', 'follow', 'mention', 'reply', 'quote'],
-                description: 'Why this notification was generated.',
+                description:
+                  'Why this notification was generated. Known values: like, repost, follow, ' +
+                  'mention, reply, quote, starterpack-joined, verified, unverified, ' +
+                  'like-via-repost, repost-via-repost, subscribed-post. The AT Protocol ' +
+                  'lexicon defines this as an open union, so treat unrecognized values as ' +
+                  'new reason kinds rather than errors.',
               },
               record: { type: 'object', description: 'Raw lexicon record payload.' },
               isRead: { type: 'boolean', description: 'Whether the notification has been read.' },
@@ -312,7 +316,9 @@ export class GetNotificationsTool extends BaseTool {
           uri: string;
           cid: string;
           author: IAtpProfile;
-          reason: 'like' | 'repost' | 'follow' | 'mention' | 'reply' | 'quote';
+          // Open union in the lexicon (e.g. like, repost, follow, mention, reply,
+          // quote, starterpack-joined, verified, like-via-repost, ...).
+          reason: string;
           record: any;
           isRead: boolean;
           indexedAt: string;

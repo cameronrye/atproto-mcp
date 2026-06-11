@@ -21,9 +21,11 @@ const BatchActionSchema = z.object({
     ),
   continueOnError: z
     .boolean()
-    .optional()
+    .default(true)
     .describe(
-      'Continue processing remaining targets after an individual failure (preserve the previous default behavior).'
+      'Whether to keep processing remaining targets after an individual target fails. ' +
+        'Defaults to true; set to false to stop at the first failure (unprocessed targets ' +
+        'are reported as skipped in the summary).'
     ),
 });
 
@@ -103,7 +105,7 @@ export class BatchActionTool extends BaseTool {
   protected async execute(params: {
     action: 'follow' | 'like' | 'repost';
     targets: string[];
-    continueOnError?: boolean;
+    continueOnError: boolean;
   }): Promise<{
     success: boolean;
     action: 'follow' | 'like' | 'repost';
@@ -116,7 +118,7 @@ export class BatchActionTool extends BaseTool {
       failed: number;
     };
   }> {
-    const continueOnError = params.continueOnError ?? true;
+    const continueOnError = params.continueOnError;
     switch (params.action) {
       case 'follow': {
         const r = await this.batchFollow(params.targets, continueOnError);
@@ -130,6 +132,120 @@ export class BatchActionTool extends BaseTool {
         const r = await this.batchRepost(params.targets, continueOnError);
         return { ...r, action: 'repost' };
       }
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Batched hydration helpers — one read round-trip for the whole batch
+  // -------------------------------------------------------------------------
+
+  /**
+   * Fetch the post views for ALL target URIs in one app.bsky.feed.getPosts call
+   * (the schema caps targets at 25, which is also getPosts' per-call limit).
+   * Each view carries the post CID and the caller's viewer.like/viewer.repost
+   * state, so the write loop needs no further reads. Targets that fail URI
+   * validation are excluded here; the write loop re-validates and attributes
+   * the error to that target. If the batched read itself fails, the error is
+   * returned so the loop can attribute it per target under continueOnError.
+   */
+  private async hydratePostViews(uris: string[]): Promise<{
+    views: Map<string, { cid?: string; viewer?: { like?: string; repost?: string } }>;
+    hydrationError?: Error;
+  }> {
+    const views = new Map<string, { cid?: string; viewer?: { like?: string; repost?: string } }>();
+    const validUris = [
+      ...new Set(
+        uris.filter(uri => {
+          try {
+            this.validateAtUri(uri);
+            return true;
+          } catch {
+            return false;
+          }
+        })
+      ),
+    ];
+    if (validUris.length === 0) {
+      return { views };
+    }
+
+    try {
+      const response = await this.executeAtpOperation(
+        async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.getPosts({ uris: validUris });
+        },
+        'getPosts',
+        { count: validUris.length }
+      );
+      for (const post of response.data.posts) {
+        views.set(post.uri, post);
+      }
+      return { views };
+    } catch (error) {
+      return {
+        views,
+        hydrationError: error instanceof Error ? error : new Error('Unknown error'),
+      };
+    }
+  }
+
+  /**
+   * Fetch the profiles for ALL target actors in one app.bsky.actor.getProfiles
+   * call (the schema caps targets at 25, which is also getProfiles' per-call
+   * limit). Each profile view carries did/handle and viewer.following (the
+   * authoritative "already following" signal), so the write loop needs no
+   * further reads. Profiles are keyed by both DID and lowercased handle so
+   * either form of target identifier resolves.
+   */
+  private async hydrateFollowProfiles(actors: string[]): Promise<{
+    profiles: Map<string, { did: DID; handle?: string; followingUri?: string }>;
+    hydrationError?: Error;
+  }> {
+    const profiles = new Map<string, { did: DID; handle?: string; followingUri?: string }>();
+    const validActors = [
+      ...new Set(
+        actors.filter(actor => {
+          try {
+            this.validateActor(actor);
+            return true;
+          } catch {
+            return false;
+          }
+        })
+      ),
+    ];
+    if (validActors.length === 0) {
+      return { profiles };
+    }
+
+    try {
+      const response = await this.executeAtpOperation(
+        async () => {
+          const agent = this.atpClient.getAgent();
+          return await agent.getProfiles({ actors: validActors });
+        },
+        'getProfiles',
+        { count: validActors.length }
+      );
+      for (const profile of response.data.profiles) {
+        const entry = {
+          did: profile.did as DID,
+          ...(profile.handle && { handle: profile.handle }),
+          // viewer.following is the follow record's URI when already following.
+          ...(profile.viewer?.following && { followingUri: profile.viewer.following }),
+        };
+        profiles.set(profile.did, entry);
+        if (profile.handle) {
+          profiles.set(profile.handle.toLowerCase(), entry);
+        }
+      }
+      return { profiles };
+    } catch (error) {
+      return {
+        profiles,
+        hydrationError: error instanceof Error ? error : new Error('Unknown error'),
+      };
     }
   }
 
@@ -163,13 +279,25 @@ export class BatchActionTool extends BaseTool {
       let failed = 0;
       let alreadyFollowing = 0;
 
+      // Hydrate ALL targets in one getProfiles round-trip before the write loop.
+      const { profiles, hydrationError } = await this.hydrateFollowProfiles(actors);
+
       for (const actor of actors) {
         try {
           // Validate the actor identifier
           this.validateActor(actor);
 
-          // Resolve the actor to get their DID and profile info
-          const userProfile = await this.resolveActor(actor);
+          if (hydrationError) {
+            throw hydrationError;
+          }
+
+          // Look up the actor's hydrated profile (DID + viewer.following). An
+          // actor missing from the batched response is THIS actor's failure,
+          // not the batch's.
+          const userProfile = profiles.get(actor) ?? profiles.get(actor.toLowerCase());
+          if (!userProfile) {
+            throw new Error(`Profile not found for actor: ${actor}`);
+          }
 
           // Check if already following this user (authoritative viewer state).
           if (userProfile.followingUri) {
@@ -305,14 +433,22 @@ export class BatchActionTool extends BaseTool {
       let failed = 0;
       let alreadyLiked = 0;
 
+      // One round-trip for the WHOLE batch: each post view carries both the CID
+      // (for the like subject) and viewer.like (authoritative "already liked").
+      const { views, hydrationError } = await this.hydratePostViews(uris);
+
       for (const uri of uris) {
         try {
           // Validate the URI
           this.validateAtUri(uri);
 
-          // One round-trip: the post view carries both the CID (for the like
-          // subject) and viewer.like (authoritative "already liked" signal).
-          const post = await this.getPostView(uri);
+          if (hydrationError) {
+            throw hydrationError;
+          }
+
+          // A URI missing from the batched response is THIS target's failure,
+          // not the batch's.
+          const post = views.get(uri);
           if (!post?.cid) {
             throw new Error(`Post not found or missing CID: ${uri}`);
           }
@@ -444,14 +580,23 @@ export class BatchActionTool extends BaseTool {
       let failed = 0;
       let alreadyReposted = 0;
 
+      // One round-trip for the WHOLE batch: each post view carries both the CID
+      // (for the repost subject) and viewer.repost (authoritative "already
+      // reposted").
+      const { views, hydrationError } = await this.hydratePostViews(uris);
+
       for (const uri of uris) {
         try {
           // Validate the URI
           this.validateAtUri(uri);
 
-          // One round-trip: the post view carries both the CID (for the repost
-          // subject) and viewer.repost (authoritative "already reposted" signal).
-          const post = await this.getPostView(uri);
+          if (hydrationError) {
+            throw hydrationError;
+          }
+
+          // A URI missing from the batched response is THIS target's failure,
+          // not the batch's.
+          const post = views.get(uri);
           if (!post?.cid) {
             throw new Error(`Post not found or missing CID: ${uri}`);
           }
@@ -555,29 +700,5 @@ export class BatchActionTool extends BaseTool {
       this.logger.error('Batch repost operation failed', error);
       this.formatError(error);
     }
-  }
-
-  /**
-   * Resolve actor identifier to DID and profile information
-   */
-  private async resolveActor(
-    actor: string
-  ): Promise<{ did: DID; handle?: string; followingUri?: string }> {
-    const response = await this.executeAtpOperation(
-      async () => {
-        const agent = this.atpClient.getAgent();
-        return await agent.getProfile({ actor });
-      },
-      'getProfile',
-      { actor }
-    );
-
-    return {
-      did: response.data.did as DID,
-      ...(response.data.handle && { handle: response.data.handle }),
-      // viewer.following is the authoritative "am I already following this user"
-      // signal (the follow record's URI), with no 100-record scan limit.
-      ...(response.data.viewer?.following && { followingUri: response.data.viewer.following }),
-    };
   }
 }

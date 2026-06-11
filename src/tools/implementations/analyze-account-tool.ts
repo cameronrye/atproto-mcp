@@ -108,15 +108,404 @@ export class AnalyzeAccountTool extends BaseTool {
     params: AnalyzeAccountSchema,
     outputSchema: {
       type: 'object',
+      description:
+        "Account analysis result; the shape depends on `dimension`. 'engagement' returns " +
+        "summary + topPosts + insights (object) + recommendations (string[]); 'network' " +
+        "returns actor + network + analysis (graph) + insights (string[]); 'strategy' " +
+        'returns actor + analysis (post performance) + recommendations (object).',
       properties: {
-        success: { type: 'boolean' },
+        success: { type: 'boolean', description: 'Whether the analysis succeeded.' },
         dimension: {
           type: 'string',
           enum: ['engagement', 'network', 'strategy'],
           description: 'Which analysis was run.',
         },
+        actor: {
+          type: 'string',
+          description: 'network/strategy dimensions: the DID or handle that was analyzed.',
+        },
+        summary: {
+          type: 'object',
+          description:
+            'engagement dimension: aggregate statistics over the sampled posts (reposts of ' +
+            'other authors excluded).',
+          properties: {
+            totalPosts: { type: 'number', description: 'Number of own posts sampled.' },
+            totalLikes: { type: 'number', description: 'Sum of likes across sampled posts.' },
+            totalReposts: { type: 'number', description: 'Sum of reposts across sampled posts.' },
+            totalReplies: { type: 'number', description: 'Sum of replies across sampled posts.' },
+            averageLikes: { type: 'number', description: 'Mean likes per post.' },
+            averageReposts: { type: 'number', description: 'Mean reposts per post.' },
+            averageReplies: { type: 'number', description: 'Mean replies per post.' },
+            averageEngagementRate: {
+              type: 'number',
+              description:
+                'Mean engagement per hour of post age; each post’s age is floored at 24 hours ' +
+                'so brand-new posts do not dominate.',
+            },
+          },
+          required: [
+            'totalPosts',
+            'totalLikes',
+            'totalReposts',
+            'totalReplies',
+            'averageLikes',
+            'averageReposts',
+            'averageReplies',
+            'averageEngagementRate',
+          ],
+        },
+        topPosts: {
+          type: 'array',
+          description: 'engagement dimension: up to 10 posts ranked by total engagement.',
+          items: {
+            type: 'object',
+            properties: {
+              uri: { type: 'string', description: 'AT-URI of the post.' },
+              cid: { type: 'string', description: 'CID of the post.' },
+              text: { type: 'string', description: 'Post text, truncated to 100 characters.' },
+              createdAt: { type: 'string', description: 'ISO 8601 creation timestamp.' },
+              likeCount: { type: 'number', description: 'Likes on the post.' },
+              repostCount: { type: 'number', description: 'Reposts of the post.' },
+              replyCount: { type: 'number', description: 'Replies to the post.' },
+              totalEngagement: { type: 'number', description: 'likes + reposts + replies.' },
+              engagementRate: {
+                type: 'number',
+                description: 'Engagement per hour of post age (age floored at 24 hours).',
+              },
+              isReply: { type: 'boolean', description: 'Whether the post is a reply.' },
+              hasMedia: {
+                type: 'boolean',
+                description: 'Whether the post embeds images or video.',
+              },
+              hasLinks: { type: 'boolean', description: 'Whether the text contains URLs.' },
+              textLength: {
+                type: 'number',
+                description: 'Length of the full (untruncated) post text in characters.',
+              },
+              hashtags: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Hashtags found in the text.',
+              },
+            },
+            required: [
+              'uri',
+              'cid',
+              'text',
+              'createdAt',
+              'likeCount',
+              'repostCount',
+              'replyCount',
+              'totalEngagement',
+              'engagementRate',
+              'isReply',
+              'hasMedia',
+              'hasLinks',
+              'textLength',
+              'hashtags',
+            ],
+          },
+        },
+        network: {
+          type: 'object',
+          description: 'network dimension: headline follow-graph counts for the account.',
+          properties: {
+            followersCount: { type: 'number', description: 'Total followers.' },
+            followsCount: { type: 'number', description: 'Total accounts followed.' },
+            postsCount: { type: 'number', description: 'Total posts.' },
+            followerToFollowingRatio: {
+              type: 'number',
+              description:
+                'followersCount / followsCount (equals followersCount when following nobody).',
+            },
+          },
+          required: ['followersCount', 'followsCount', 'postsCount', 'followerToFollowingRatio'],
+        },
+        analysis: {
+          description:
+            "Dimension-specific analysis: graph classification for 'network', post-performance " +
+            "statistics for 'strategy'.",
+          anyOf: [
+            {
+              type: 'object',
+              description: 'network dimension: follow-graph classification.',
+              properties: {
+                networkType: {
+                  type: 'string',
+                  enum: ['broadcaster', 'connector', 'balanced', 'new_user'],
+                  description: 'Follow-graph shape derived from the follower/following ratio.',
+                },
+                engagementQuality: {
+                  type: 'string',
+                  enum: ['high', 'medium', 'low'],
+                  description: "Estimated reach quality from the sampled followers' own reach.",
+                },
+                mutualConnectionsCount: {
+                  type: 'number',
+                  description:
+                    'Overlap between the sampled followers and follows; present only when > 0.',
+                },
+                topFollowers: {
+                  type: 'array',
+                  description:
+                    'Top 10 sampled followers ranked by their own follower count; present only ' +
+                    'when the followers graph was sampled and non-empty.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      did: { type: 'string', description: 'Decentralized identifier.' },
+                      handle: { type: 'string', description: 'AT Protocol handle.' },
+                      displayName: { type: 'string', description: 'Display name, if set.' },
+                      followersCount: {
+                        type: 'number',
+                        description: "The account's own follower count.",
+                      },
+                    },
+                    required: ['did', 'handle', 'followersCount'],
+                  },
+                },
+                topFollows: {
+                  type: 'array',
+                  description:
+                    'Top 10 sampled follows ranked by their own follower count; present only ' +
+                    'when the follows graph was sampled and non-empty.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      did: { type: 'string', description: 'Decentralized identifier.' },
+                      handle: { type: 'string', description: 'AT Protocol handle.' },
+                      displayName: { type: 'string', description: 'Display name, if set.' },
+                      followersCount: {
+                        type: 'number',
+                        description: "The account's own follower count.",
+                      },
+                    },
+                    required: ['did', 'handle', 'followersCount'],
+                  },
+                },
+              },
+              required: ['networkType', 'engagementQuality'],
+            },
+            {
+              type: 'object',
+              description: 'strategy dimension: post-performance statistics.',
+              properties: {
+                totalPostsAnalyzed: {
+                  type: 'number',
+                  description: 'Number of own posts analyzed (reposts excluded).',
+                },
+                avgEngagementRate: {
+                  type: 'number',
+                  description:
+                    'Mean weighted engagement (likes + 2×replies + 3×reposts) per hour since ' +
+                    'posting, rounded to 2 decimals.',
+                },
+                bestPerformingPosts: {
+                  type: 'array',
+                  description: 'Top 5 posts by weighted engagement.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      uri: { type: 'string', description: 'AT-URI of the post.' },
+                      text: {
+                        type: 'string',
+                        description: 'Post text, truncated to 100 characters.',
+                      },
+                      engagement: {
+                        type: 'number',
+                        description: 'Weighted engagement (likes + 2×replies + 3×reposts).',
+                      },
+                      createdAt: { type: 'string', description: 'ISO 8601 indexing timestamp.' },
+                    },
+                    required: ['uri', 'text', 'engagement', 'createdAt'],
+                  },
+                },
+                worstPerformingPosts: {
+                  type: 'array',
+                  description: 'Bottom 5 posts by weighted engagement (lowest first).',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      uri: { type: 'string', description: 'AT-URI of the post.' },
+                      text: {
+                        type: 'string',
+                        description: 'Post text, truncated to 100 characters.',
+                      },
+                      engagement: {
+                        type: 'number',
+                        description: 'Weighted engagement (likes + 2×replies + 3×reposts).',
+                      },
+                      createdAt: { type: 'string', description: 'ISO 8601 indexing timestamp.' },
+                    },
+                    required: ['uri', 'text', 'engagement', 'createdAt'],
+                  },
+                },
+              },
+              required: [
+                'totalPostsAnalyzed',
+                'avgEngagementRate',
+                'bestPerformingPosts',
+                'worstPerformingPosts',
+              ],
+            },
+          ],
+        },
         insights: {
-          description: 'Human-readable analysis insights (shape varies by dimension).',
+          description:
+            "Dimension-specific insights: structured content patterns for 'engagement', " +
+            "human-readable strings for 'network'.",
+          anyOf: [
+            {
+              type: 'object',
+              description: 'engagement dimension: content-pattern analysis.',
+              properties: {
+                bestPerformingType: {
+                  type: 'string',
+                  description: "Which post type performs best: 'replies' or 'original posts'.",
+                },
+                optimalTextLength: {
+                  type: 'object',
+                  description: 'Character-length range of the top 20% of posts by engagement.',
+                  properties: {
+                    min: { type: 'number', description: 'Shortest top-performer length.' },
+                    max: { type: 'number', description: 'Longest top-performer length.' },
+                  },
+                  required: ['min', 'max'],
+                },
+                mediaImpact: {
+                  type: 'object',
+                  description: 'Average total engagement with vs without media embeds.',
+                  properties: {
+                    withMedia: { type: 'number', description: 'Mean engagement with media.' },
+                    withoutMedia: {
+                      type: 'number',
+                      description: 'Mean engagement without media.',
+                    },
+                  },
+                  required: ['withMedia', 'withoutMedia'],
+                },
+                hashtagImpact: {
+                  type: 'object',
+                  description: 'Average total engagement with vs without hashtags.',
+                  properties: {
+                    withHashtags: {
+                      type: 'number',
+                      description: 'Mean engagement with hashtags.',
+                    },
+                    withoutHashtags: {
+                      type: 'number',
+                      description: 'Mean engagement without hashtags.',
+                    },
+                  },
+                  required: ['withHashtags', 'withoutHashtags'],
+                },
+                topHashtags: {
+                  type: 'array',
+                  description: 'Up to 5 hashtags ranked by average engagement.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      tag: { type: 'string', description: "Hashtag including '#'." },
+                      avgEngagement: {
+                        type: 'number',
+                        description: 'Mean total engagement of posts using the tag.',
+                      },
+                      count: { type: 'number', description: 'How many posts used the tag.' },
+                    },
+                    required: ['tag', 'avgEngagement', 'count'],
+                  },
+                },
+              },
+              required: [
+                'bestPerformingType',
+                'optimalTextLength',
+                'mediaImpact',
+                'hashtagImpact',
+                'topHashtags',
+              ],
+            },
+            {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'network dimension: human-readable insights.',
+            },
+          ],
+        },
+        recommendations: {
+          description:
+            "Dimension-specific recommendations: actionable strings for 'engagement', a " +
+            "structured plan for 'strategy'.",
+          anyOf: [
+            {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'engagement dimension: actionable suggestions.',
+            },
+            {
+              type: 'object',
+              description: 'strategy dimension: posting recommendations.',
+              properties: {
+                bestPostingTimes: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description:
+                    "Top 3 posting hours by engagement (e.g. '9:00 AM'); present only when " +
+                    'timing analysis is enabled and data exists.',
+                },
+                contentTypes: {
+                  type: 'array',
+                  description: 'Engagement by content type, best first.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      type: {
+                        type: 'string',
+                        description:
+                          "Content category: 'withMedia', 'withLinks', 'textOnly' or 'threads'.",
+                      },
+                      avgEngagement: {
+                        type: 'number',
+                        description: 'Mean engagement rate for the category.',
+                      },
+                      recommendation: {
+                        type: 'string',
+                        description: 'Whether to produce more or fewer posts of this type.',
+                      },
+                    },
+                    required: ['type', 'avgEngagement', 'recommendation'],
+                  },
+                },
+                topics: {
+                  type: 'array',
+                  description:
+                    'Up to 10 recurring topics/keywords ranked by average engagement; present ' +
+                    'only when topic analysis is enabled.',
+                  items: {
+                    type: 'object',
+                    properties: {
+                      topic: { type: 'string', description: 'Hashtag or keyword.' },
+                      frequency: {
+                        type: 'number',
+                        description: 'How many posts mention the topic (always ≥ 2).',
+                      },
+                      avgEngagement: {
+                        type: 'number',
+                        description: 'Mean engagement rate of posts mentioning the topic.',
+                      },
+                    },
+                    required: ['topic', 'frequency', 'avgEngagement'],
+                  },
+                },
+                optimizationTips: {
+                  type: 'array',
+                  items: { type: 'string' },
+                  description: 'General improvement tips; always present.',
+                },
+              },
+              required: ['optimizationTips'],
+            },
+          ],
         },
       },
       required: ['success', 'dimension'],
@@ -234,11 +623,12 @@ export class AnalyzeAccountTool extends BaseTool {
         const replyCount = post.replyCount || 0;
         const totalEngagement = likeCount + repostCount + replyCount;
 
-        // Calculate engagement rate (engagement per hour since posting)
+        // Calculate engagement rate (engagement per hour of post age). The age
+        // denominator is floored at 24h so a minutes-old post (tiny denominator)
+        // cannot dominate averages and rankings over established posts.
         const createdAt = new Date(post.record.createdAt);
         const hoursSincePost = (Date.now() - createdAt.getTime()) / (1000 * 60 * 60);
-        const engagementRate =
-          hoursSincePost > 0 ? totalEngagement / hoursSincePost : totalEngagement;
+        const engagementRate = totalEngagement / Math.max(hoursSincePost, 24);
 
         return {
           uri: post.uri,

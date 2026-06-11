@@ -16,6 +16,17 @@ const createMockAtpClient = () => {
         displayName: `User ${actor}`,
       },
     })),
+    // batch action=follow hydrates all actors (DID + viewer.following) in one call.
+    getProfiles: vi.fn().mockImplementation(async ({ actors }: { actors: string[] }) => ({
+      data: {
+        profiles: actors.map((actor: string) => ({
+          did: `did:plc:${actor.replace('.bsky.social', '')}`,
+          handle: actor,
+          displayName: `User ${actor}`,
+          viewer: {},
+        })),
+      },
+    })),
     getPost: vi.fn().mockImplementation(async ({ uri }: { uri: string }) => ({
       data: {
         uri,
@@ -100,6 +111,22 @@ const createMockAtpClient = () => {
   } as unknown as AtpClient;
 };
 
+describe('BatchActionTool — continueOnError default', () => {
+  it('defaults continueOnError to true via the schema and documents the default', () => {
+    const tool = new BatchActionTool(createMockAtpClient());
+
+    const parsed = tool.schema.params.parse({
+      action: 'like',
+      targets: ['at://did:plc:user1/app.bsky.feed.post/1'],
+    });
+
+    // The default must come from the zod schema (visible to MCP clients), not
+    // from a hidden code-side fallback.
+    expect(parsed.continueOnError).toBe(true);
+    expect(tool.schema.params.shape.continueOnError.description).toMatch(/defaults to true/i);
+  });
+});
+
 describe('BatchActionTool — action=follow', () => {
   let tool: BatchActionTool;
   let mockClient: AtpClient;
@@ -124,23 +151,16 @@ describe('BatchActionTool — action=follow', () => {
 
   it('should handle partial failures gracefully', async () => {
     const agent = mockClient.getAgent();
-    // Mock getProfile to fail for the second user
-    (agent.getProfile as Mock)
-      .mockResolvedValueOnce({
-        data: {
-          did: 'did:plc:user1',
-          handle: 'user1.bsky.social',
-          displayName: 'User 1',
-        },
-      })
-      .mockRejectedValueOnce(new Error('User not found'))
-      .mockResolvedValueOnce({
-        data: {
-          did: 'did:plc:user3',
-          handle: 'user3.bsky.social',
-          displayName: 'User 3',
-        },
-      });
+    // The batched profile hydration returns no entry for the second user — a
+    // target missing from the batched response is that target's failure.
+    (agent.getProfiles as Mock).mockResolvedValueOnce({
+      data: {
+        profiles: [
+          { did: 'did:plc:user1', handle: 'user1.bsky.social', displayName: 'User 1' },
+          { did: 'did:plc:user3', handle: 'user3.bsky.social', displayName: 'User 3' },
+        ],
+      },
+    });
 
     const result = await tool.handler({
       action: 'follow',
@@ -224,22 +244,6 @@ describe('BatchActionTool — action=repost', () => {
   });
 
   it('should repost multiple posts successfully', async () => {
-    const result = await tool.handler({
-      action: 'repost',
-      targets: [
-        'at://did:plc:user1/app.bsky.feed.post/1',
-        'at://did:plc:user2/app.bsky.feed.post/2',
-      ],
-    });
-
-    expect(result.success).toBe(true);
-    expect(result.action).toBe('repost');
-    expect(result.results).toHaveLength(2);
-    expect(result.summary.succeeded).toBe(2);
-    expect(result.summary.failed).toBe(0);
-  });
-
-  it('should process multiple reposts successfully', async () => {
     const result = await tool.handler({
       action: 'repost',
       targets: [
