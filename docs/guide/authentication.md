@@ -255,7 +255,9 @@ The server enforces a per-tool limit of **100 requests per minute per tool**.
 ### Network Security
 
 - The server talks to the AT Protocol service over HTTPS
-- It communicates with MCP clients over stdio (no network listener to harden)
+- By default it communicates with MCP clients over stdio (no network listener
+  to harden); with `--transport http` it binds loopback unless you opt into
+  wider exposure, which is yours to secure
 - A built-in per-tool rate limit (100 requests/minute) is always on
 
 ### Access Control

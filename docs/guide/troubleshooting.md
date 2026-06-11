@@ -2,11 +2,13 @@
 
 Common issues and fixes for the AT Protocol MCP Server.
 
-This server speaks the
-[Model Context Protocol](https://modelcontextprotocol.io/) over **stdio only** —
-it is launched by your MCP client (Claude Desktop, an IDE, your own script) and
-communicates over stdin/stdout. It does **not** bind a network port, so there is
-no HTTP endpoint, no `localhost:3000`, and no `/health` URL to curl.
+By default this server speaks the
+[Model Context Protocol](https://modelcontextprotocol.io/) over **stdio** — it
+is launched by your MCP client (Claude Desktop, an IDE, your own script) and
+communicates over stdin/stdout, binding **no** network port: no HTTP endpoint,
+no `localhost:3000`, and no `/health` URL to curl. (With `--transport http` the
+server instead serves MCP at `/mcp` — and only `/mcp`; there is still no
+`/health` route.)
 
 This page is symptom &rarr; fix. For error codes and recovery patterns, see
 [Error Handling](./error-handling.md).
@@ -240,7 +242,7 @@ Keep in mind Bluesky itself also enforces platform-side rate limits; persistent
 **Fix**:
 
 - Ask your client to list tools (for example, "What tools are available?"). The
-  server exposes 43 tools.
+  server exposes 51 tools.
 - Tool names are `snake_case` (`create_post`, not `createPost`).
 - Some tools require authentication; without credentials they are unavailable.
   See [Authentication Issues](#authentication-issues).
@@ -270,9 +272,10 @@ data:
 - The placeholder `atproto://conversation-context` resource is no longer
   registered (it always read as empty).
 
-Real-time streaming and OAuth login are planned but not yet functional, so they
-are not exposed as tools. See [Experimental & Roadmap](./experimental.md) for
-the current status.
+OAuth login is planned but not yet functional, so it is not exposed as a tool.
+Real-time streaming is not planned as tools (the leftover firehose client code
+has been removed). See [Experimental & Roadmap](./experimental.md) for the
+current status.
 
 ### Resource Not Available or Read Fails
 
@@ -281,11 +284,16 @@ the current status.
 
 **Fix**:
 
-- The registered resources (`atproto://timeline`, `atproto://profile`,
+- The static resources (`atproto://timeline`, `atproto://profile`,
   `atproto://notifications`) call the real API and require authentication — set
   your credentials.
-- Use the exact URI form, e.g. `atproto://timeline`. Reading any unknown URI
-  returns JSON-RPC error `-32002` (Resource not found).
+- The resource templates (`atproto://profile/{actor}`,
+  `atproto://feed/{actor}`) work without authentication, but `{actor}` must be
+  a syntactically valid handle or DID — anything else does not match the
+  template.
+- Use the exact URI form, e.g. `atproto://timeline`. Reading a URI that matches
+  neither a static resource nor a template returns JSON-RPC error `-32002`
+  (Resource not found).
 - If reads fail after a long session, the session may have expired; restart the
   server.
 

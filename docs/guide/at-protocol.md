@@ -31,7 +31,7 @@ If you want to understand the protocol itself in depth, start here:
 
 The table below maps the AT Protocol building blocks to the MCP tools this
 server exposes. See the [API Reference](../api/index.md) for the full catalog of
-43 tools.
+51 tools.
 
 | AT Protocol concept                                                  | What it is                                                                                                            | Related MCP tools                                                                                                                                                        |
 | -------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -68,9 +68,10 @@ App passwords are the supported authentication path. Create one in Bluesky
 revoked individually, and never expose your main password. See
 [Authentication](./authentication.md) for setup.
 
-Run without credentials and only the public tools work (notably
-[`search_posts`](../api/tools/search-posts.md) and
-[`get_user_profile`](../api/tools/get-user-profile.md)); most tools require
+Run without credentials and only the public/enhanced tools work (notably
+[`get_user_profile`](../api/tools/get-user-profile.md) and
+[`search_actors`](../api/tools/search-actors.md));
+[`search_posts`](../api/tools/search-posts.md) and most other tools require
 authentication.
 
 ### OAuth (planned)

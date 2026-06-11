@@ -123,17 +123,21 @@ Each tool has:
 
 ### Available Tools
 
-The AT Protocol MCP Server provides 43 tools across categories:
+The AT Protocol MCP Server provides 51 tools across categories:
 
 - **Social Operations**: create_post, like_post, repost, follow_user
 - **Data Retrieval**: search_posts, get_user_profile, get_timeline,
   get_author_feed, get_user_connections
+- **Direct Messages**: list_conversations, get_conversation_messages,
+  send_direct_message
+- **Bookmarks**: add_bookmark, remove_bookmark, get_bookmarks
 - **Content Management**: delete_post, update_profile, upload_image
 - **Moderation**: mute_user, block_user, report_content
 - **Batch & Analytics**: batch_action, analyze_account, discover
+- **Starter Packs**: search_starter_packs, get_starter_pack
 
-OAuth login and real-time streaming are planned but not yet functional, so they
-are not exposed as tools. See the
+OAuth login is planned but not yet functional, so it is not exposed as a tool;
+real-time streaming is not planned as tools. See the
 [Experimental & Roadmap](./experimental.md) page.
 
 See the [API Reference](../api/index.md) for the complete list.
@@ -202,10 +206,22 @@ Resources are data sources that LLMs can read to get context.
 - **atproto://profile** - User's profile information
 - **atproto://notifications** - Recent notifications
 
-All three resources require authentication. Reading any other URI returns
-JSON-RPC error `-32002` (Resource not found). The placeholder
+All three static resources require authentication. The placeholder
 `atproto://conversation-context` resource from earlier releases has been
 removed.
+
+### Resource Templates
+
+The server also answers `resources/templates/list` with two parameterized
+templates that expose any actor's **public** data and work **without
+authentication**:
+
+- **atproto://profile/{actor}** - Public profile for a handle or DID
+- **atproto://feed/{actor}** - Recent public posts by a handle or DID
+
+`resources/read` resolves a concrete URI against the static resources first,
+then the templates. A URI that matches neither returns JSON-RPC error `-32002`
+(Resource not found).
 
 See the [API Reference](../api/index.md) for details.
 
@@ -298,19 +314,30 @@ See the [API Reference](../api/index.md) for details.
 
 ## Transport Protocols
 
-The AT Protocol MCP Server uses the **stdio (Standard Input/Output)** transport
-mechanism for local integrations:
+By default the AT Protocol MCP Server uses the **stdio (Standard Input/Output)**
+transport for local integrations:
 
 ```bash
 atproto-mcp
 ```
 
 Communication occurs via stdin/stdout using JSON-RPC 2.0, which is the standard
-transport for MCP servers integrated with LLM clients like Claude Desktop.
+transport for MCP servers integrated with LLM clients like Claude Desktop. The
+stdio transport is recommended for MCP clients that spawn the server
+themselves, as it provides secure, local communication.
 
-**Note:** HTTP/SSE transport is not currently implemented. The stdio transport
-is recommended for all MCP server integrations as it provides secure, local
-communication between the LLM client and the server.
+The server can alternatively serve the MCP **Streamable HTTP** transport:
+
+```bash
+atproto-mcp --transport http --port 8080
+```
+
+In HTTP mode the single route `/mcp` accepts `POST` (JSON-RPC messages, with an
+`initialize` request opening a session identified by the server-minted
+`Mcp-Session-Id` header), `GET` (the standalone SSE stream), and `DELETE`
+(session termination). The binding defaults to the loopback interface
+(`127.0.0.1:3000`); see the [Configuration guide](./configuration.md) and
+[Deployment guide](./deployment.md).
 
 ## Message Format
 
@@ -387,13 +414,18 @@ The server advertises its capabilities:
   "capabilities": {
     "tools": {},
     "resources": {},
-    "prompts": {}
+    "prompts": {},
+    "completions": {}
   }
 }
 ```
 
 The server advertises empty capability objects — it does not declare
-`listChanged` or `subscribe` flags.
+`listChanged` or `subscribe` flags. The `completions` capability means
+`completion/complete` is served: enumerable prompt arguments return candidate
+values, and the `{actor}` variable of the resource templates completes to the
+authenticated user's handle (free-text arguments and unauthenticated servers
+complete to an empty list, never an error).
 
 ## Best Practices
 

@@ -42,8 +42,9 @@ write operations, private data, feeds).
 > **Zero-config launch**: `npx atproto-mcp` runs the server in unauthenticated
 > public-data mode — no credentials required.
 >
-> **Recent additions**: Batch operations for bulk actions, advanced analytics
-> and insights, and intelligent content discovery.
+> **Recent additions**: Bluesky direct messages, private bookmarks, starter pack
+> discovery, reply/quote controls on posts, parameterized MCP resource
+> templates, and an optional Streamable HTTP transport (`--transport http`).
 
 ## Architecture
 
@@ -86,10 +87,11 @@ server to access AT Protocol functionality.
   (follow/like/repost up to 25 items at once)
 - **Analytics & Insights**: Analyze engagement patterns, network connections,
   and get content strategy recommendations
-- **Content Discovery**: Find similar users, trending topics, and influential
-  voices in your areas of interest
-- **Conversation Context**: An MCP resource that acts as a scratchpad for
-  conversation state (not auto-populated yet)
+- **Content Discovery**: Find similar users, trending topics, starter packs, and
+  influential voices in your areas of interest
+- **Direct Messages**: List conversations, read message history, and send
+  Bluesky DMs (requires a DM-enabled app password)
+- **Private Bookmarks**: Save, list, and remove private bookmarks on posts
 
 ### Core Features
 
@@ -103,13 +105,16 @@ server to access AT Protocol functionality.
 - **MCP Server Compliance**: Built with `@modelcontextprotocol/sdk` following
   MCP specification
 - **Type-Safe**: Written in TypeScript with strict type checking
-- **Comprehensive Tools**: 43 MCP tools for social networking operations
+- **Comprehensive Tools**: 51 MCP tools for social networking operations
 - **Rate Limiting**: Built-in respect for AT Protocol rate limits
 - **Extensible**: Modular architecture for easy customization
 
-> **Planned**: OAuth login and real-time firehose streaming are on the roadmap
-> but not yet functional. App-password authentication is the supported auth path
-> today.
+> **Planned**: OAuth login is on the roadmap but not yet functional —
+> app-password authentication is the supported auth path today. Real-time
+> firehose streaming is **not** planned as MCP tools: a request/response tool
+> cannot honestly expose a continuous stream, and the unused firehose client
+> code has been removed. If streaming ever ships it will be built fresh on
+> [Jetstream](https://docs.bsky.app/blog/jetstream).
 
 ## Who Is This For?
 
@@ -269,7 +274,7 @@ credentials.
 
 ## Available Tools
 
-The server provides **43 MCP tools** across multiple categories. See the
+The server provides **51 MCP tools** across multiple categories. See the
 [complete API documentation](https://cameronrye.github.io/atproto-mcp/api/) for
 detailed information on each tool.
 
@@ -288,6 +293,8 @@ detailed information on each tool.
   enriches the underlying API call when authenticated)
 - `get_post_context` - Get a post with optional thread, author profile,
   engagement metrics, and media (ENHANCED mode)
+- `search_starter_packs` / `get_starter_pack` - Search Bluesky starter packs by
+  keyword and fetch a pack's details (ENHANCED mode)
 
 **Rich Media**
 
@@ -318,6 +325,18 @@ for most endpoints that were previously public, including `search_posts`.
 - `get_notifications` - Access notification feeds (use `countOnly: true` for a
   cheap unread badge count)
 - `mark_notifications_seen` - Mark notifications as seen up to a timestamp
+
+**Direct Messages**
+
+- `list_conversations` - List your Bluesky DM conversations
+- `get_conversation_messages` - Read a conversation's message history
+- `send_direct_message` - Send a DM (requires an app password created with
+  "Allow access to your direct messages" enabled)
+
+**Bookmarks**
+
+- `add_bookmark` / `remove_bookmark` - Privately bookmark and un-bookmark posts
+- `get_bookmarks` - List your private bookmarks
 
 **Content Management**
 
@@ -523,10 +542,13 @@ This project is licensed under the MIT License.
 
 ## Deployment
 
-This is a **stdio MCP server**: it is normally launched by an MCP client (e.g.
-Claude Desktop) via `npx atproto-mcp` and communicates over stdin/stdout. It
-does not listen on a network port, so there is no HTTP endpoint to expose or
-scale.
+By default this is a **stdio MCP server**: it is normally launched by an MCP
+client (e.g. Claude Desktop) via `npx atproto-mcp` and communicates over
+stdin/stdout, binding no network port. Alternatively, `--transport http` serves
+the MCP **Streamable HTTP** transport at `http://<host>:<port>/mcp` (default
+binding `127.0.0.1:3000`, loopback only); exposing it beyond loopback (e.g.
+`--host 0.0.0.0`) is the operator's responsibility to secure. stdio remains the
+default and the recommended setup for MCP clients.
 
 ### Built-in safeguards
 

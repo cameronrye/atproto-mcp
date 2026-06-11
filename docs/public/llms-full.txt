@@ -2,18 +2,19 @@
 
 > A comprehensive Model Context Protocol (MCP) server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem including Bluesky and other decentralized social networks.
 
-This MCP server provides a bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, and manage content on the decentralized social web. It exposes 43 tools, 3 resources, and 2 prompts over the stdio transport.
+This MCP server provides a bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, and manage content on the decentralized social web. It exposes 51 tools, 3 resources plus 2 parameterized resource templates, and 2 prompts, and declares the completions capability. The default transport is stdio; --transport http serves the MCP Streamable HTTP transport at /mcp instead (loopback binding by default).
 
 Key capabilities:
 - Full AT Protocol integration using official @atproto/api
 - MCP-compliant server implementation with @modelcontextprotocol/sdk
 - Type-safe TypeScript implementation with comprehensive validation
 - App password authentication (supported); OAuth login is planned but not yet functional
-- Extensive social operations (posts, likes, reposts, follows)
+- Extensive social operations (posts, likes, reposts, follows, reply/quote controls via threadgate/postgate)
+- Bluesky direct messages (chat.bsky.convo), private bookmarks, and starter pack discovery
 - Content management (images, videos, rich text)
 - User profile, timeline, and notification access
 - Analytics and discovery tools (engagement, network, trending, recommendations)
-- Real-time firehose streaming is on the roadmap (not yet built — see Experimental & Roadmap)
+- Real-time firehose streaming is not exposed and not planned as tools (the unused firehose client code was removed; any future event consumption would be built on Jetstream — see Experimental & Roadmap)
 
 ## Getting Started
 
@@ -34,11 +35,11 @@ Key capabilities:
 
 - [API Overview](https://cameronrye.github.io/atproto-mcp/api/): Complete API documentation
 
-The server registers **43 tools**. Most require authentication; a small number of public/enhanced tools (notably `get_user_profile`, `search_actors`, `get_author_feed`, and `get_user_connections`) also work in unauthenticated mode. `search_posts` requires authentication — the AT Protocol search API changed in 2025 to require auth. OAuth login and real-time streaming are planned but not yet functional, so they are not exposed as tools.
+The server registers **51 tools**. Most require authentication; a small number of public/enhanced tools (notably `get_user_profile`, `search_actors`, `get_author_feed`, `get_user_connections`, `search_starter_packs`, and `get_starter_pack`) also work in unauthenticated mode. `search_posts` requires authentication — the AT Protocol search API changed in 2025 to require auth. OAuth login is planned but not yet functional, so it is not exposed as a tool; real-time streaming is not planned as tools.
 
 ### Social Operations
-- [Create Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-post.html): Create posts with text, auto-detected or explicit richtext facets, replies, image/external embeds, and quote posts
-- [Create Thread](https://cameronrye.github.io/atproto-mcp/api/tools/create-thread.html): Create a multi-post thread
+- [Create Post](https://cameronrye.github.io/atproto-mcp/api/tools/create-post.html): Create posts with text, auto-detected or explicit richtext facets, replies, image/external/video embeds, quote posts, and reply/quote controls (threadgate/postgate via `replyControls`/`quoteControls`)
+- [Create Thread](https://cameronrye.github.io/atproto-mcp/api/tools/create-thread.html): Create a multi-post thread (optional `replyControls` gate the root post)
 - [Reply to Post](https://cameronrye.github.io/atproto-mcp/api/tools/reply-to-post.html): Reply to existing posts
 - [Like Post](https://cameronrye.github.io/atproto-mcp/api/tools/like-post.html): Like posts
 - [Unlike Post](https://cameronrye.github.io/atproto-mcp/api/tools/unlike-post.html): Remove likes from posts
@@ -68,6 +69,23 @@ The server registers **43 tools**. Most require authentication; a small number o
 - [Mark Notifications Seen](https://cameronrye.github.io/atproto-mcp/api/tools/mark-notifications-seen.html): Mark notifications as seen up to a timestamp
 - [Get Custom Feed](https://cameronrye.github.io/atproto-mcp/api/tools/get-custom-feed.html): Access custom feeds
 
+### Direct Messages
+These call the Bluesky chat service (chat.bsky.convo) and require an app password created with "Allow access to your direct messages" enabled:
+- [List Conversations](https://cameronrye.github.io/atproto-mcp/api/tools/list-conversations.html): List your DM conversations (filter by `status: 'request' | 'accepted'`)
+- [Get Conversation Messages](https://cameronrye.github.io/atproto-mcp/api/tools/get-conversation-messages.html): Read a conversation's message history
+- [Send Direct Message](https://cameronrye.github.io/atproto-mcp/api/tools/send-direct-message.html): Send a direct message to a conversation
+
+### Bookmarks
+Bookmarks are private to your account; other users cannot see them:
+- [Add Bookmark](https://cameronrye.github.io/atproto-mcp/api/tools/add-bookmark.html): Privately bookmark a post
+- [Remove Bookmark](https://cameronrye.github.io/atproto-mcp/api/tools/remove-bookmark.html): Remove a bookmark
+- [Get Bookmarks](https://cameronrye.github.io/atproto-mcp/api/tools/get-bookmarks.html): List your bookmarks
+
+### Starter Packs
+Both work without authentication (enhanced tools):
+- [Search Starter Packs](https://cameronrye.github.io/atproto-mcp/api/tools/search-starter-packs.html): Search Bluesky starter packs by keyword
+- [Get Starter Pack](https://cameronrye.github.io/atproto-mcp/api/tools/get-starter-pack.html): Fetch a starter pack's details by AT-URI or bsky.app link
+
 ### Content Management
 - [Delete Post](https://cameronrye.github.io/atproto-mcp/api/tools/delete-post.html): Delete posts
 - [Upload Image](https://cameronrye.github.io/atproto-mcp/api/tools/upload-image.html): Upload images — the returned blob descriptor feeds create_post `embed.images[].image`, `embed.external.thumb`, and update_profile `avatar`/`banner`
@@ -96,15 +114,23 @@ The server registers **43 tools**. Most require authentication; a small number o
 - [Get List](https://cameronrye.github.io/atproto-mcp/api/tools/get-list.html): Retrieve list information
 
 ### Resources
-Three resources are registered; all require authentication. Reading an unknown resource URI returns JSON-RPC error -32002 (Resource not found). The placeholder `atproto://conversation-context` resource from earlier releases has been removed.
+Three static resources are registered; all require authentication. The placeholder `atproto://conversation-context` resource from earlier releases has been removed.
 - [Timeline Resource](https://cameronrye.github.io/atproto-mcp/api/resources/timeline.html): `atproto://timeline` — authenticated timeline data
 - [Profile Resource](https://cameronrye.github.io/atproto-mcp/api/resources/profile.html): `atproto://profile` — authenticated profile data
 - [Notifications Resource](https://cameronrye.github.io/atproto-mcp/api/resources/notifications.html): `atproto://notifications` — authenticated notification data
+
+Two parameterized resource templates are also advertised (resources/templates/list); they expose any actor's public data and work without authentication:
+- `atproto://profile/{actor}` — public profile for a handle or DID
+- `atproto://feed/{actor}` — recent public posts by a handle or DID
+
+Reading a URI that matches neither a static resource nor a template returns JSON-RPC error -32002 (Resource not found). The `{actor}` template variable supports completion/complete.
 
 ### Prompts
 Two prompts are available; they are pure text templates and work without authentication:
 - `content_composition` (args: `topic`, `tone`, `length`, `include_hashtags`)
 - `reply_template` (args: `original_post`, `reply_type`, `relationship`)
+
+Prompt arguments support completion/complete: enumerable arguments return candidate values; free-text arguments complete to an empty list.
 
 ### Types
 - [Core Types](https://cameronrye.github.io/atproto-mcp/api/types/core.html): Core type definitions
@@ -126,7 +152,7 @@ Two prompts are available; they are pure text templates and work without authent
 
 ## Optional
 
-- [Experimental & Roadmap](https://cameronrye.github.io/atproto-mcp/guide/experimental.html): Streaming, OAuth login, and other planned features
+- [Experimental & Roadmap](https://cameronrye.github.io/atproto-mcp/guide/experimental.html): OAuth login and other planned features (and why streaming is not planned)
 - [Deployment Guide](https://cameronrye.github.io/atproto-mcp/guide/deployment.html): Deploy the server to production
 - [Troubleshooting](https://cameronrye.github.io/atproto-mcp/guide/troubleshooting.html): Common issues and solutions
 - [FAQ](https://cameronrye.github.io/atproto-mcp/FAQ.html): Frequently asked questions

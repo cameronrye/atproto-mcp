@@ -13,8 +13,12 @@ The server can be configured through:
 
 ::: tip Transport
 
-The server communicates over **stdio** only (for MCP clients such as Claude
-Desktop). It does **not** listen on a TCP port and exposes no HTTP endpoints.
+By default the server communicates over **stdio** (the standard setup for MCP
+clients such as Claude Desktop) and binds no TCP port. With
+`--transport http` it instead serves the MCP **Streamable HTTP** transport at
+`http://<host>:<port>/mcp` — see
+[Command Line Arguments](#command-line-arguments) below and the
+[Deployment guide](./deployment.md).
 
 :::
 
@@ -22,12 +26,12 @@ Desktop). It does **not** listen on a TCP port and exposes no HTTP endpoints.
 
 The `ConfigManager` reads the variables defined in `ENV_MAPPINGS` in
 `src/utils/config.ts` (listed below), plus `LOG_LEVEL` (read by the logger) and
-`NODE_ENV` (used to relax validation under `test`). Two additional variables are
-read directly by specific subsystems: `ATPROTO_MEDIA_DIR` (base directory that
+`NODE_ENV` (used to relax validation under `test`). One additional variable is
+read directly by a specific subsystem: `ATPROTO_MEDIA_DIR` (base directory that
 tool-supplied media file paths must stay within; defaults to the working
-directory) and `ATPROTO_RELAY` (firehose relay WebSocket URL; defaults to
-`wss://bsky.network`). Other variables — including the legacy `OAUTH_CLIENT_ID`
-/ `OAUTH_CLIENT_SECRET` / `OAUTH_REDIRECT_URI` names — are ignored.
+directory). Other variables — including the legacy `OAUTH_CLIENT_ID` /
+`OAUTH_CLIENT_SECRET` / `OAUTH_REDIRECT_URI` names and the former
+`ATPROTO_RELAY` — are ignored.
 
 ### Authentication
 
@@ -48,19 +52,20 @@ the AT Protocol search API changed in 2025 to require auth).
 
 ### Server
 
-| Variable          | Description                                      | Default       |
-| ----------------- | ------------------------------------------------ | ------------- |
-| `MCP_SERVER_NAME` | Server name advertised over the MCP protocol     | `atproto-mcp` |
-| `MCP_SERVER_PORT` | Reserved; **ignored** under the stdio transport  | `3000`        |
-| `MCP_SERVER_HOST` | Reserved; **ignored** under the stdio transport  | `localhost`   |
-| `LOG_LEVEL`       | Logging level (`debug`, `info`, `warn`, `error`) | `info`        |
+| Variable          | Description                                                                 | Default       |
+| ----------------- | --------------------------------------------------------------------------- | ------------- |
+| `MCP_SERVER_NAME` | Server name advertised over the MCP protocol                                | `atproto-mcp` |
+| `MCP_SERVER_PORT` | HTTP port for `--transport http` (the stdio transport ignores it)           | `3000`        |
+| `MCP_SERVER_HOST` | HTTP bind host for `--transport http` (the stdio transport ignores it)      | `localhost`   |
+| `LOG_LEVEL`       | Logging level (`debug`, `info`, `warn`, `error`)                            | `info`        |
 
-::: warning Reserved variables
+::: warning Port and host only apply to the HTTP transport
 
-`MCP_SERVER_PORT` and `MCP_SERVER_HOST` are accepted for forward compatibility
-but have **no effect**: the stdio transport binds no port and no host. There is
-no HTTP server, no `http://localhost:3000`, and no `/health` or `/metrics`
-endpoint.
+`MCP_SERVER_PORT` and `MCP_SERVER_HOST` (and the `--port`/`--host` flags, which
+override them) only take effect with `--transport http`. Under the default
+stdio transport the server binds no port and no host — there is no HTTP server
+and no `/health` or `/metrics` endpoint. In HTTP mode the only route served is
+`/mcp`, and `localhost` is pinned to the IPv4 loopback `127.0.0.1`.
 
 :::
 
@@ -77,8 +82,9 @@ atproto-mcp [options]
 These are the only flags the CLI accepts (defined in `src/cli.ts`):
 
 ```bash
--p, --port <number>        Server port (reserved; stdio transport ignores it)
--H, --host <string>        Server host (reserved; stdio transport ignores it)
+-t, --transport <mode>     Transport: stdio|http (default: stdio)
+-p, --port <number>        HTTP port for --transport http (default: 3000; stdio ignores it)
+-H, --host <string>        HTTP bind host for --transport http (default: 127.0.0.1, loopback; stdio ignores it)
 -s, --service <url>        AT Protocol service URL (default: https://bsky.social)
 -a, --auth <method>        Authentication method: app-password|oauth (optional)
 -l, --log-level <level>    Log level: debug|info|warn|error (default: info)
@@ -100,7 +106,19 @@ atproto-mcp --service https://custom-pds.example.com
 
 # Select the authentication method explicitly
 atproto-mcp --auth app-password
+
+# Serve the Streamable HTTP transport on loopback port 8080
+atproto-mcp --transport http --port 8080
 ```
+
+::: warning HTTP transport binding
+
+`--transport http` binds the loopback interface (`127.0.0.1`) by default, so
+only local clients can connect. Binding any other host (e.g. `--host 0.0.0.0`)
+exposes the server to the network — securing that exposure (firewalling,
+reverse proxy, authentication) is the operator's responsibility.
+
+:::
 
 ## MCP Client Configuration
 
@@ -126,7 +144,8 @@ Add to `~/Library/Application Support/Claude/claude_desktop_config.json`:
 
 ### Other MCP Clients
 
-Generic MCP client configuration (the server always uses the stdio transport):
+Generic MCP client configuration (the server uses the stdio transport by
+default):
 
 ```json
 {
@@ -166,8 +185,8 @@ ATPROTO_AUTH_METHOD=app-password
 MCP_SERVER_NAME=atproto-mcp
 LOG_LEVEL=debug
 
-# MCP_SERVER_PORT / MCP_SERVER_HOST are reserved and ignored by the
-# stdio transport; they are listed here only for completeness.
+# MCP_SERVER_PORT / MCP_SERVER_HOST set the default binding for
+# `--transport http`; the default stdio transport ignores them.
 # MCP_SERVER_PORT=3000
 # MCP_SERVER_HOST=localhost
 ```
@@ -193,9 +212,12 @@ services:
 
 ::: tip
 
-The server speaks stdio, so there is nothing to publish with `ports:`. The
-image's Dockerfile deliberately has no `EXPOSE` line — the container binds no
-port.
+By default the server speaks stdio, so there is nothing to publish with
+`ports:`. The image's Dockerfile deliberately has no `EXPOSE` line — the
+container binds no port unless you opt into the HTTP transport. To run the
+Streamable HTTP transport in a container instead, override the command with
+`node dist/cli.js --transport http --host 0.0.0.0` and publish the port
+(`ports: ['3000:3000']`) — and secure that exposure yourself.
 
 :::
 

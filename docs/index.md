@@ -22,8 +22,9 @@ hero:
 features:
   - title: Complete AT Protocol Integration
     details:
-      43 tools built on the official @atproto/api, covering posts, replies,
-      likes, reposts, follows, profiles, timelines, search, and moderation.
+      51 tools built on the official @atproto/api, covering posts, replies,
+      likes, reposts, follows, profiles, timelines, search, direct messages,
+      bookmarks, starter packs, and moderation.
 
   - title: MCP Server Compliance
     details:
@@ -52,7 +53,8 @@ features:
 
   - title: Resources & Prompts
     details:
-      Three MCP resources (timeline, profile, notifications) and two
+      Three MCP resources (timeline, profile, notifications), two parameterized
+      resource templates (any actor's public profile and feed), and two
       content-composition prompts.
 
   - title: App Password Authentication
@@ -71,11 +73,49 @@ features:
       guides, and best practices for integration.
 ---
 
-## What's New in v0.4.0
+## What's New
 
-The latest release reshapes the tool API for clarity and reliability,
-consolidating the 62-tool roster down to 43 tools that are all functional,
-single-purpose, and fully documented:
+The latest release grows the roster from 43 to 51 tools and broadens the MCP
+surface:
+
+::: tip New Tool Areas
+
+Bluesky direct messages (`list_conversations`, `get_conversation_messages`,
+`send_direct_message`), private bookmarks (`add_bookmark`, `remove_bookmark`,
+`get_bookmarks`), and starter packs (`search_starter_packs`,
+`get_starter_pack`).
+
+:::
+
+::: tip Reply & Quote Controls
+
+`create_post` and `create_thread` can gate who may reply (a threadgate record
+via `replyControls`) and whether a post may be quoted (a postgate record via
+`quoteControls`).
+
+:::
+
+::: tip Richer MCP Surface
+
+Parameterized resource templates (`atproto://profile/{actor}`,
+`atproto://feed/{actor}`) serve any actor's public data — no authentication
+required — and the server advertises the `completions` capability for prompt
+arguments and template variables.
+
+:::
+
+::: tip Streamable HTTP Transport
+
+`--transport http` serves MCP over Streamable HTTP at `/mcp` (loopback by
+default). stdio remains the default transport for MCP clients.
+
+:::
+
+### Previously in v0.4.0
+
+v0.4.0 reshaped the tool API for clarity and reliability, consolidating the
+62-tool roster down to 43 tools that are all functional, single-purpose, and
+fully documented:
 
 ::: tip Consolidated Toolset
 
@@ -95,7 +135,7 @@ this cannot regress.
 
 :::
 
-::: tip New Tools
+::: tip New Tools in 0.4.0
 
 `search_actors` finds accounts by handle or display name, and `get_author_feed`
 lists a specific user's posts.
@@ -142,6 +182,9 @@ npx atproto-mcp
 - Access follower and following lists
 - Get notifications
 - Read threads, custom feeds, and timelines
+- Send and read Bluesky direct messages
+- Save and list private bookmarks
+- Search and inspect starter packs
 
 ### Authentication
 
@@ -149,8 +192,9 @@ npx atproto-mcp
 - Unauthenticated mode for public read-only tools
 - In-memory session handling
 
-> Real-time firehose streaming and OAuth login are not yet implemented and are
-> not exposed as tools. See [Experimental & Roadmap](./guide/experimental).
+> OAuth login is not yet implemented and is not exposed as a tool. Real-time
+> firehose streaming is not planned as tools — see
+> [Experimental & Roadmap](./guide/experimental).
 
 ### Developer Experience
 

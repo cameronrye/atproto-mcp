@@ -161,8 +161,9 @@ setInterval(() => pollFeed('https://example.com/feed.xml'), 15 * 60 * 1000);
 ### Webhook Server
 
 Your own HTTP server receives webhooks and forwards them to the MCP server via
-`create_post`. Note that the HTTP listener belongs to **your** application — the
-AT Protocol MCP Server itself binds no port and is reached only over stdio.
+`create_post`. Note that the HTTP listener belongs to **your** application — in
+this example the AT Protocol MCP Server is reached over its default stdio
+transport and binds no port of its own.
 
 ```typescript
 import express from 'express';
@@ -327,9 +328,11 @@ process.on('SIGINT', shutdown);
 ## Streaming-based integrations
 
 Real-time patterns such as live analytics, firehose-driven moderation, and
-event-driven bots are **not supported** by this server today. Real-time firehose
-streaming is on the roadmap but not yet built — firehose decoding is not
-implemented, so no streaming tools are exposed. See
+event-driven bots are **not supported** by this server, and streaming tools are
+not planned: MCP tools are request/response, so a tool could only return a
+buffered snapshot of past events, not a live stream. The leftover firehose
+client code has been removed; if event consumption is ever added it would be
+built fresh on Jetstream. See
 [Experimental & Roadmap](../guide/experimental.md) for the current status.
 
 If you need a polling-based approximation, `discover` with `mode: "trending"`

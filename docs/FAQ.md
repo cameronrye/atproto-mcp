@@ -39,9 +39,12 @@ When connected to this MCP server, LLMs can help users:
 - Follow and interact with users
 - Search and discover content
 - Access user profiles and timelines
+- Send and read Bluesky direct messages
+- Save and list private bookmarks
+- Search and inspect starter packs
 - Run analytics and discovery heuristics over their own posts and graph
 
-> Real-time firehose streaming is registered but not yet implemented. See
+> Real-time firehose streaming is not exposed as tools and is not planned. See
 > [Experimental & Roadmap](./guide/experimental).
 
 **Example**: You ask your LLM client "Search for posts about AI from this week",
@@ -299,8 +302,12 @@ Common issues:
 
 ### Is streaming supported?
 
-Not yet. Real-time firehose streaming is on the roadmap but not yet built, so no
-streaming tools are exposed. See [Experimental & Roadmap](./guide/experimental).
+No, and streaming tools are not planned. MCP tools are request/response — a
+tool can only return a buffered snapshot of past events, not a live stream, and
+advertising that as "streaming" would be dishonest. The leftover firehose
+client code has been removed; if event consumption is ever added, it would be
+built fresh on Jetstream. See
+[Experimental & Roadmap](./guide/experimental).
 
 ## Performance
 
@@ -401,12 +408,16 @@ Yes! You can deploy the MCP server for:
 
 ### What hosting options are available?
 
-The server communicates over stdio and is typically launched as a subprocess by
-the LLM client, so it runs wherever that client runs:
+By default the server communicates over stdio and is launched as a subprocess
+by the LLM client, so it runs wherever that client runs:
 
 - **Local machines** - For personal LLM client use
 - **VPS** - DigitalOcean, Linode, etc.
 - **Container platforms** - Docker for packaging and reproducible runs
+
+For a long-running networked deployment, `--transport http` serves the MCP
+Streamable HTTP transport at `/mcp` (loopback by default; securing wider
+exposure is up to you).
 
 See the [Deployment Guide](./guide/deployment.md) for detailed deployment
 instructions.
@@ -434,7 +445,6 @@ and revoked independently. Still:
 The server stores:
 
 - The session/authentication tokens (in memory)
-- Event buffer (in memory, max 100 events)
 - No persistent user data
 
 ## Advanced Topics
@@ -459,9 +469,13 @@ Yes! Configure the MCP server to use your custom PDS:
 
 ### Can LLMs process the entire AT Protocol firehose?
 
-Not yet. Real-time firehose streaming is on the roadmap but not yet built —
-firehose frame (CAR / DAG-CBOR) decoding is not implemented, so no streaming
-tools are exposed.
+No. The binary firehose (CAR / DAG-CBOR frames) was never decoded by this
+server, and the unused firehose client code has been removed along with its
+WebSocket dependency. Streaming is not planned as MCP tools — a
+request/response tool cannot honestly expose a continuous stream. If event
+consumption is ever added, it would be built fresh on
+[Jetstream](https://docs.bsky.app/blog/jetstream), Bluesky's JSON firehose
+alternative.
 
 See [Experimental & Roadmap](./guide/experimental) for the current status.
 

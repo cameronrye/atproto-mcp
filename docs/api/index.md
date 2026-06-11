@@ -9,13 +9,14 @@ The AT Protocol MCP Server provides a comprehensive set of tools and resources
 for interacting with the AT Protocol ecosystem. This reference documentation
 covers:
 
-- **[Tools](#tools)** - 43 MCP tools for performing operations
-- **[Resources](#resources)** - 4 MCP resources for accessing data
+- **[Tools](#tools)** - 51 MCP tools for performing operations
+- **[Resources](#resources)** - 3 MCP resources plus 2 parameterized resource
+  templates for accessing data
 - **[Prompts](#prompts)** - 2 MCP prompts for guided content generation
 - **[Types](#types)** - TypeScript type definitions
 
-OAuth login and real-time firehose streaming are on the roadmap but not yet
-functional, so they are not exposed as tools. See the
+OAuth login is on the roadmap but not yet functional, so it is not exposed as a
+tool. Real-time firehose streaming is not planned as tools. See the
 [Experimental & Roadmap](../guide/experimental.md) page for details.
 
 ## Tools
@@ -63,6 +64,27 @@ Tools for searching and retrieving data:
   feeds (use `countOnly: true` for a cheap unread count)
 - **[mark_notifications_seen](./tools/mark-notifications-seen.md)** - Mark
   notifications as seen up to a timestamp (defaults to now)
+
+### Direct Messages
+
+Tools for Bluesky direct messages (`chat.bsky.convo`, proxied to the Bluesky
+chat service). They require an app password created with **"Allow access to
+your direct messages"** enabled:
+
+- **[list_conversations](./tools/list-conversations.md)** - List your DM
+  conversations (filter by `status: 'request' | 'accepted'`)
+- **[get_conversation_messages](./tools/get-conversation-messages.md)** - Read
+  a conversation's message history
+- **[send_direct_message](./tools/send-direct-message.md)** - Send a direct
+  message to a conversation
+
+### Bookmarks
+
+Tools for private, account-scoped bookmarks (other users cannot see them):
+
+- **[add_bookmark](./tools/add-bookmark.md)** - Privately bookmark a post
+- **[remove_bookmark](./tools/remove-bookmark.md)** - Remove a bookmark
+- **[get_bookmarks](./tools/get-bookmarks.md)** - List your bookmarks
 
 ### Content Management
 
@@ -127,6 +149,10 @@ Tools for discovering content and users:
   similarity)
 - **[discover_communities](./tools/discover-communities.md)** - Discover
   communities around topics
+- **[search_starter_packs](./tools/search-starter-packs.md)** - Search Bluesky
+  starter packs by keyword (works without authentication)
+- **[get_starter_pack](./tools/get-starter-pack.md)** - Fetch a starter pack's
+  details by AT-URI or bsky.app link (works without authentication)
 
 ### Composite Operations
 
@@ -148,8 +174,8 @@ Tools for working with images and media:
 
 ## Resources
 
-The server exposes 3 resources that provide read-only access to AT Protocol data
-through the MCP protocol:
+The server exposes 3 static resources that provide read-only access to the
+authenticated user's AT Protocol data through the MCP protocol:
 
 - **[Timeline Resource](./resources/timeline.md)** - Current user's timeline
   feed (requires authentication; calls the real API)
@@ -158,10 +184,23 @@ through the MCP protocol:
 - **[Notifications Resource](./resources/notifications.md)** - Current user's
   notifications (requires authentication; calls the real API)
 
+It also advertises 2 parameterized resource templates
+(`resources/templates/list`) that expose **any** actor's public data and work
+**without authentication** (they fall back to the public API when no session is
+active):
+
+- **`atproto://profile/{actor}`** - Public profile and statistics for any
+  actor, addressed by handle (e.g. `alice.bsky.social`) or DID
+- **`atproto://feed/{actor}`** - Recent public posts by any actor
+
+The `{actor}` variable supports `completion/complete` (the server offers the
+authenticated user's own handle as a candidate).
+
 The placeholder Conversation Context resource
 (`atproto://conversation-context`) from earlier releases has been removed — it
-was never auto-populated and could only return empty content. Reading an
-unknown resource URI returns JSON-RPC error `-32002` (Resource not found).
+was never auto-populated and could only return empty content. Reading a URI
+that matches neither a static resource nor a template returns JSON-RPC error
+`-32002` (Resource not found).
 
 ## Prompts
 
@@ -172,6 +211,10 @@ templates and work without authentication:
   `tone`, `length`, `include_hashtags`.
 - **`reply_template`** - Draft a contextual reply. Arguments: `original_post`,
   `reply_type`, `relationship`.
+
+Prompt arguments support `completion/complete`: enumerable arguments (such as
+`tone` or `reply_type`) return candidate values, while free-text arguments
+complete to an empty list.
 
 ## Types
 
@@ -216,6 +259,7 @@ practice this is limited to:
 - `get_author_feed` - List a user's posts
 - `get_user_connections` - Follower/following lists (ENHANCED mode: works
   without auth, enriches the underlying API call when authenticated)
+- `search_starter_packs` / `get_starter_pack` - Starter pack search and lookup
 - `get_post_context`, `analyze_image`, and other PUBLIC/ENHANCED rich-media and
   composite tools
 

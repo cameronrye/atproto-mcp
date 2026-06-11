@@ -5,9 +5,11 @@ interaction sequences behind common operations.
 
 ::: tip Transport
 
-The server communicates with MCP clients over **stdio only**
-(`StdioServerTransport`). It does not bind a network port or expose an HTTP
-endpoint. Outbound calls to the AT Protocol use HTTPS.
+By default the server communicates with MCP clients over **stdio**
+(`StdioServerTransport`), binding no network port. With `--transport http` it
+serves the MCP Streamable HTTP transport at `/mcp` instead (loopback by
+default). Outbound calls to the AT Protocol use HTTPS either way. The diagrams
+below show the default stdio setup.
 
 :::
 
@@ -124,7 +126,7 @@ structured schema.
 
 ## Tool Organization
 
-A representative slice of the 43 tools, grouped by area. (The former streaming
+A representative slice of the 51 tools, grouped by area. (The former streaming
 and OAuth tools were removed in 0.4.0 because they never worked — see
 [Experimental & Roadmap](../guide/experimental.md).)
 

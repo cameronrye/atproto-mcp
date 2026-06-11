@@ -7,9 +7,14 @@ MCP Server.
 
 The server provides three types of MCP primitives:
 
-1. **Tools** (43) - Executable functions for AT Protocol operations
-2. **Resources** (3) - Data sources for context
+1. **Tools** (51) - Executable functions for AT Protocol operations
+2. **Resources** (3 static + 2 parameterized templates) - Data sources for
+   context
 3. **Prompts** (2) - Templates for common tasks
+
+It also advertises the `completions` capability: `completion/complete` serves
+candidate values for prompt arguments and for the `{actor}` variable of the
+resource templates.
 
 ## Tool Categories
 
@@ -32,6 +37,9 @@ and provide richer viewer-specific data when authenticated.
   `direction: 'followers' | 'follows'`
 - `get_custom_feed` - Access custom feeds
 - `get_list` - Get list details
+- `search_starter_packs` - Search Bluesky starter packs by keyword
+- `get_starter_pack` - Fetch a starter pack's details by AT-URI or bsky.app
+  link
 
 #### Moderation & Analysis
 
@@ -81,6 +89,25 @@ These tools require authentication to perform write operations:
 - `get_notifications` - Get notifications (use `countOnly: true` for a cheap
   unread badge count)
 - `mark_notifications_seen` - Mark notifications as seen up to a timestamp
+
+#### Direct Messages
+
+These call the Bluesky chat service (`chat.bsky.convo`) and additionally
+require an app password created with **"Allow access to your direct messages"**
+enabled:
+
+- `list_conversations` - List your DM conversations (filter by
+  `status: 'request' | 'accepted'`)
+- `get_conversation_messages` - Read a conversation's message history
+- `send_direct_message` - Send a direct message
+
+#### Bookmarks
+
+Bookmarks are private to your account; other users cannot see them:
+
+- `add_bookmark` - Privately bookmark a post
+- `remove_bookmark` - Remove a bookmark
+- `get_bookmarks` - List your bookmarks
 
 #### Content Management
 
@@ -237,9 +264,11 @@ confirmation step; `readOnlyHint: true` tools are safe to auto-approve.
 ## Resources
 
 Resources provide context data that LLMs can read. The server provides 3
-resources; all of them require authentication. Resource contents are returned
-as stringified JSON text; the shapes below are illustrative. Reading an unknown
-resource URI returns JSON-RPC error `-32002` (Resource not found).
+static resources (all of which require authentication) plus 2 parameterized
+[resource templates](#resource-templates) that work without authentication.
+Resource contents are returned as stringified JSON text; the shapes below are
+illustrative. Reading a URI that matches neither a static resource nor a
+template returns JSON-RPC error `-32002` (Resource not found).
 
 ### atproto://timeline
 
@@ -337,6 +366,52 @@ Your recent notifications and mentions. **Requires authentication.**
 "Check my notifications"
 "Who liked my recent posts?"
 ```
+
+### Resource Templates
+
+Alongside the static resources, the server advertises two parameterized
+resource templates via `resources/templates/list`. Unlike the static resources
+(which expose the authenticated user's own data), templates expose **any**
+actor's public data and therefore **work without authentication** — when no
+session is active the server transparently falls back to the public API
+(`public.api.bsky.app`), exactly like the ENHANCED read-only tools.
+
+#### `atproto://profile/{actor}`
+
+Public profile information and statistics for any actor. `{actor}` is a handle
+(e.g. `alice.bsky.social`) or DID (e.g. `did:plc:...`); it may be
+percent-encoded.
+
+**Usage**:
+
+```
+"Read the profile resource for alice.bsky.social"
+```
+
+#### `atproto://feed/{actor}`
+
+Recent public posts by any actor (their author feed, up to 50 posts).
+
+**Usage**:
+
+```
+"Read the feed resource for did:plc:abc123..."
+```
+
+A URI whose `{actor}` segment is not a syntactically valid handle or DID does
+not match the template and returns `-32002` (Resource not found).
+
+### Completions
+
+The server declares the `completions` capability. `completion/complete`
+requests serve:
+
+- **Prompt arguments** (`ref/prompt`) - enumerable arguments such as `tone` or
+  `reply_type` return their candidate values; free-text arguments complete to
+  an empty list (never an error).
+- **Resource template variables** (`ref/resource`) - the `{actor}` variable
+  completes to the authenticated user's own handle when a session exists;
+  unauthenticated servers return no candidates.
 
 ::: info Removed
 

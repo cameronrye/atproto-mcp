@@ -10,8 +10,9 @@ example handling patterns you implement **on the client side**.
 
 ## What an Error Looks Like Over the Wire
 
-The server speaks JSON-RPC 2.0 over stdio. When a tool call fails, the client
-receives a standard JSON-RPC error object.
+The server speaks JSON-RPC 2.0 (over stdio by default, or Streamable HTTP with
+`--transport http`). When a tool call fails, the client receives a standard
+JSON-RPC error object.
 
 | Code   | Name               | When it is used                                                                  |
 | ------ | ------------------ | -------------------------------------------------------------------------------- |

@@ -164,9 +164,9 @@ atproto-mcp
 You should see output like:
 
 ```text
-[2026-06-11T12:00:00.000Z] INFO  [ToolsFactory] Created 43 AT Protocol MCP tools
-[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 43 MCP tools
-[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 4 MCP resources
+[2026-06-11T12:00:00.000Z] INFO  [ToolsFactory] Created 51 AT Protocol MCP tools
+[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 51 MCP tools
+[2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 3 MCP resources and 2 resource templates
 [2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Registered 2 MCP prompts
 [2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] Starting AT Protocol MCP Server...
 [2026-06-11T12:00:00.000Z] INFO  [AtpMcpServer] AT Protocol MCP Server started successfully
@@ -176,8 +176,10 @@ Logs are written to stderr (stdout carries the MCP protocol).
 
 ### Health Check
 
-The server uses the **stdio transport** and does not expose an HTTP endpoint.
-The bundled health check is a process-local smoke check that loads the package,
+By default the server uses the **stdio transport** and does not expose an HTTP
+endpoint (with `--transport http`, only `/mcp` is served — there is no
+`/health` route). The bundled health check is a process-local smoke check that
+loads the package,
 builds and validates the configuration, and checks this process's heap — it does
 not bind a port or probe a running server:
 

@@ -243,6 +243,27 @@ export default withMermaid(
             ],
           },
           {
+            text: 'Direct Messages',
+            collapsed: true,
+            items: [
+              { text: 'List Conversations', link: '/api/tools/list-conversations' },
+              {
+                text: 'Get Conversation Messages',
+                link: '/api/tools/get-conversation-messages',
+              },
+              { text: 'Send Direct Message', link: '/api/tools/send-direct-message' },
+            ],
+          },
+          {
+            text: 'Bookmarks',
+            collapsed: true,
+            items: [
+              { text: 'Add Bookmark', link: '/api/tools/add-bookmark' },
+              { text: 'Remove Bookmark', link: '/api/tools/remove-bookmark' },
+              { text: 'Get Bookmarks', link: '/api/tools/get-bookmarks' },
+            ],
+          },
+          {
             text: 'Media',
             collapsed: true,
             items: [
@@ -286,6 +307,8 @@ export default withMermaid(
               { text: 'Discover', link: '/api/tools/discover' },
               { text: 'Discover Communities', link: '/api/tools/discover-communities' },
               { text: 'Find Similar Users', link: '/api/tools/find-similar-users' },
+              { text: 'Search Starter Packs', link: '/api/tools/search-starter-packs' },
+              { text: 'Get Starter Pack', link: '/api/tools/get-starter-pack' },
             ],
           },
           {

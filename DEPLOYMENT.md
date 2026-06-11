@@ -6,21 +6,28 @@ as Claude Desktop and other MCP-compatible apps) can use it.
 ## Overview
 
 The MCP server acts as middleware between LLM clients and the AT Protocol
-ecosystem. It speaks the **Model Context Protocol over stdio** — the server is
-launched as a child process by the MCP client and communicates over standard
-input/output. **It does not listen on a TCP port and does not expose an HTTP
-endpoint.**
+ecosystem. By default it speaks the **Model Context Protocol over stdio** — the
+server is launched as a child process by the MCP client and communicates over
+standard input/output, binding no TCP port. With **`--transport http`** it
+instead serves the MCP **Streamable HTTP** transport at
+`http://<host>:<port>/mcp`.
 
-This means there are only two supported deployment shapes today:
+This gives three supported deployment shapes:
 
 1. **Local stdio process** — the MCP client (e.g. Claude Desktop) spawns
-   `atproto-mcp` directly. This is the primary, recommended setup.
+   `atproto-mcp` directly. This is the primary, recommended setup and the
+   default.
 2. **Docker container running the stdio server** — useful for pinning a specific
    build/runtime or isolating dependencies. The container still communicates
-   over stdio; it does not serve HTTP.
+   over stdio.
+3. **Streamable HTTP service (`--transport http`)** — a long-running process
+   that HTTP-capable MCP clients connect to at `/mcp`. It binds the loopback
+   interface (`127.0.0.1`, port `3000`) by default, so only local clients can
+   connect; see [Streamable HTTP transport](#streamable-http-transport).
 
 > [!NOTE] End users do not connect to this server directly. They interact with
-> their LLM client, which spawns and talks to this MCP server over stdio.
+> their LLM client, which spawns and talks to this MCP server over stdio (or
+> connects to `/mcp` in HTTP mode).
 
 ## Prerequisites
 
@@ -89,6 +96,38 @@ Add the server to your client's MCP configuration. For Claude Desktop, edit
 The client launches the process and communicates over stdio. Restart the client
 after changing its configuration.
 
+## Streamable HTTP transport
+
+`--transport http` serves the MCP Streamable HTTP transport instead of stdio.
+stdio remains the default and the recommended setup for MCP clients that spawn
+the server themselves; use HTTP mode when you want a long-running server that
+HTTP-capable MCP clients connect to.
+
+```bash
+# Loopback-only (the default binding), port 8080
+node dist/cli.js --transport http --port 8080
+```
+
+How it works:
+
+- The only route served is **`/mcp`** (`POST`, `GET`, and `DELETE`); any other
+  path returns 404, and there is still **no `/health` endpoint**.
+- **Sessions:** an `initialize` request opens a session and the server mints an
+  `Mcp-Session-Id` header, which the client must echo on every subsequent
+  request. `GET` opens the standalone SSE stream for a session and `DELETE`
+  terminates it. Each session is backed by its own MCP server instance.
+- **Binding:** defaults to the loopback interface (`127.0.0.1`, port `3000`;
+  `localhost` is pinned to the IPv4 loopback so the binding is deterministic).
+  `--port`/`--host` (or `MCP_SERVER_PORT`/`MCP_SERVER_HOST`) change it.
+- **DNS-rebinding protection** is enabled: requests whose `Host` header is not
+  in the allowlist computed at bind time are rejected (403). Request bodies are
+  capped at 4 MiB.
+
+> [!WARNING] Binding any non-loopback host (e.g. `--host 0.0.0.0`) exposes the
+> server to the network. The server adds no transport-level authentication —
+> securing that exposure (firewalling, reverse proxy, TLS, authentication) is
+> the operator's responsibility.
+
 ## Authentication
 
 App passwords are the supported, fully-working authentication method.
@@ -110,20 +149,19 @@ available. Most tools require authentication.
 The server reads the following environment variables. Unrelated settings (a
 server port/host, Redis, or monitoring infrastructure) are **not** consulted.
 
-| Variable                | Description                                                                            | Required |
-| ----------------------- | -------------------------------------------------------------------------------------- | -------- |
-| `ATPROTO_IDENTIFIER`    | Your AT Protocol handle or DID (enables authenticated tools)                           | No\*     |
-| `ATPROTO_PASSWORD`      | Your app password                                                                      | No\*     |
-| `ATPROTO_SERVICE`       | AT Protocol service (PDS/AppView) URL (default `https://bsky.social`)                  | No       |
-| `ATPROTO_AUTH_METHOD`   | `app-password` (default) or `oauth` (experimental)                                     | No       |
-| `ATPROTO_CLIENT_ID`     | OAuth client ID (experimental auth path only)                                          | No       |
-| `ATPROTO_CLIENT_SECRET` | OAuth client secret (experimental auth path only)                                      | No       |
-| `ATPROTO_MEDIA_DIR`     | Base directory that tool-supplied media file paths must stay within (default: cwd)     | No       |
-| `ATPROTO_RELAY`         | Firehose relay WebSocket URL for experimental streaming (default `wss://bsky.network`) | No       |
-| `MCP_SERVER_NAME`       | Server name advertised to MCP clients (default `atproto-mcp`)                          | No       |
-| `MCP_SERVER_PORT`       | Accepted but **reserved/ignored**: stdio transport binds no port                       | No       |
-| `MCP_SERVER_HOST`       | Accepted but **reserved/ignored**: stdio transport binds no host                       | No       |
-| `LOG_LEVEL`             | `debug` \| `info` \| `warn` \| `error` (default `info`)                                | No       |
+| Variable                | Description                                                                                                        | Required |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------ | -------- |
+| `ATPROTO_IDENTIFIER`    | Your AT Protocol handle or DID (enables authenticated tools)                                                       | No\*     |
+| `ATPROTO_PASSWORD`      | Your app password                                                                                                  | No\*     |
+| `ATPROTO_SERVICE`       | AT Protocol service (PDS/AppView) URL (default `https://bsky.social`)                                              | No       |
+| `ATPROTO_AUTH_METHOD`   | `app-password` (default) or `oauth` (experimental)                                                                 | No       |
+| `ATPROTO_CLIENT_ID`     | OAuth client ID (experimental auth path only)                                                                      | No       |
+| `ATPROTO_CLIENT_SECRET` | OAuth client secret (experimental auth path only)                                                                  | No       |
+| `ATPROTO_MEDIA_DIR`     | Base directory that tool-supplied media file paths must stay within (default: cwd)                                 | No       |
+| `MCP_SERVER_NAME`       | Server name advertised to MCP clients (default `atproto-mcp`)                                                      | No       |
+| `MCP_SERVER_PORT`       | HTTP port for `--transport http` (default `3000`); the stdio transport ignores it                                  | No       |
+| `MCP_SERVER_HOST`       | HTTP bind host for `--transport http` (default `localhost`, pinned to `127.0.0.1`); the stdio transport ignores it | No       |
+| `LOG_LEVEL`             | `debug` \| `info` \| `warn` \| `error` (default `info`)                                                            | No       |
 
 \* App-password auth requires `ATPROTO_IDENTIFIER` **and** `ATPROTO_PASSWORD`
 together. Both are optional overall — omit them to run in unauthenticated mode.
@@ -140,19 +178,20 @@ The experimental OAuth path also accepts the legacy fallback names
 ### CLI Flags
 
 ```text
+-t, --transport <mode>  stdio | http (default: stdio)
 -s, --service <url>     AT Protocol service URL
 -a, --auth <method>     app-password | oauth
 -l, --log-level <lvl>   debug | info | warn | error
--p, --port <port>       reserved/ignored (stdio transport binds no port)
--h, --host <host>       reserved/ignored (stdio transport binds no host)
+-p, --port <port>       HTTP port for --transport http (stdio ignores it)
+-H, --host <host>       HTTP bind host for --transport http (stdio ignores it)
 -v, --version           print version
-    --help              print usage
+-h, --help              print usage
 ```
 
 ## Docker Deployment (stdio)
 
-The container runs the same stdio server. **Do not publish a port** — the server
-does not serve HTTP, so there is nothing listening to map.
+The container runs the same stdio server by default. **Do not publish a port**
+for the stdio setup — nothing is listening, so there is nothing to map.
 
 ### Build
 
@@ -172,8 +211,21 @@ docker run -i --rm \
 The `-i` flag keeps stdin open so the MCP client can drive the server over
 stdio. There is intentionally no `-p 3000:3000` mapping.
 
-> [!NOTE] The Dockerfile intentionally has **no `EXPOSE`** directive — the
-> server communicates over stdio, binds no port, and exposes no HTTP endpoint.
+> [!NOTE] The Dockerfile intentionally has **no `EXPOSE`** directive — by
+> default the server communicates over stdio, binds no port, and exposes no HTTP
+> endpoint.
+
+To run the Streamable HTTP transport in a container instead, override the
+command and publish the port. Inside a container the loopback default is
+unreachable from the host, so bind `0.0.0.0` — and treat the published port as
+network exposure to secure:
+
+```bash
+docker run --rm -p 3000:3000 \
+  -e ATPROTO_IDENTIFIER=your.handle.bsky.social \
+  -e ATPROTO_PASSWORD=your-app-password \
+  atproto-mcp node dist/cli.js --transport http --host 0.0.0.0
+```
 
 ### Using the container from an MCP client
 
@@ -212,7 +264,7 @@ wired into the Docker image's `HEALTHCHECK`:
 node dist/health-check.js
 ```
 
-Important: because the server speaks MCP over stdio and binds no port, a
+Important: under the default stdio transport the server binds no port, so a
 separate health-check process **cannot connect to the running server to probe
 it**. This script instead:
 
@@ -226,7 +278,8 @@ It deliberately does **not** report uptime, cache size, or connection counts of
 the running server — a fresh process cannot observe those. It exits `0` on
 success and `1` on failure, which is what the Docker `HEALTHCHECK` consumes.
 
-There is **no** `GET /health` HTTP endpoint. Commands like
+There is **no** `GET /health` HTTP endpoint in either transport mode — even with
+`--transport http`, the only route served is `/mcp`. Commands like
 `curl http://localhost:3000/health` do not apply to this server.
 
 ## Security Considerations
@@ -256,9 +309,10 @@ for the full policy. Deployment essentials:
 
 ### A tool reports it is not available
 
-Most tools require authentication. Confirm credentials are set. Some tools are
-experimental stubs (streaming, OAuth completion) and are intentionally
-non-functional — see
+Most tools require authentication. Confirm credentials are set. The direct
+message tools additionally require an app password created with "Allow access to
+your direct messages" enabled. Streaming and OAuth tools from older docs were
+removed in 0.4.0 — see
 [Experimental & Roadmap](https://cameronrye.github.io/atproto-mcp/guide/experimental).
 
 ### Enable debug logging
@@ -275,22 +329,16 @@ stdout.
 
 ## Roadmap / Planned (not yet available)
 
-> [!WARNING] Everything in this section is a **future idea** and is **not
-> implemented**. Today the server is stdio-only with no network listener.
-
-A future version could add an **HTTP/SSE transport** so the server can be hosted
-as a long-running network service rather than spawned per-client. That would
-make the following possible (none of which exist yet):
+The Streamable HTTP transport has shipped (see
+[Streamable HTTP transport](#streamable-http-transport) above). Still **not
+implemented**:
 
 - A real HTTP **health endpoint** (e.g. `GET /health`) that genuinely probes the
-  running server, replacing the current process-local smoke check.
-- Remote/multi-client access over the network, with TLS termination via a
-  reverse proxy and proper CORS configuration.
-- Horizontal scaling behind a load balancer.
-
-Until that transport ships, ignore any reference (in older docs or reserved
-`--port`/`--host` flags) implying an HTTP server, bound port, or `/health` HTTP
-endpoint.
+  running server — the HTTP transport serves only `/mcp`, and the bundled health
+  check remains a process-local smoke check.
+- Built-in TLS or transport-level authentication for HTTP mode; put a reverse
+  proxy in front if you need them.
+- OAuth login (app passwords are the supported authentication path).
 
 ## Support
 

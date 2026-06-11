@@ -1,5 +1,14 @@
 # Glama Quality & Maintenance Improvement Plan
 
+> **Status update (2026-06-11):** this plan was executed (shipped as v0.4.0).
+> One statement below is now superseded: the plan said the `FirehoseClient` and
+> `oauth-client` modules (and the firehose tests) were **kept/retained for
+> future work** — the `FirehoseClient`, its tests, and the `ws` dependency have
+> since been **removed**. Streaming is no longer planned as tools; any future
+> event consumption would be built fresh on Jetstream. File links below that
+> point at `src/utils/firehose-client.ts` no longer resolve. The rest of the
+> document is preserved as the historical plan.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Raise the atproto-mcp Glama score from Quality C → A and Maintenance B → A by removing non-functional tools, consolidating redundant tools, completing tool-definition quality (parameter descriptions, output schemas, behavioral docs), and claiming the Glama listing.
@@ -19,7 +28,7 @@ Glama Quality = **30% Server Coherence + 70% Tool Definition Quality**.
 - **Maintenance (B):** no `glama.json` ownership claim (highest-leverage fix); the "0 of 1 issue" metric is stale (repo has zero issues).
 
 ### Verified non-functional tools (remove)
-- **Streaming (6):** `start_streaming`, `stop_streaming`, `get_streaming_status`, `get_recent_events`, `monitor_keywords`, `track_users` — gated by `FIREHOSE_DECODING_IMPLEMENTED = false` ([src/utils/firehose-client.ts:40](../../../src/utils/firehose-client.ts#L40)); event buffer is always empty (no CAR/DAG-CBOR decoder).
+- **Streaming (6):** `start_streaming`, `stop_streaming`, `get_streaming_status`, `get_recent_events`, `monitor_keywords`, `track_users` — gated by `FIREHOSE_DECODING_IMPLEMENTED = false` (`src/utils/firehose-client.ts:40`; file since removed entirely); event buffer is always empty (no CAR/DAG-CBOR decoder).
 - **OAuth (4):** `start_oauth_flow` (returns unusable URL), `handle_oauth_callback`, `refresh_oauth_tokens`, `revoke_oauth_tokens` (always throw `OAUTH_NOT_IMPLEMENTED`). App-password auth is the working path.
 - **`generate_alt_text` (1):** no vision model; returns guidelines, not a description.
 

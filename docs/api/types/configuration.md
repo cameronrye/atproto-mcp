@@ -21,19 +21,20 @@ interface IMcpServerConfig {
 
 **Fields:**
 
-- `port` - Reserved. The server uses the stdio transport and binds no port; this
-  value is accepted but ignored.
-- `host` - Reserved. Accepted but ignored under the stdio transport.
+- `port` - HTTP port for `--transport http` (default `3000`). Ignored under the
+  default stdio transport, which binds no port.
+- `host` - HTTP bind host for `--transport http` (default `localhost`, pinned
+  to the IPv4 loopback `127.0.0.1`). Ignored under the stdio transport.
 - `name` - Server name
 - `version` - Server version
 - `description` - Server description
 - `atproto` - AT Protocol configuration
 
-::: tip stdio transport
+::: tip Transports
 
-This server communicates over stdio (`StdioServerTransport`). `port` and `host`
-are kept on the config for forward compatibility but are not used — there is no
-HTTP listener.
+By default this server communicates over stdio (`StdioServerTransport`) and
+`port`/`host` are unused. They take effect only with `--transport http`, which
+serves the MCP Streamable HTTP transport at `http://<host>:<port>/mcp`.
 
 :::
 
@@ -41,8 +42,8 @@ HTTP listener.
 
 ```typescript
 const config: IMcpServerConfig = {
-  port: 3000, // reserved/ignored under stdio
-  host: 'localhost', // reserved/ignored under stdio
+  port: 3000, // used by --transport http; ignored under stdio
+  host: 'localhost', // used by --transport http; ignored under stdio
   name: 'AT Protocol MCP Server',
   version: '0.4.0',
   description: 'MCP server for AT Protocol',
@@ -217,12 +218,13 @@ LOG_LEVEL=info
 The `ConfigManager` reads the `MCP_SERVER_*` and `ATPROTO_*` variables
 documented in the [Configuration Guide](../../guide/configuration.md), plus
 `LOG_LEVEL` and `NODE_ENV`. A few additional variables are read directly by
-specific subsystems: `ATPROTO_MEDIA_DIR` (base directory for tool-supplied media
-paths) and `ATPROTO_RELAY` (firehose relay URL), and — for the experimental
-OAuth tools — the legacy `OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` fallbacks
-plus the redirect URI via `ATPROTO_OAUTH_REDIRECT_URI` (falling back to
-`OAUTH_REDIRECT_URI`). `MCP_SERVER_PORT`/`MCP_SERVER_HOST` are accepted but
-ignored under the stdio transport.
+specific subsystems: `ATPROTO_MEDIA_DIR` (base directory for tool-supplied
+media paths) and — for the experimental OAuth path — the legacy
+`OAUTH_CLIENT_ID` / `OAUTH_CLIENT_SECRET` fallbacks plus the redirect URI via
+`ATPROTO_OAUTH_REDIRECT_URI` (falling back to `OAUTH_REDIRECT_URI`).
+`MCP_SERVER_PORT`/`MCP_SERVER_HOST` set the binding for `--transport http` and
+are ignored under the default stdio transport. The former `ATPROTO_RELAY`
+variable is no longer read (the firehose client was removed).
 
 :::
 

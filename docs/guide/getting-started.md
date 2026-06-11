@@ -39,10 +39,11 @@ Start the MCP server with default settings:
 atproto-mcp
 ```
 
-This starts the server using the **stdio transport** — it communicates over
-standard input/output, not a network port, so your MCP client launches it as a
-subprocess. No port is bound (the `--port`/`--host` flags are accepted but
-ignored).
+This starts the server using the default **stdio transport** — it communicates
+over standard input/output, not a network port, so your MCP client launches it
+as a subprocess. No port is bound. (Alternatively, `--transport http` serves
+the MCP Streamable HTTP transport at `http://127.0.0.1:3000/mcp`; see the
+[Configuration guide](./configuration.md).)
 
 ### 2. Authentication
 
@@ -105,7 +106,8 @@ Common flags for a quick start:
 atproto-mcp --service https://bsky.social --auth app-password --log-level info
 ```
 
-The `--port`/`--host` flags are accepted but **ignored** by the stdio transport.
+The `--port`/`--host` flags only take effect with `--transport http`; the
+default stdio transport ignores them.
 
 For the full list of CLI flags and environment variables, see the
 [Configuration guide](./configuration.md).

@@ -1,33 +1,45 @@
 # Experimental & Roadmap
 
-This page is the single source of truth for capabilities that are **planned but
-not yet built**. These features are not exposed as MCP tools today; they are
-documented here so you know what is and is not on the roadmap.
+This page is the single source of truth for capabilities that are **planned,
+declined, or recently shipped from this list**. None of the planned features
+are exposed as MCP tools today; they are documented here so you know what is
+and is not on the roadmap.
 
-::: warning Not production-ready
+::: warning Planned features are not production-ready
 
-Nothing on this page works end-to-end today. If you need working functionality,
-use [app-password authentication](./authentication.md) and the tools documented
-in the [main API reference](../api/index.md).
+Except where a feature is explicitly marked **Shipped**, nothing on this page
+works end-to-end today. If you need working functionality, use
+[app-password authentication](./authentication.md) and the tools documented in
+the [main API reference](../api/index.md).
 
 :::
 
 ## Status at a glance
 
-| Feature              | Status                                                               |
-| -------------------- | -------------------------------------------------------------------- |
-| Firehose streaming   | Planned — not exposed as tools; firehose decoding not built          |
-| OAuth login          | Planned — not exposed as tools; app passwords are the supported path |
-| AI alt-text          | Planned — no vision model wired in                                   |
-| Conversation context | Removed — the placeholder resource was unregistered                  |
-| HTTP transport       | Planned — server is stdio-only today                                 |
+| Feature              | Status                                                                  |
+| -------------------- | ----------------------------------------------------------------------- |
+| Firehose streaming   | Not planned as tools — leftover firehose client code has been removed   |
+| OAuth login          | Planned — not exposed as tools; app passwords are the supported path    |
+| AI alt-text          | Planned — no vision model wired in                                      |
+| Conversation context | Removed — the placeholder resource was unregistered                     |
+| HTTP transport       | **Shipped** — `--transport http` (stdio remains the default)            |
 
 ## Firehose streaming
 
 Real-time firehose streaming (keyword/user monitoring of the AT Protocol
-firehose) is on the roadmap but **not yet built**. AT Protocol firehose frames
-are CAR / DAG-CBOR encoded, and that decoding has not been implemented yet, so no
-streaming tools are exposed.
+firehose) is **not exposed as tools and is no longer on the tool roadmap**:
+
+- MCP tools are request/response. A tool can only return a buffered snapshot of
+  past events, not a live stream — advertising that as "streaming" would be
+  dishonest, which is why the non-functional streaming tools were removed in
+  0.4.0 and never reintroduced.
+- The leftover `FirehoseClient` infrastructure (which never decoded the
+  CAR / DAG-CBOR firehose frames) and the `ws` WebSocket dependency have now
+  been **removed** as well. Earlier docs said this code was retained for future
+  work; it no longer is.
+- If event consumption is ever added, it would be built fresh against
+  [Jetstream](https://docs.bsky.app/blog/jetstream) (Bluesky's JSON-over-
+  WebSocket firehose alternative) rather than by reviving the removed client.
 
 If you need a polling-based approximation, [`discover`](../api/tools/discover.md)
 with `mode: "trending"` samples your own home timeline.
@@ -60,15 +72,15 @@ resources (`atproto://timeline`, `atproto://profile`,
 `atproto://notifications`) are functional and call the real API when
 authenticated.
 
-## Planned: HTTP transport
+## Shipped: HTTP transport
 
-The server currently communicates **only over stdio** (`StdioServerTransport`) —
-the standard transport for MCP clients such as Claude Desktop. It does **not**
-listen on a TCP port; the `--port` / `--host` flags and the `MCP_SERVER_PORT` /
-`MCP_SERVER_HOST` environment variables are accepted but reserved (ignored by
-the stdio transport).
+The **Streamable HTTP transport has shipped**: `--transport http` serves MCP at
+`http://<host>:<port>/mcp` (loopback `127.0.0.1:3000` by default), with
+`--port` / `--host` (or `MCP_SERVER_PORT` / `MCP_SERVER_HOST`) controlling the
+binding. stdio remains the default transport and the standard setup for MCP
+clients such as Claude Desktop, which spawn the server themselves.
 
-An HTTP / SSE transport — which would enable a long-running networked deployment
-with a real health endpoint — is a possible future direction but is **not yet
-available**. Until it ships, deploy the server over stdio (see
-[Deployment](./deployment.md)).
+Still not available in HTTP mode: a `GET /health` endpoint (only `/mcp` is
+served) and built-in TLS/authentication. See
+[Configuration](./configuration.md) and [Deployment](./deployment.md) for
+setup and security notes.
