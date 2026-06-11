@@ -4,7 +4,7 @@
  * (swapRecord = the CID it read) to avoid clobbering a concurrent update.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UpdateProfileTool } from '../tools/implementations/content-management-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

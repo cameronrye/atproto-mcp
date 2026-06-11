@@ -23,20 +23,18 @@
  * - Authenticated: 100+ tests (all 60 tools, write operations, media, etc.)
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AtpMcpServer } from '../index.js';
 import { GetUserProfileTool } from '../tools/implementations/get-user-profile-tool.js';
-import { AtpClient } from '../utils/atp-client.js';
+import type { AtpClient } from '../utils/atp-client.js';
 import {
+  delay,
   getIntegrationTestConfig,
   shouldRunIntegrationTests,
-  canRunAuthenticatedTests,
-  delay,
 } from '../test/integration-config.js';
 
 // Helper to skip tests unless explicitly enabled
 const describeIntegration = shouldRunIntegrationTests() ? describe : describe.skip;
-const describeAuth = canRunAuthenticatedTests() ? describe : describe.skip;
 
 // Get test configuration
 const config = getIntegrationTestConfig();
@@ -48,7 +46,7 @@ describeIntegration('Real AT Protocol Integration Tests - Unauthenticated Mode',
 
   beforeAll(async () => {
     console.log('🚀 Starting Real AT Protocol Integration Tests (Unauthenticated)');
-    console.log(`📡 Connecting to: ${config.testAccount?.service || 'https://bsky.social'}`);
+    console.log(`📡 Connecting to: ${config.testAccount?.service ?? 'https://bsky.social'}`);
     console.log('⚠️  These tests connect to real AT Protocol servers');
     console.log('⚠️  Testing public endpoints only (no authentication)');
     console.log('');
@@ -56,7 +54,7 @@ describeIntegration('Real AT Protocol Integration Tests - Unauthenticated Mode',
     // Create server without authentication (unauthenticated mode)
     server = new AtpMcpServer({
       atproto: {
-        service: config.testAccount?.service || 'https://bsky.social',
+        service: config.testAccount?.service ?? 'https://bsky.social',
       },
     });
 

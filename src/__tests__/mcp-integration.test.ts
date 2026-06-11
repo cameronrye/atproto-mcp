@@ -3,9 +3,9 @@
  * Tests the actual MCP server functionality end-to-end
  */
 
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { createSchemaSniffingMockServer } from '../test/mock-mcp-server.js';
 import { AtpMcpServer } from '../index.js';
-import { createMockServerConfig } from '../test/setup.js';
 
 // Create a mock AtpClient instance that will be reused
 const mockAtpClient = {
@@ -38,66 +38,7 @@ vi.mock('../utils/atp-client.js', () => ({
 }));
 
 // Mock the MCP SDK to capture handler registrations
-const mockHandlers = new Map<string, Function>();
-const mockServer = {
-  setRequestHandler: vi.fn((schema: any, handler: Function) => {
-    // Extract method from Zod schema structure
-    let method: string | undefined;
-
-    // Try to parse the schema to extract the method
-    try {
-      // For z.object({ method: z.literal('method_name') })
-      if (schema._def?.shape && typeof schema._def.shape === 'function') {
-        const shape = schema._def.shape();
-        if (shape.method?._def?.value) {
-          method = shape.method._def.value;
-        }
-      }
-      // For z.literal('method_name')
-      else if (schema._def?.value) {
-        method = schema._def.value;
-      }
-      // Try to parse the schema by calling it with test data
-      else {
-        const testData = { method: 'test' };
-        try {
-          schema.parse(testData);
-          // If it parses successfully, it might be expecting a method field
-          // Let's try common MCP methods
-          const mcpMethods = [
-            'initialize',
-            'ping',
-            'tools/list',
-            'tools/call',
-            'resources/list',
-            'resources/read',
-            'prompts/list',
-            'prompts/get',
-          ];
-          for (const mcpMethod of mcpMethods) {
-            try {
-              schema.parse({ method: mcpMethod });
-              method = mcpMethod;
-              break;
-            } catch {
-              // Continue trying
-            }
-          }
-        } catch {
-          // Schema doesn't accept our test data
-        }
-      }
-    } catch (error) {
-      console.log('Error parsing schema:', error);
-    }
-
-    if (method) {
-      mockHandlers.set(method, handler);
-    }
-  }),
-  connect: vi.fn().mockResolvedValue(undefined),
-  close: vi.fn().mockResolvedValue(undefined),
-};
+const { mockHandlers, mockServer } = createSchemaSniffingMockServer();
 
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
   Server: vi.fn().mockImplementation(function () {

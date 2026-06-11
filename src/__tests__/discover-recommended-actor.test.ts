@@ -6,7 +6,7 @@
  * gone in both paths.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiscoverTool } from '../tools/implementations/discover-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

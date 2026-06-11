@@ -5,7 +5,7 @@
  * and invites a duplicate retry).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreateThreadTool } from '../tools/implementations/create-thread-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

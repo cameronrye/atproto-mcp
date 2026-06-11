@@ -2,16 +2,16 @@
  * Tests for type validators and type guards
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  validateDID,
-  validateATURI,
-  validateCID,
-  validateNSID,
-  isDID,
   isATURI,
   isCID,
+  isDID,
   isNSID,
+  validateATURI,
+  validateCID,
+  validateDID,
+  validateNSID,
 } from '../index.js';
 
 describe('DID Validation', () => {

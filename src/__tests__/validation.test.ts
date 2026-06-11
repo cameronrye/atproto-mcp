@@ -2,7 +2,7 @@
  * Phase 1 Validation Test - Simple functional test to verify MCP server works
  */
 
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { AtpMcpServer } from '../index.js';
 
 describe('Phase 1 Validation - MCP Server Functionality', () => {

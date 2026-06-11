@@ -19,31 +19,21 @@
  * unless TEST_CLEANUP_ENABLED=false in .env.test
  */
 
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { AtpMcpServer } from '../index.js';
-import { AtpClient } from '../utils/atp-client.js';
+import type { AtpClient } from '../utils/atp-client.js';
 import {
-  getIntegrationTestConfig,
   canRunAuthenticatedTests,
-  getTestAccountCredentials,
   delay,
+  getIntegrationTestConfig,
+  getTestAccountCredentials,
 } from '../test/integration-config.js';
 
 // Tool imports
 import { CreatePostTool } from '../tools/implementations/create-post-tool.js';
 import { DeletePostTool } from '../tools/implementations/content-management-tools.js';
 import { LikePostTool, UnlikePostTool } from '../tools/implementations/like-post-tool.js';
-import { RepostTool, UnrepostTool } from '../tools/implementations/repost-tool.js';
 import { FollowUserTool, UnfollowUserTool } from '../tools/implementations/follow-user-tool.js';
-import { ReplyToPostTool } from '../tools/implementations/reply-to-post-tool.js';
-import {
-  MuteUserTool,
-  UnmuteUserTool,
-  BlockUserTool,
-  UnblockUserTool,
-} from '../tools/implementations/moderation-tools.js';
-import { BatchActionTool } from '../tools/implementations/batch-operations-tools.js';
-import { UploadImageTool } from '../tools/implementations/media-tools.js';
 
 // Helper to skip tests unless authenticated mode is enabled
 const describeAuth = canRunAuthenticatedTests() ? describe : describe.skip;
@@ -52,7 +42,7 @@ const describeAuth = canRunAuthenticatedTests() ? describe : describe.skip;
 const config = getIntegrationTestConfig();
 
 // Track created resources for cleanup
-interface TestResources {
+interface ITestResources {
   posts: string[]; // URIs of created posts
   follows: string[]; // URIs of follow records
   likes: string[]; // URIs of like records
@@ -64,24 +54,15 @@ interface TestResources {
 describeAuth('Real AT Protocol Integration Tests - Authenticated Mode', () => {
   let server: AtpMcpServer;
   let atpClient: AtpClient;
-  let testResources: TestResources;
+  let testResources: ITestResources;
 
   // Tool instances
   let createPostTool: CreatePostTool;
   let deletePostTool: DeletePostTool;
   let likePostTool: LikePostTool;
   let unlikePostTool: UnlikePostTool;
-  let repostTool: RepostTool;
-  let unrepostTool: UnrepostTool;
   let followUserTool: FollowUserTool;
   let unfollowUserTool: UnfollowUserTool;
-  let replyToPostTool: ReplyToPostTool;
-  let muteUserTool: MuteUserTool;
-  let unmuteUserTool: UnmuteUserTool;
-  let blockUserTool: BlockUserTool;
-  let unblockUserTool: UnblockUserTool;
-  let batchActionTool: BatchActionTool;
-  let uploadImageTool: UploadImageTool;
 
   beforeAll(async () => {
     const credentials = getTestAccountCredentials();
@@ -117,17 +98,8 @@ describeAuth('Real AT Protocol Integration Tests - Authenticated Mode', () => {
     deletePostTool = new DeletePostTool(atpClient);
     likePostTool = new LikePostTool(atpClient);
     unlikePostTool = new UnlikePostTool(atpClient);
-    repostTool = new RepostTool(atpClient);
-    unrepostTool = new UnrepostTool(atpClient);
     followUserTool = new FollowUserTool(atpClient);
     unfollowUserTool = new UnfollowUserTool(atpClient);
-    replyToPostTool = new ReplyToPostTool(atpClient);
-    muteUserTool = new MuteUserTool(atpClient);
-    unmuteUserTool = new UnmuteUserTool(atpClient);
-    blockUserTool = new BlockUserTool(atpClient);
-    unblockUserTool = new UnblockUserTool(atpClient);
-    batchActionTool = new BatchActionTool(atpClient);
-    uploadImageTool = new UploadImageTool(atpClient);
 
     console.log('✅ Server started in authenticated mode');
     console.log('✅ All tool instances created');
@@ -313,7 +285,10 @@ describeAuth('Real AT Protocol Integration Tests - Authenticated Mode', () => {
 /**
  * Cleanup utility to remove test data
  */
-async function cleanupTestResources(resources: TestResources, atpClient: AtpClient): Promise<void> {
+async function cleanupTestResources(
+  resources: ITestResources,
+  atpClient: AtpClient
+): Promise<void> {
   const agent = atpClient.getAgent();
 
   try {

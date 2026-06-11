@@ -3,10 +3,10 @@
  * rate-limit retry. These exercise the live read/write hot path an LLM drives.
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AtpClient } from '../atp-client.js';
 import { RateLimitError } from '../../types/index.js';
-import { mockConsole, createMockAtpConfig } from '../../test/setup.js';
+import { createMockAtpConfig, mockConsole } from '../../test/setup.js';
 
 vi.mock('@atproto/api', () => ({
   AtpAgent: vi.fn().mockImplementation(function () {

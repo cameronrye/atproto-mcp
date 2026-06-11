@@ -3,7 +3,7 @@
  * supported auth path (app passwords) and must not reference removed tools.
  */
 
-import { describe, it, expect, afterEach, beforeEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AtpOAuthClient } from '../oauth-client.js';
 import { AuthenticationError, type IAtpConfig } from '../../types/index.js';
 import { mockConsole } from '../../test/setup.js';

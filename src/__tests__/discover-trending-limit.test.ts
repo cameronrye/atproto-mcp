@@ -5,7 +5,7 @@
  * sample size and every category was hard-capped at 10.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiscoverTool } from '../tools/implementations/discover-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

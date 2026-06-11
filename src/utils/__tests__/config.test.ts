@@ -2,10 +2,10 @@
  * Tests for configuration management system
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { ConfigManager } from '../config.js';
 import { ConfigurationError } from '../../types/index.js';
-import { mockConsole, expectToThrow } from '../../test/setup.js';
+import { expectToThrow, mockConsole } from '../../test/setup.js';
 
 describe('ConfigManager', () => {
   beforeEach(() => {

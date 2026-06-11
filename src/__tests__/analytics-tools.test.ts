@@ -2,7 +2,7 @@
  * Tests for analytics and insights tools
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyzeAccountTool } from '../tools/implementations/analyze-account-tool.js';
 import { FindInfluentialUsersTool } from '../tools/implementations/analytics-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';

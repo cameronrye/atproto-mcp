@@ -7,7 +7,7 @@
  * otherwise totals/averages/topPosts are attributed to the wrong account.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyzeAccountTool } from '../tools/implementations/analyze-account-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

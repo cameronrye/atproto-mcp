@@ -2,11 +2,10 @@
  * Tests for the main AT Protocol MCP Server
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AtpMcpServer } from '../index.js';
-import { ConfigurationError } from '../types/index.js';
-import { mockConsole, expectToThrow, createMockServerConfig } from '../test/setup.js';
+import { createMockServerConfig, expectToThrow, mockConsole } from '../test/setup.js';
 
 // Mock dependencies
 vi.mock('@modelcontextprotocol/sdk/server/index.js', () => ({
@@ -245,8 +244,8 @@ describe('AtpMcpServer', () => {
 
   describe('MCP handlers', () => {
     // Helper function to find handler by testing the schema
-    const findHandlerByMethod = (method: string) => {
-      return mockServer.setRequestHandler.mock.calls.find((call: any[]) => {
+    const findHandlerByMethod = (method: string) =>
+      mockServer.setRequestHandler.mock.calls.find((call: any[]) => {
         const schema = call[0];
         if (!schema || typeof schema.parse !== 'function') return false;
 
@@ -264,7 +263,6 @@ describe('AtpMcpServer', () => {
           }
         }
       });
-    };
 
     // Note: 'initialize' and 'ping' are handled natively by the SDK Server/Protocol
     // and are no longer registered by our code (see tool-dispatch.test.ts for the

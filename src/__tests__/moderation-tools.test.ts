@@ -11,15 +11,15 @@
  *  - analyze_moderation_status (ENHANCED) works unauthenticated and surfaces labels.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  MuteUserTool,
-  UnmuteUserTool,
+  AnalyzeModerationStatusTool,
   BlockUserTool,
-  UnblockUserTool,
+  MuteUserTool,
   ReportContentTool,
   ReportUserTool,
-  AnalyzeModerationStatusTool,
+  UnblockUserTool,
+  UnmuteUserTool,
 } from '../tools/implementations/moderation-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

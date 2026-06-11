@@ -6,7 +6,7 @@
  * silently dropped.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FindInfluentialUsersTool } from '../tools/implementations/analytics-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

@@ -2,7 +2,7 @@
  * Tests for unauthenticated mode functionality
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { AtpMcpServer } from '../index.js';
 import { ConfigManager } from '../utils/config.js';
 import { AtpClient } from '../utils/atp-client.js';

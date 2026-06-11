@@ -4,7 +4,7 @@
  * does not cause the live Map iteration to skip a still-valid subscriber.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { FirehoseClient, type IFirehoseEvent } from '../firehose-client.js';
 
 const event: IFirehoseEvent = {
@@ -33,7 +33,7 @@ describe('FirehoseClient.processEvent subscription iteration', () => {
 
     // Invoke the private dispatcher directly (decoding is not wired up, so it is
     // never reached via the socket in this build).
-    (client as unknown as { processEvent(e: IFirehoseEvent): void }).processEvent(event);
+    (client as unknown as { processEvent: (e: IFirehoseEvent) => void }).processEvent(event);
 
     // With live Map iteration, B is skipped because A deleted it before it was
     // reached. A snapshot delivers the in-flight event to B regardless.

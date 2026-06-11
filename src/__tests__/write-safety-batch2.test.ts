@@ -13,7 +13,7 @@
  * - reply_to_post: root/parent must reference app.bsky.feed.post records.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   DeletePostTool,
   UpdateProfileTool,

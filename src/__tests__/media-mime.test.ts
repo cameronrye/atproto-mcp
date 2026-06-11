@@ -4,7 +4,7 @@
  * straight to uploadBlob, so a non-image response could be stored as a blob.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { safeImageMime } from '../tools/implementations/media-tools.js';
 
 describe('safeImageMime', () => {

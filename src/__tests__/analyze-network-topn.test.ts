@@ -5,7 +5,7 @@
  * ranking even though maxSampleSize advertises up to 100.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AnalyzeAccountTool } from '../tools/implementations/analyze-account-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

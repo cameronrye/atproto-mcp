@@ -5,7 +5,7 @@
  * the quote-post path previously skipped it.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepostTool } from '../tools/implementations/repost-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

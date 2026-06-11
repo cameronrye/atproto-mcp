@@ -4,7 +4,7 @@
  * coerced to empty text. Text resources keep using `text`.
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { AtpMcpServer } from '../index.js';
 
 const fixtures = vi.hoisted(() => ({

@@ -2,7 +2,7 @@
  * Tests for Zod to JSON Schema conversion
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { AtpMcpServer } from '../index.js';
 import { createTools } from '../tools/index.js';

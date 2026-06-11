@@ -12,7 +12,7 @@
  *     returned uri/cid while reply.root stays pinned to the first post.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreatePostTool } from '../tools/implementations/create-post-tool.js';
 import { ReplyToPostTool } from '../tools/implementations/reply-to-post-tool.js';
 import { CreateThreadTool } from '../tools/implementations/create-thread-tool.js';
@@ -31,9 +31,20 @@ const wrap = async (op: () => unknown) => {
   }
 };
 
+// Typed like the real com.atproto.repo.getRecord (a Promise-returning XRPC
+// call); an untyped vi.fn() would make mockImplementation(async ...) trip
+// @typescript-eslint/no-misused-promises (Promise where void is expected).
+const createGetRecordMock = () =>
+  vi.fn<
+    (params: { repo?: string; collection?: string; rkey: string }) => Promise<{
+      data: { uri?: string; cid: string };
+    }>
+  >();
+type GetRecordMock = ReturnType<typeof createGetRecordMock>;
+
 interface IMockAgentParts {
   post: ReturnType<typeof vi.fn>;
-  getRecord: ReturnType<typeof vi.fn>;
+  getRecord: GetRecordMock;
 }
 
 function createMockAtpClient(): { client: AtpClient } & IMockAgentParts {
@@ -45,7 +56,8 @@ function createMockAtpClient(): { client: AtpClient } & IMockAgentParts {
   });
 
   // getCidFromUri -> com.atproto.repo.getRecord -> { data: { cid } }
-  const getRecord = vi.fn().mockResolvedValue({
+  const getRecord = createGetRecordMock();
+  getRecord.mockResolvedValue({
     data: {
       uri: 'at://did:plc:author/app.bsky.feed.post/parent',
       cid: ROOT_CID,

@@ -7,7 +7,7 @@
  * ancestor, not the grandparent) and a real depth (not always 0).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GetPostContextTool } from '../tools/implementations/composite-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

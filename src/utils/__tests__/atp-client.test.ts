@@ -2,15 +2,15 @@
  * Tests for AT Protocol client wrapper
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AtpAgentOptions } from '@atproto/api';
 import { AtpClient } from '../atp-client.js';
-import { AuthenticationError, AtpError, ValidationError } from '../../types/index.js';
+import { AtpError, AuthenticationError, ValidationError } from '../../types/index.js';
 import {
-  mockConsole,
-  expectToThrow,
   createMockAtpConfig,
   createMockSession,
+  expectToThrow,
+  mockConsole,
 } from '../../test/setup.js';
 
 // Mock the @atproto/api module. Note: the real AtpAgent does NOT expose
@@ -117,7 +117,7 @@ describe('AtpClient', () => {
 
       // Simulate session create event
       if (persistSession) {
-        persistSession('create', mockSession);
+        void persistSession('create', mockSession);
       }
 
       expect(client.isAuthenticated()).toBe(true);
@@ -150,8 +150,8 @@ describe('AtpClient', () => {
       const persistSession = (constructorCall?.[0] as AtpAgentOptions | undefined)?.persistSession;
 
       if (persistSession) {
-        persistSession('create', mockSession);
-        persistSession('expired', undefined);
+        void persistSession('create', mockSession);
+        void persistSession('expired', undefined);
       }
 
       // Wait for refresh to complete
@@ -179,7 +179,7 @@ describe('AtpClient', () => {
       const constructorCall = vi.mocked(AtpAgent).mock.calls[0];
       const persistSession = (constructorCall?.[0] as AtpAgentOptions | undefined)?.persistSession;
       if (persistSession) {
-        persistSession('create', mockSession);
+        void persistSession('create', mockSession);
       }
     });
 

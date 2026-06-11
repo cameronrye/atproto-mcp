@@ -7,7 +7,7 @@
  * the authoritative `viewer.following` signal from getProfile instead.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FollowUserTool } from '../tools/implementations/follow-user-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

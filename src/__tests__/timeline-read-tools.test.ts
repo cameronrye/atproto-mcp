@@ -9,7 +9,7 @@
  * results. GetTimeline is PRIVATE; GetCustomFeed is ENHANCED.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GetTimelineTool } from '../tools/implementations/timeline-tools.js';
 import { GetCustomFeedTool } from '../tools/implementations/advanced-social-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';

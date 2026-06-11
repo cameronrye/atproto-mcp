@@ -4,7 +4,7 @@
  * units) is valid and must not be rejected client-side; >300 graphemes is.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreatePostTool } from '../tools/implementations/create-post-tool.js';
 import { ValidationError } from '../types/index.js';
 import type { AtpClient } from '../utils/atp-client.js';

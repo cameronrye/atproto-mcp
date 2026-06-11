@@ -2,10 +2,10 @@
  * Tests for content discovery tools
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  FindSimilarUsersTool,
   DiscoverCommunitiesTool,
+  FindSimilarUsersTool,
 } from '../tools/implementations/content-discovery-tools.js';
 import { DiscoverTool } from '../tools/implementations/discover-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';

@@ -2,7 +2,7 @@
  * Tests for BaseTool
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BaseTool, ToolAuthMode } from '../base-tool.js';
 import type { AtpClient } from '../../../utils/atp-client.js';
 import { RateLimitError } from '../../../types/index.js';
@@ -28,14 +28,13 @@ class TestTool extends BaseTool {
 }
 
 // Mock AtpClient
-const createMockAtpClient = (authenticated = true, hasCredentials = true) => {
-  return {
+const createMockAtpClient = (authenticated = true, hasCredentials = true) =>
+  ({
     isAuthenticated: vi.fn().mockReturnValue(authenticated),
     hasCredentials: vi.fn().mockReturnValue(hasCredentials),
     executePublicRequest: vi.fn().mockResolvedValue({ success: true, data: {} }),
     executeAuthenticatedRequest: vi.fn().mockResolvedValue({ success: true, data: {} }),
-  } as unknown as AtpClient;
-};
+  }) as unknown as AtpClient;
 
 describe('BaseTool', () => {
   describe('Availability', () => {

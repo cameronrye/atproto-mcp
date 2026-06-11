@@ -6,10 +6,10 @@
  * racing parallel logins.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AtpAgentOptions, AtpSessionData, AtpSessionEvent } from '@atproto/api';
 import { AtpClient } from '../atp-client.js';
-import { mockConsole, createMockAtpConfig, createMockSession } from '../../test/setup.js';
+import { createMockAtpConfig, createMockSession, mockConsole } from '../../test/setup.js';
 
 // The real AtpAgent exposes token refresh on agent.sessionManager
 // (CredentialSession.refreshSession()), not on the agent itself.

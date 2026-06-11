@@ -10,7 +10,7 @@
  * test guards against.
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { DiscoverTool } from '../tools/implementations/discover-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

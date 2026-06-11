@@ -10,10 +10,10 @@
  * list is exhausted). All three are PRIVATE tools.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  CreateListTool,
   AddToListTool,
+  CreateListTool,
   RemoveFromListTool,
 } from '../tools/implementations/advanced-social-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';

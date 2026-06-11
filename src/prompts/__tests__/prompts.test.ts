@@ -2,17 +2,16 @@
  * Tests for MCP Prompts
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { ContentCompositionPrompt, ReplyTemplatePrompt } from '../index.js';
 import type { AtpClient } from '../../utils/atp-client.js';
 
 // Mock AtpClient
-const createMockAtpClient = (authenticated = true) => {
-  return {
+const createMockAtpClient = (authenticated = true) =>
+  ({
     isAuthenticated: vi.fn().mockReturnValue(authenticated),
-  } as unknown as AtpClient;
-};
+  }) as unknown as AtpClient;
 
 describe('ContentCompositionPrompt', () => {
   let prompt: ContentCompositionPrompt;

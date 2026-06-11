@@ -2,7 +2,7 @@
  * Unit tests for SearchActorsTool
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SearchActorsTool } from '../tools/implementations/search-actors-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

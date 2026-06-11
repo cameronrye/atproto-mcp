@@ -13,7 +13,7 @@
  *  - getFirehoseUrl() scheme selection from ATPROTO_RELAY
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { FirehoseClient } from '../firehose-client.js';
 
 const makeClient = (): FirehoseClient =>

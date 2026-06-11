@@ -10,7 +10,7 @@
  * deleteLike/deleteRepost helpers, or an explicit assertion for delete_post).
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { UnlikePostTool } from '../tools/implementations/like-post-tool.js';
 import { UnrepostTool } from '../tools/implementations/repost-tool.js';
 import { UnfollowUserTool } from '../tools/implementations/follow-user-tool.js';

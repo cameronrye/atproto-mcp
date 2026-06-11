@@ -24,9 +24,6 @@ export default tseslint.config(
       '**/*.d.ts',
       '**/*.config.js',
       '**/*.config.ts',
-      '**/__tests__/**',
-      '**/*.test.ts',
-      '**/*.spec.ts',
     ],
   },
 
@@ -131,6 +128,32 @@ export default tseslint.config(
       'no-useless-rename': 'error',
       'no-useless-escape': 'error',
       'sort-imports': ['error', { ignoreDeclarationSort: true }],
+    },
+  },
+
+  // Test files: same production ruleset, but type-aware linting goes through
+  // tsconfig.test.json (the production tsconfig excludes tests, so the project
+  // service used above cannot resolve them).
+  {
+    files: ['src/**/__tests__/**/*.ts', 'src/**/*.test.ts', 'src/**/*.spec.ts', 'src/test/**/*.ts'],
+    languageOptions: {
+      parserOptions: {
+        projectService: false,
+        project: './tsconfig.test.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+    rules: {
+      // Tests assert presence with expect() and then use `!` on find()/get()
+      // results; a runtime TypeError here is a test failure anyway.
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      // expect(mock.method).toHaveBeenCalled() passes method references around;
+      // vi mocks carry no `this` state, so unbound access is safe here.
+      '@typescript-eslint/unbound-method': 'off',
+      // vi.fn().mockImplementation(function () { ... }) must stay a `function`
+      // expression: mocked classes are invoked with `new`, and arrow functions
+      // are not constructable.
+      'prefer-arrow-callback': 'off',
     },
   }
 );

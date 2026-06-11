@@ -2,14 +2,14 @@
  * Tests for error classes
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
-  BaseError,
   AtpError,
   AuthenticationError,
+  BaseError,
+  ConfigurationError,
   RateLimitError,
   ValidationError,
-  ConfigurationError,
 } from '../index.js';
 
 // BaseError is abstract only at the type level; instantiate it directly so the

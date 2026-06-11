@@ -2,7 +2,7 @@
  * Unit tests for GetAuthorFeedTool
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GetAuthorFeedTool } from '../tools/implementations/get-author-feed-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

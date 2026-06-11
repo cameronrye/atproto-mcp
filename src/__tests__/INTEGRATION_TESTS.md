@@ -11,28 +11,27 @@ session. In particular:
 
 - `search_posts` - requires authentication (the AT Protocol search API changed
   in 2025 to require auth)
-- `get_thread` - requires authentication (PRIVATE)
 - `get_custom_feed` - requires authentication (PRIVATE)
-- `get_followers` / `get_follows` - work unauthenticated against the public
-  AppView (ENHANCED), returning richer viewer-state data when authenticated
+- `get_user_connections` - works unauthenticated against the public AppView
+  (ENHANCED), returning richer viewer-state data when authenticated
 
 (Exact public/private behavior is set by the upstream AT Protocol service and
 can change over time; this suite does not attempt to assert specific HTTP status
 codes for those endpoints.)
 
 These integration tests focus on `get_user_profile`, the simplest tool that
-genuinely works without authentication (the social-graph reads `get_followers` /
-`get_follows` are also unauthenticated/ENHANCED but are not exercised here):
+genuinely works without authentication (the social-graph read
+`get_user_connections` is also unauthenticated/ENHANCED but is not exercised
+here):
 
 - `get_user_profile` - works without auth (and returns more data when
   authenticated)
 
-Note: `start_oauth_flow` only builds a heuristic PKCE authorization URL, and the
-OAuth-completion tools (`handle_oauth_callback`, `refresh_oauth_tokens`,
-`revoke_oauth_tokens`) are not implemented — they always fail with an
-`AUTHENTICATION_FAILED` error whose message states that OAuth token exchange is
-not implemented (reaching the client as a JSON-RPC `-32603` Internal Error).
-They are therefore not exercised by these tests.
+Note: the OAuth stub tools (`start_oauth_flow`, `handle_oauth_callback`,
+`refresh_oauth_tokens`, `revoke_oauth_tokens`) were removed in 0.4.0 — OAuth
+login was never functional and is no longer exposed as tools, so there is
+nothing OAuth-related to exercise here. App-password authentication is the
+supported path.
 
 ## Overview
 
@@ -59,8 +58,7 @@ ensure:
 ### Tools Tested
 
 Currently, this suite exercises one unauthenticated tool (other ENHANCED reads
-such as `get_followers` / `get_follows` also work without auth but are not
-covered here):
+such as `get_user_connections` also work without auth but are not covered here):
 
 1. **get_user_profile** - Profile retrieval (ENHANCED mode)
    - Handle-based lookup
@@ -73,29 +71,24 @@ covered here):
 ### Tools That Require Authentication
 
 The following tools are not exercised by the unauthenticated suite — most
-require an authenticated session, and the streaming tools are gated off entirely
-(see below):
+require an authenticated session:
 
 - ❌ **search_posts** - requires authentication (the AT Protocol search API
   changed in 2025 to require auth); not exercised by the unauthenticated suite
-- ❌ **get_followers** - works unauthenticated against the public AppView
+- ❌ **get_user_connections** - works unauthenticated against the public AppView
   (ENHANCED), but not exercised by this suite
-- ❌ **get_follows** - works unauthenticated against the public AppView
-  (ENHANCED), but not exercised by this suite
-- ❌ **get_thread** - typically requires authentication
 - ❌ **get_custom_feed** - typically requires authentication
 - ❌ All write operations (create_post, like_post, follow_user, etc.)
 - ❌ All moderation tools (mute_user, block_user, report_content, etc.)
 - ❌ All list management tools (create_list, add_to_list, etc.)
 - ❌ All media tools (upload_image, upload_video, etc.)
-- ❌ All streaming tools (start_streaming, stop_streaming, etc.) — **not an auth
-  issue**: firehose decoding is gated off in this build
-  (`FIREHOSE_DECODING_IMPLEMENTED = false`), so these tools never open a socket
-  or return real events regardless of authentication
+
+(Real-time firehose streaming is not implemented, so there are no streaming
+tools to exercise.)
 
 To test these tools, you would need to:
 
-1. Provide authentication credentials (app password or OAuth)
+1. Provide authentication credentials (an app password)
 2. Create separate authenticated integration tests
 3. Implement proper credential management and security
 

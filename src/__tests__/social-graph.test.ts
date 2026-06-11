@@ -10,10 +10,10 @@
  * PRIVATE (requires auth).
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  GetUserConnectionsTool,
   GetNotificationsTool,
+  GetUserConnectionsTool,
 } from '../tools/implementations/social-graph-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

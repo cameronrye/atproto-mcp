@@ -2,11 +2,11 @@
  * Tests for MCP Resources
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  TimelineResource,
-  ProfileResource,
   NotificationsResource,
+  ProfileResource,
+  TimelineResource,
   createResources,
 } from '../index.js';
 import type { AtpClient } from '../../utils/atp-client.js';

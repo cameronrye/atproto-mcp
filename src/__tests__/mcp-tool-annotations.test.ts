@@ -7,7 +7,7 @@
  * verified behavior of each implementation.
  */
 
-import { describe, it, expect, vi, beforeAll } from 'vitest';
+import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { AtpMcpServer } from '../index.js';
 
 vi.mock('../utils/atp-client.js', () => ({

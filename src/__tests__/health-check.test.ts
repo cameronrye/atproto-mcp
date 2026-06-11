@@ -2,11 +2,10 @@
  * Real-world tests for health check functionality
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { spawn } from 'child_process';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -84,7 +83,7 @@ describe('Health Check - Real-world Usage', () => {
     it('should handle empty service URL', async () => {
       process.env['ATPROTO_SERVICE'] = '';
 
-      const { output, exitCode } = await runHealthCheck();
+      const { exitCode } = await runHealthCheck();
 
       // May fail without a valid service URL
       expect([0, 1]).toContain(exitCode);

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { Logger, LogLevel } from '../logger.js';
+import { LogLevel, Logger } from '../logger.js';
 
 /**
  * The server speaks MCP over stdio, where process.stdout is the JSON-RPC channel.

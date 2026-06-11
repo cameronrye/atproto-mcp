@@ -2,7 +2,7 @@
  * Tests for batch operation tools
  */
 
-import { describe, it, expect, beforeEach, vi, type Mock } from 'vitest';
+import { type Mock, beforeEach, describe, expect, it, vi } from 'vitest';
 import { BatchActionTool } from '../tools/implementations/batch-operations-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

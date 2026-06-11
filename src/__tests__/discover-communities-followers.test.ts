@@ -5,7 +5,7 @@
  * Previously every followersCount and avgFollowerCount was a fabricated 0.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DiscoverCommunitiesTool } from '../tools/implementations/content-discovery-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

@@ -4,7 +4,7 @@
  * (they are sensitive enough not to belong in logs verbatim).
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import { redactConfigForLog } from '../config.js';
 import type { IMcpServerConfig } from '../../types/index.js';
 

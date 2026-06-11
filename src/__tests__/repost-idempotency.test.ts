@@ -5,7 +5,7 @@
  * authoritative signal is viewer.repost from getPosts.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepostTool } from '../tools/implementations/repost-tool.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

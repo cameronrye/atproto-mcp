@@ -10,7 +10,7 @@
  * agent.uploadBlob again with garbage.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { CreatePostTool } from '../tools/implementations/create-post-tool.js';
 import { UpdateProfileTool } from '../tools/implementations/content-management-tools.js';
 import { AnalyzeImageTool } from '../tools/implementations/rich-media-tools.js';

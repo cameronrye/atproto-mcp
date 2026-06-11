@@ -6,7 +6,7 @@
  * rather than pretending to count mutual followers.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FindSimilarUsersTool } from '../tools/implementations/content-discovery-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

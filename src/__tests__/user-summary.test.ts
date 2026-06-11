@@ -9,7 +9,7 @@
  * results). ENHANCED tool: works unauthenticated via executePublicRequest.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GetUserSummaryTool } from '../tools/implementations/composite-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

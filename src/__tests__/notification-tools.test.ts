@@ -8,10 +8,10 @@
  * - get_notifications (full): returns the notification list plus the unread count.
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  MarkNotificationsSeenTool,
   GetNotificationsTool,
+  MarkNotificationsSeenTool,
 } from '../tools/implementations/social-graph-tools.js';
 import type { AtpClient } from '../utils/atp-client.js';
 

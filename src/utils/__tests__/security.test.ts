@@ -1,10 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { Logger, LogLevel } from '../logger.js';
+import { LogLevel, Logger } from '../logger.js';
 import {
   ErrorSanitizer,
+  type ISecurityConfig,
   InputSanitizer,
   RateLimiter,
-  type ISecurityConfig,
   SecurityManager,
 } from '../security.js';
 

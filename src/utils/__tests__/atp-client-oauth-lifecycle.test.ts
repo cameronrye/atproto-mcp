@@ -5,7 +5,7 @@
  * destroy it so the interval is cleared.
  */
 
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AtpClient } from '../atp-client.js';
 import { mockConsole } from '../../test/setup.js';
 import type { IAtpConfig } from '../../types/index.js';
