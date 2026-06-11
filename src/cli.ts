@@ -79,7 +79,7 @@ const CLI_OPTIONS = {
   },
   host: {
     type: 'string' as const,
-    short: 'h',
+    short: 'H',
     description: 'Server host (default: localhost)',
   },
   service: {
@@ -99,6 +99,7 @@ const CLI_OPTIONS = {
   },
   help: {
     type: 'boolean' as const,
+    short: 'h',
     description: 'Show help message',
   },
   version: {
@@ -125,11 +126,11 @@ currently have no effect.
 
 Options:
   -p, --port <number>        Server port (reserved; stdio transport ignores it)
-  -h, --host <string>        Server host (reserved; stdio transport ignores it)
+  -H, --host <string>        Server host (reserved; stdio transport ignores it)
   -s, --service <url>        AT Protocol service URL (default: https://bsky.social)
   -a, --auth <method>        Authentication method: app-password|oauth (optional)
   -l, --log-level <level>    Log level: debug|info|warn|error (default: info)
-      --help                 Show this help message
+  -h, --help                 Show this help message
   -v, --version              Show version information
 
 🔓 Unauthenticated Mode (Default):

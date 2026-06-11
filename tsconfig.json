@@ -25,8 +25,6 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true,
     "removeComments": false,
     "importHelpers": true,
     "skipLibCheck": true,
@@ -36,5 +34,14 @@
     "baseUrl": "./src"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "docs", "**/*.test.ts", "**/*.spec.ts"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "docs",
+    "src/test",
+    "src/__tests__",
+    "**/__tests__",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }

@@ -2,11 +2,10 @@
  * Real-world tests for CLI functionality
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { spawn } from 'child_process';
-import { join } from 'path';
+import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -40,6 +39,15 @@ describe('CLI - Real-world Usage', () => {
       expect(output).toContain('--service');
       expect(output).toContain('Unauthenticated Mode');
       expect(output).toContain('Authenticated Mode');
+    });
+
+    it('should display help message with -h flag (not consume it as host)', async () => {
+      const output = await runCLI(['-h']);
+
+      expect(output).toContain('AT Protocol MCP Server');
+      expect(output).toContain('Usage: atproto-mcp');
+      expect(output).toContain('Options:');
+      expect(output).not.toContain('Configuration Error');
     });
 
     it('should display version with --version flag', async () => {
@@ -97,10 +105,11 @@ describe('CLI - Real-world Usage', () => {
       expect(output).toContain('AT Protocol MCP Server');
     });
 
-    it('should accept -h for host', async () => {
-      const output = await runCLI(['-h', '0.0.0.0', '--version']);
+    it('should accept -H for host', async () => {
+      const output = await runCLI(['-H', '0.0.0.0', '--version']);
 
       expect(output).toContain('AT Protocol MCP Server');
+      expect(output).not.toContain('Configuration Error');
     });
 
     it('should accept -s for service', async () => {
@@ -124,7 +133,7 @@ describe('CLI - Real-world Usage', () => {
 
   describe('Error Handling', () => {
     it('should handle invalid log level gracefully', async () => {
-      const { output, exitCode } = await runCLIWithExitCode(['--log-level', 'invalid', '--help']);
+      const { output } = await runCLIWithExitCode(['--log-level', 'invalid', '--help']);
 
       // Should still show help or error message
       expect(output.length).toBeGreaterThan(0);
