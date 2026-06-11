@@ -9,11 +9,95 @@ and this project adheres to
 
 ## [Unreleased]
 
+This release is driven by a full end-to-end audit of the server. It fixes the
+broken `npx` launch path, makes image posting work for the first time over MCP,
+completes the video publishing pipeline through the `app.bsky.video` service,
+and hardens dozens of verified defects across tools, session handling, CI, and
+the MCP protocol surface.
+
+### Fixed
+
+- **`npx atproto-mcp` silently failed to start.** The ESM entry guard compared
+  the realpath-resolved module URL against the literal symlink path npm
+  installs in `node_modules/.bin`, so the published bin exited 0 without
+  output. The same guard made the Docker health check fail open.
+- **Image posting now works end-to-end.** `create_post` image embeds,
+  `update_profile` avatar/banner, and `analyze_image` accept the blob
+  descriptor `upload_image` returns (the previous `Blob`-typed parameters
+  could never be satisfied over JSON-RPC). External link embeds accept the
+  thumbnail `generate_link_preview` uploads.
+- `analyze_account` no longer attributes reposted (other authors') posts to
+  the analyzed account, and engagement rates floor the post-age denominator so
+  brand-new posts cannot dominate averages.
+- `update_profile` no longer rebuilds the profile from scratch when reading
+  the current profile fails transiently, and field limits count graphemes per
+  the lexicon instead of UTF-16 code units.
+- `create_thread` validates every post before publishing any, so a
+  predictable limit violation cannot orphan a partial thread.
+- Rich-text facets: explicit byte offsets must fall on UTF-8 codepoint
+  boundaries, and mention/hashtag values are normalized (leading `@`/`#`
+  stripped). Reply references (in `create_post` and `reply_to_post`) must
+  point at `app.bsky.feed.post` records, and `delete_post` resolves handle
+  authorities before its ownership check.
+- `discover`: the `actor` parameter now actually tailors recommendations, and
+  `limit` governs the number of items returned rather than silently resizing
+  the analysis sample.
+- `find_influential_users` ranks the full candidate pool instead of an
+  arbitrary first-40 slice; `find_similar_users` batches and parallelizes its
+  reads; `batch_action` hydrates all targets in one `getPosts`/`getProfiles`
+  call instead of one read per target.
+- `get_notifications` reports the full set of notification reasons the API
+  returns (the narrower enum made strict MCP clients reject valid responses).
+- `remove_from_list` distinguishes "list too large to scan" from a definitive
+  "not in list" past its 5,000-member pagination cap.
+- Session lifecycle: an expired session is invalidated immediately and a
+  failed recovery no longer permanently wedges authenticated calls;
+  `authenticate()` is single-flighted; OAuth client instances no longer leak
+  their keepalive interval; the session-refresh branch actually executes.
+- MCP protocol: unknown resources return `-32002`,
+  `resources/templates/list` is handled, binary resource content passes
+  through as base64, prompts work unauthenticated (they are pure text
+  templates) and enforce their required arguments, and startup errors are no
+  longer masked by cleanup failures.
+
+### Added
+
+- **Video publishing.** `upload_video` follows the official `app.bsky.video`
+  flow — upload-quota preflight, service auth, processing-job polling — and
+  returns the processed video blob; `create_post` gains an `embed.video`
+  variant (captions, alt text, aspect ratio).
+- Per-tool MCP annotations (`destructiveHint`, `idempotentHint`) verified
+  against each implementation, so spec-compliant clients no longer treat
+  every write tool as destructive and non-idempotent. A completeness test
+  keeps the map in sync with the roster.
+- Faithful `outputSchema` declarations for `analyze_account` and `discover`.
+- An `exports` map in `package.json`, and a slimmer npm package: test code
+  and source maps that referenced missing files are no longer shipped
+  (179 → 87 files).
+- CI hardening: the nightly authenticated job fails loudly when credentials
+  are missing, release changelogs see full git history, workflows declare
+  least-privilege permissions, and Dependabot watches npm and GitHub Actions.
+- Test files are now type-checked and linted in CI; behavioral coverage was
+  added for the list-management, timeline, user-summary, and video tools.
+
+### Changed (BREAKING)
+
+- CLI: `-h` now prints help (it was previously the short flag for `--host`).
+  Use `-H` or `--host` to set the host.
+- The `conversation-context` resource was removed. MCP has no resource-write
+  mechanism, so it could only ever return empty data; the server now
+  advertises 3 resources.
+- `like_post`/`repost`: the result `cid` is now optional and absent when the
+  action already existed (it was previously an empty string).
+- `upload_video` output changed shape: it returns the processed video blob
+  descriptor plus `jobId` from the video service. The old raw-blob upload
+  never produced playable video and usually failed against the PDS blob cap.
+
 ### Planned
 
 - OAuth token exchange (the `oauth-client` scaffolding is in place)
-- Firehose frame decoding to enable real-time streaming
-- Direct messaging support
+- Firehose frame decoding to enable real-time streaming (or Jetstream)
+- Direct messaging support (`chat.bsky.convo`)
 - Group/community features
 - Custom feed generator integration
 - Multi-account management
