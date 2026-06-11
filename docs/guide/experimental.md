@@ -14,13 +14,13 @@ in the [main API reference](../api/index.md).
 
 ## Status at a glance
 
-| Feature              | Status                                                            |
-| -------------------- | ---------------------------------------------------------------- |
-| Firehose streaming   | Planned — not exposed as tools; firehose decoding not built      |
+| Feature              | Status                                                               |
+| -------------------- | -------------------------------------------------------------------- |
+| Firehose streaming   | Planned — not exposed as tools; firehose decoding not built          |
 | OAuth login          | Planned — not exposed as tools; app passwords are the supported path |
-| AI alt-text          | Planned — no vision model wired in                               |
-| Conversation context | Placeholder — `atproto://conversation-context` never auto-populated |
-| HTTP transport       | Planned — server is stdio-only today                             |
+| AI alt-text          | Planned — no vision model wired in                                   |
+| Conversation context | Removed — the placeholder resource was unregistered                  |
+| HTTP transport       | Planned — server is stdio-only today                                 |
 
 ## Firehose streaming
 
@@ -52,11 +52,13 @@ from an existing post, use
 
 ## Conversation context resource
 
-The **`atproto://conversation-context`** resource is registered and readable,
-but the server does not auto-populate it during a session. Reading it returns
-empty / near-empty context in normal operation. The other three resources
-(`atproto://timeline`, `atproto://profile`, `atproto://notifications`) are
-functional and call the real API when authenticated.
+The placeholder **`atproto://conversation-context`** resource has been
+**removed**. MCP offers no client-write mechanism for resources and no tool
+populated its store, so it could only ever read as empty. It would be
+re-registered only together with a real population path. The three registered
+resources (`atproto://timeline`, `atproto://profile`,
+`atproto://notifications`) are functional and call the real API when
+authenticated.
 
 ## Planned: HTTP transport
 

@@ -13,19 +13,22 @@ example handling patterns you implement **on the client side**.
 The server speaks JSON-RPC 2.0 over stdio. When a tool call fails, the client
 receives a standard JSON-RPC error object.
 
-| Code   | Name             | When it is used                                                                  |
-| ------ | ---------------- | -------------------------------------------------------------------------------- |
-| -32700 | Parse Error      | Invalid JSON received                                                            |
-| -32600 | Invalid Request  | Malformed JSON-RPC request                                                       |
-| -32601 | Method Not Found | Unknown JSON-RPC method                                                          |
-| -32602 | Invalid Params   | A tool's input failed validation, or the tool name is unknown                    |
-| -32603 | Internal Error   | Everything else: auth failures, rate limits, network errors, unexpected failures |
+| Code   | Name               | When it is used                                                                  |
+| ------ | ------------------ | -------------------------------------------------------------------------------- |
+| -32700 | Parse Error        | Invalid JSON received                                                            |
+| -32600 | Invalid Request    | Malformed JSON-RPC request                                                       |
+| -32601 | Method Not Found   | Unknown JSON-RPC method                                                          |
+| -32602 | Invalid Params     | A tool's input failed validation, or the tool name is unknown                    |
+| -32002 | Resource Not Found | `resources/read` with an unknown resource URI                                    |
+| -32603 | Internal Error     | Everything else: auth failures, rate limits, network errors, unexpected failures |
 
-Two cases map to specific codes:
+Three cases map to specific codes:
 
 - **Validation failures** (a tool argument that fails its schema) surface as
   **`-32602` Invalid Params**, with the validation message.
 - **Unknown tool names** also surface as **`-32602` Invalid Params**.
+- **Unknown resource URIs** (`resources/read` for a URI the server does not
+  register) surface as **`-32002` Resource not found**, the MCP-reserved code.
 
 Every other failure — including authentication errors, rate-limit rejections,
 and AT Protocol/network errors — is sanitized and returned as **`-32603`
@@ -109,8 +112,8 @@ A tool argument failed its schema. Reaches the client as **`-32602`**; the
 message names the offending field.
 
 **Respond by**: validating input before the call. For example, post `text` must
-be non-empty and within Bluesky's 300-character limit, and `langs` must be
-BCP-47 codes (`en`, `en-US`, `pt-BR`).
+be non-empty and within Bluesky's limit of 300 graphemes / 3000 UTF-8 bytes,
+and `langs` must be BCP-47 codes (`en`, `en-US`, `pt-BR`).
 
 ### Rate Limit Exceeded
 

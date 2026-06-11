@@ -2,7 +2,7 @@
 
 > A comprehensive Model Context Protocol (MCP) server for AT Protocol integration, enabling LLMs to interact directly with the AT Protocol ecosystem including Bluesky and other decentralized social networks.
 
-This MCP server provides a bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, and manage content on the decentralized social web. It exposes 43 tools, 4 resources, and 2 prompts over the stdio transport.
+This MCP server provides a bridge between Large Language Models and the AT Protocol, allowing LLMs to perform social operations, retrieve data, and manage content on the decentralized social web. It exposes 43 tools, 3 resources, and 2 prompts over the stdio transport.
 
 Key capabilities:
 - Full AT Protocol integration using official @atproto/api

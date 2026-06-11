@@ -11,24 +11,28 @@ Update the authenticated user's profile information.
 ### `displayName` (optional)
 
 - **Type:** `string`
-- **Constraints:** Maximum 64 characters
+- **Constraints:** Maximum 64 graphemes (emoji count as one)
 - **Description:** Display name to show on profile
 
 ### `description` (optional)
 
 - **Type:** `string`
-- **Constraints:** Maximum 256 characters
+- **Constraints:** Maximum 256 graphemes (emoji count as one)
 - **Description:** Bio/description text
 
 ### `avatar` (optional)
 
-- **Type:** `Blob`
-- **Description:** Avatar image file
+- **Type:** `object`
+- **Description:** New avatar image as a pre-uploaded blob descriptor: pass the
+  `image.blob` object returned by [upload_image](./upload-image.md) verbatim
+  (`{ type: 'blob', ref, mimeType, size }`). Omit to keep the existing avatar.
 
 ### `banner` (optional)
 
-- **Type:** `Blob`
-- **Description:** Banner image file
+- **Type:** `object`
+- **Description:** New banner/header image as a pre-uploaded blob descriptor:
+  pass the `image.blob` object returned by [upload_image](./upload-image.md)
+  verbatim. Omit to keep the existing banner.
 
 ## Response
 
@@ -64,9 +68,17 @@ uploaded, not as a URL.
 
 ### Update Avatar
 
+Upload the image first with `upload_image`, then pass its `image.blob`
+descriptor:
+
 ```json
 {
-  "avatar": "<Blob data>"
+  "avatar": {
+    "type": "blob",
+    "ref": "bafkreiabc123...",
+    "mimeType": "image/jpeg",
+    "size": 245678
+  }
 }
 ```
 
@@ -76,8 +88,18 @@ uploaded, not as a URL.
 {
   "displayName": "Alice Smith",
   "description": "Software engineer | Open source contributor",
-  "avatar": "<Blob data>",
-  "banner": "<Blob data>"
+  "avatar": {
+    "type": "blob",
+    "ref": "bafkreiabc123...",
+    "mimeType": "image/jpeg",
+    "size": 245678
+  },
+  "banner": {
+    "type": "blob",
+    "ref": "bafkreidef456...",
+    "mimeType": "image/png",
+    "size": 512344
+  }
 }
 ```
 
@@ -98,7 +120,7 @@ uploaded, not as a URL.
 
 ```json
 {
-  "error": "Display name cannot exceed 64 characters",
+  "error": "Display name cannot exceed 64 graphemes",
   "code": "VALIDATION_ERROR"
 }
 ```
@@ -107,7 +129,7 @@ uploaded, not as a URL.
 
 ```json
 {
-  "error": "Description cannot exceed 256 characters",
+  "error": "Description cannot exceed 256 graphemes",
   "code": "VALIDATION_ERROR"
 }
 ```
@@ -116,11 +138,13 @@ uploaded, not as a URL.
 
 ### Text Fields
 
-- `displayName` is capped at 64 characters; `description` at 256 characters
+- `displayName` is capped at 64 graphemes; `description` at 256 graphemes
 - Use the marker in `updatedFields` to confirm which fields changed
 
 ### Images
 
+- Upload images first with `upload_image`, then pass the returned `image.blob`
+  descriptors as `avatar`/`banner`
 - Avatars render best as square images; banners as wide images
 - Image format and size limits are enforced by the Bluesky platform, not by this
   server

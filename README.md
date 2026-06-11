@@ -43,8 +43,7 @@ write operations, private data, feeds).
 > public-data mode — no credentials required.
 >
 > **Recent additions**: Batch operations for bulk actions, advanced analytics
-> and insights, intelligent content discovery, and a conversation-context
-> scratchpad resource.
+> and insights, and intelligent content discovery.
 
 ## Architecture
 
@@ -227,10 +226,10 @@ config:
   `get_timeline`)
 - All write operations (create, like, repost, follow, etc.)
 - Resources (timeline, profile, notifications) - these are listed but require
-  authentication to return data (the `conversation-context` scratchpad resource
-  is readable without auth and simply returns near-empty placeholder content)
-- Prompts (content composition, reply templates) - these are listed but require
-  authentication to be available
+  authentication to return data
+
+Prompts (content composition, reply templates) are pure text templates and work
+without authentication.
 
 **Important:** All tools, resources, and prompts are listed by the MCP server
 regardless of authentication state. Most tools and resources that require

@@ -91,15 +91,21 @@ page focuses on the richer variants, workflows, and social-graph operations.
     "images": [
       {
         "alt": "A beautiful sunset over the ocean",
-        "image": "<blob reference or base64 data>"
+        "image": {
+          "type": "blob",
+          "ref": "bafkreiabc123...",
+          "mimeType": "image/jpeg",
+          "size": 245678
+        }
       }
     ]
   }
 }
 ```
 
-**Note:** Images are typically uploaded first using the `upload_image` tool,
-then referenced in the post.
+**Note:** Images must be uploaded first using the `upload_image` tool; pass the
+returned `image.blob` object verbatim as `embed.images[].image` (raw image data
+is not accepted).
 
 ### Post with Link Preview
 

@@ -201,8 +201,11 @@ Resources are data sources that LLMs can read to get context.
 - **atproto://timeline** - User's personalized timeline
 - **atproto://profile** - User's profile information
 - **atproto://notifications** - Recent notifications
-- **atproto://conversation-context** - Placeholder resource (registered and
-  readable, but the server does not auto-populate it)
+
+All three resources require authentication. Reading any other URI returns
+JSON-RPC error `-32002` (Resource not found). The placeholder
+`atproto://conversation-context` resource from earlier releases has been
+removed.
 
 See the [API Reference](../api/index.md) for details.
 
@@ -289,7 +292,7 @@ Prompts are templates that help LLMs perform common tasks.
 - **content_composition** - Help write engaging posts
 - **reply_template** - Generate thoughtful replies
 
-Both prompts require authentication to be available.
+Both prompts are pure text templates and work without authentication.
 
 See the [API Reference](../api/index.md) for details.
 
@@ -364,15 +367,16 @@ All MCP messages use JSON-RPC 2.0:
 
 ## Error Codes
 
-Standard JSON-RPC 2.0 error codes:
+Standard JSON-RPC 2.0 error codes, plus the MCP-reserved resource code:
 
-| Code   | Meaning          | Description        |
-| ------ | ---------------- | ------------------ |
-| -32700 | Parse error      | Invalid JSON       |
-| -32600 | Invalid request  | Invalid JSON-RPC   |
-| -32601 | Method not found | Unknown method     |
-| -32602 | Invalid params   | Invalid parameters |
-| -32603 | Internal error   | Server error       |
+| Code   | Meaning            | Description                              |
+| ------ | ------------------ | ---------------------------------------- |
+| -32700 | Parse error        | Invalid JSON                             |
+| -32600 | Invalid request    | Invalid JSON-RPC                         |
+| -32601 | Method not found   | Unknown method                           |
+| -32602 | Invalid params     | Invalid parameters                       |
+| -32603 | Internal error     | Server error                             |
+| -32002 | Resource not found | `resources/read` with an unknown URI     |
 
 ## Capabilities
 

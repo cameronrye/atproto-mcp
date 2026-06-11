@@ -255,19 +255,20 @@ names the offending field.
 - Check the parameter types and required fields for the tool (see the
   [Tools reference](../api/index)).
 - For `create_post` and replies, `text` must be non-empty and within Bluesky's
-  300-character limit.
+  limit of 300 graphemes / 3000 UTF-8 bytes.
 - Language fields (`langs`) expect BCP-47 codes such as `en`, `en-US`, or
   `pt-BR`.
 
-### Some Tools Are "Not Implemented"
+### A Tool or Resource From Older Docs Is Missing
 
-**Symptom**: A tool returns `status: "not_implemented"`, an empty result, or
-guidance text instead of doing the work.
+**Symptom**: A tool or resource mentioned in older documentation is not listed
+by the server.
 
-**Fix**: This is expected for the placeholder resource, not a bug:
+**Fix**: Some placeholders were removed because they could never return real
+data:
 
-- The `atproto://conversation-context` resource is a placeholder and reads as
-  empty.
+- The placeholder `atproto://conversation-context` resource is no longer
+  registered (it always read as empty).
 
 Real-time streaming and OAuth login are planned but not yet functional, so they
 are not exposed as tools. See [Experimental & Roadmap](./experimental.md) for
@@ -275,14 +276,16 @@ the current status.
 
 ### Resource Not Available or Read Fails
 
-**Symptom**: A resource cannot be listed or read.
+**Symptom**: A resource cannot be listed or read, or reading returns a
+`Resource not found` (`-32002`) error.
 
 **Fix**:
 
-- The functional resources (`atproto://timeline`, `atproto://profile`,
+- The registered resources (`atproto://timeline`, `atproto://profile`,
   `atproto://notifications`) call the real API and require authentication — set
   your credentials.
-- Use the exact URI form, e.g. `atproto://timeline`.
+- Use the exact URI form, e.g. `atproto://timeline`. Reading any unknown URI
+  returns JSON-RPC error `-32002` (Resource not found).
 - If reads fail after a long session, the session may have expired; restart the
   server.
 

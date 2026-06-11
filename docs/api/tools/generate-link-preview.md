@@ -1,6 +1,10 @@
 # generate_link_preview
 
-Generate a link preview card for a URL to embed in posts.
+Generate a link preview card for a URL to embed in posts. The returned
+`preview` fields map directly onto a [create_post](./create-post.md)
+`embed.external` object: `uri`/`title`/`description` fill the card, and the
+`preview.thumb.blob` descriptor (when present) is passed verbatim as
+`embed.external.thumb` so the card carries the uploaded thumbnail.
 
 ## Authentication
 
@@ -11,7 +15,10 @@ Generate a link preview card for a URL to embed in posts.
 ### `url` (required)
 
 - **Type:** `string`
-- **Description:** URL to generate preview for
+- **Description:** Fully-qualified HTTP or HTTPS URL of the webpage to preview.
+  SSRF-safe: private/internal IP ranges and non-HTTP schemes are rejected. The
+  server fetches up to 2 MB of the page HTML and up to 1 MB for the `og:image`
+  thumbnail.
 
 ## Response
 
@@ -66,6 +73,34 @@ Generate a link preview card for a URL to embed in posts.
   }
 }
 ```
+
+### Attach the Preview to a Post
+
+Reuse the `preview` fields in a `create_post` call — pass the inner
+`preview.thumb.blob` object verbatim as `embed.external.thumb` (the thumbnail
+blob is already uploaded; nothing is re-fetched):
+
+```json
+{
+  "text": "Interesting article about AT Protocol",
+  "embed": {
+    "external": {
+      "uri": "https://example.com/article",
+      "title": "Understanding AT Protocol",
+      "description": "A comprehensive guide to the AT Protocol architecture and features",
+      "thumb": {
+        "type": "blob",
+        "ref": "bafyreiabc123...",
+        "mimeType": "image/jpeg",
+        "size": 45678
+      }
+    }
+  }
+}
+```
+
+(When the preview has no `thumb`, omit `embed.external.thumb` for a card
+without a thumbnail.)
 
 ## How It Works
 

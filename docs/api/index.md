@@ -148,7 +148,7 @@ Tools for working with images and media:
 
 ## Resources
 
-The server exposes 4 resources that provide read-only access to AT Protocol data
+The server exposes 3 resources that provide read-only access to AT Protocol data
 through the MCP protocol:
 
 - **[Timeline Resource](./resources/timeline.md)** - Current user's timeline
@@ -157,14 +157,16 @@ through the MCP protocol:
   information (requires authentication; calls the real API)
 - **[Notifications Resource](./resources/notifications.md)** - Current user's
   notifications (requires authentication; calls the real API)
-- **Conversation Context Resource** (`atproto://conversation-context`) -
-  _Placeholder._ Registered and readable, but the server never auto-populates
-  it, so it returns empty/near-empty content.
+
+The placeholder Conversation Context resource
+(`atproto://conversation-context`) from earlier releases has been removed — it
+was never auto-populated and could only return empty content. Reading an
+unknown resource URI returns JSON-RPC error `-32002` (Resource not found).
 
 ## Prompts
 
-The server provides 2 prompts for guided content generation. Both require
-authentication to be available:
+The server provides 2 prompts for guided content generation. They are pure text
+templates and work without authentication:
 
 - **`content_composition`** - Compose a post from a topic. Arguments: `topic`,
   `tone`, `length`, `include_hashtags`.

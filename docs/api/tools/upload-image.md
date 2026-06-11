@@ -1,6 +1,10 @@
 # upload_image
 
-Upload an image to AT Protocol for use in posts or profile.
+Upload an image to AT Protocol for use in posts or profile. The returned
+`image.blob` descriptor is the handle for the uploaded blob: pass it verbatim
+as `embed.images[].image` in [create_post](./create-post.md), as
+`embed.external.thumb` for a link card, or as `avatar`/`banner` in
+[update_profile](./update-profile.md).
 
 ## Authentication
 
@@ -70,6 +74,33 @@ Upload an image to AT Protocol for use in posts or profile.
   }
 }
 ```
+
+### Attach the Uploaded Image to a Post
+
+Pass the returned `image.blob` object verbatim as `embed.images[].image` in
+`create_post` (the blob is already on the server — nothing is re-uploaded):
+
+```json
+{
+  "text": "Look at this sunset!",
+  "embed": {
+    "images": [
+      {
+        "alt": "A beautiful sunset over the ocean",
+        "image": {
+          "type": "blob",
+          "ref": "bafkreiabc123...",
+          "mimeType": "image/jpeg",
+          "size": 245678
+        }
+      }
+    ]
+  }
+}
+```
+
+The same `image.blob` object also works as `avatar` or `banner` in
+`update_profile`, and as `embed.external.thumb` on a `create_post` link card.
 
 ## Supported Formats
 

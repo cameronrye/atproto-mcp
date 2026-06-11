@@ -20,7 +20,8 @@ implemented).
 - **Type:** `string`
 - **Constraints:**
   - Minimum length: 1 character
-  - Maximum length: 300 characters
+  - Maximum length: 300 graphemes / 3000 UTF-8 bytes (emoji count as one
+    grapheme)
 - **Description:** The text content of the post
 
 ### `reply` (optional)
@@ -41,12 +42,21 @@ implemented).
   - `images` (optional): Array of image objects (max 4)
     - `alt` (required): `string` - Alt text for accessibility (max 1000
       characters)
-    - `image` (required): `Blob` - Image file data
+    - `image` (required): `object` - Pre-uploaded blob descriptor: pass the
+      `image.blob` object returned by [upload_image](./upload-image.md)
+      verbatim (`{ type: 'blob', ref, mimeType, size }`; `ref` may be the flat
+      CID string or the lexicon `{ "$link": "<cid>" }` form). This tool does
+      **not** accept raw image data — upload first, then reference the blob.
   - `external` (optional): External link object
     - `uri` (required): `string` - Valid URL
     - `title` (required): `string` - Link title (max 300 characters)
     - `description` (required): `string` - Link description (max 1000
       characters)
+    - `thumb` (optional): `object` - Thumbnail for the link card as a
+      pre-uploaded blob descriptor: pass the `preview.thumb.blob` object from
+      [generate_link_preview](./generate-link-preview.md) (or the `image.blob`
+      from [upload_image](./upload-image.md)) verbatim. Omit for a card without
+      a thumbnail.
 
 ### `facets` (optional)
 
@@ -141,6 +151,9 @@ Returns an object with the following properties:
 
 ### Post with Images
 
+Images must be uploaded first with [upload_image](./upload-image.md); pass each
+returned `image.blob` object verbatim as `embed.images[].image`:
+
 ```json
 {
   "text": "Check out these amazing photos!",
@@ -148,11 +161,21 @@ Returns an object with the following properties:
     "images": [
       {
         "alt": "A beautiful sunset over the ocean",
-        "image": "<Blob data>"
+        "image": {
+          "type": "blob",
+          "ref": "bafkreiabc123...",
+          "mimeType": "image/jpeg",
+          "size": 245678
+        }
       },
       {
         "alt": "Mountains in the distance",
-        "image": "<Blob data>"
+        "image": {
+          "type": "blob",
+          "ref": "bafkreidef456...",
+          "mimeType": "image/png",
+          "size": 198432
+        }
       }
     ]
   }
@@ -169,6 +192,31 @@ Returns an object with the following properties:
       "uri": "https://example.com/article",
       "title": "Understanding AT Protocol",
       "description": "A comprehensive guide to the AT Protocol architecture and features"
+    }
+  }
+}
+```
+
+### Post with External Link and Thumbnail
+
+Call [generate_link_preview](./generate-link-preview.md) first, then reuse its
+`preview` fields — including the `preview.thumb.blob` descriptor — so the link
+card carries a thumbnail:
+
+```json
+{
+  "text": "Interesting article about AT Protocol",
+  "embed": {
+    "external": {
+      "uri": "https://example.com/article",
+      "title": "Understanding AT Protocol",
+      "description": "A comprehensive guide to the AT Protocol architecture and features",
+      "thumb": {
+        "type": "blob",
+        "ref": "bafkreighi789...",
+        "mimeType": "image/jpeg",
+        "size": 45678
+      }
     }
   }
 }
@@ -218,9 +266,12 @@ auto-detection:
 
 #### Text Too Long
 
+The limit is 300 graphemes and 3000 UTF-8 bytes, counted on graphemes so
+emoji-heavy posts are not falsely rejected:
+
 ```json
 {
-  "error": "Post text cannot exceed 300 characters",
+  "error": "Post text is 312 graphemes; the maximum is 300.",
   "code": "VALIDATION_ERROR"
 }
 ```
@@ -285,12 +336,14 @@ derived from the response's `retry-after` header:
 
 ### Text Content
 
-- Keep posts concise and under 300 characters
+- Keep posts concise and within 300 graphemes (3000 UTF-8 bytes)
 - Use proper formatting and line breaks for readability
 - Include relevant hashtags for discoverability
 
 ### Images
 
+- Upload images first with `upload_image`, then pass each returned `image.blob`
+  descriptor as `embed.images[].image`
 - Always provide descriptive alt text for accessibility
 - Maximum 4 images per post (Bluesky platform limit)
 

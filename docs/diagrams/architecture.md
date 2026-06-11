@@ -163,9 +163,8 @@ graph LR
 
 ## Resources
 
-The server registers **4 resources**. Three are functional and fetch live data
-from the AT Protocol (they require authentication). The fourth is a registered
-placeholder.
+The server registers **3 resources**. All of them fetch live data from the AT
+Protocol and require authentication.
 
 ```mermaid
 graph TB
@@ -173,7 +172,6 @@ graph TB
         Timeline[Timeline<br/>atproto://timeline]
         Profile[Profile<br/>atproto://profile]
         Notifs[Notifications<br/>atproto://notifications]
-        Convo[Conversation Context<br/>atproto://conversation-context<br/>placeholder]
     end
 
     subgraph "AT Protocol"
@@ -187,14 +185,13 @@ graph TB
     style Timeline fill:#e3f2fd
     style Profile fill:#f3e5f5
     style Notifs fill:#fff3e0
-    style Convo fill:#eeeeee
 ```
 
-::: warning Placeholder resource
+::: info Removed placeholder
 
-`atproto://conversation-context` is registered and readable, but the server
-never auto-populates it — reads return empty/near-empty content. See
-[Experimental & Roadmap](../guide/experimental.md).
+The `atproto://conversation-context` placeholder resource from earlier releases
+has been removed — it was never auto-populated and could only read as empty.
+See [Experimental & Roadmap](../guide/experimental.md).
 
 :::
 

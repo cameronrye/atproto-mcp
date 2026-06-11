@@ -8,7 +8,7 @@ MCP Server.
 The server provides three types of MCP primitives:
 
 1. **Tools** (43) - Executable functions for AT Protocol operations
-2. **Resources** (4) - Data sources for context
+2. **Resources** (3) - Data sources for context
 3. **Prompts** (2) - Templates for common tasks
 
 ## Tool Categories
@@ -205,11 +205,41 @@ Each tool has an authentication mode:
 - Graceful degradation
 - Example: `get_user_profile` (shows viewer relationship when authenticated)
 
+## Tool Annotations
+
+Every tool advertises explicit
+[MCP tool annotations](https://modelcontextprotocol.io/docs/concepts/tools#tool-annotations)
+in `tools/list`, so clients can build confirmation UI and auto-approval policies
+on them:
+
+- **`openWorldHint: true`** on every tool — they all reach the live AT Protocol
+  network.
+- **`readOnlyHint: true`** on pure read tools (searches, feeds, profiles,
+  lookups, `analyze_*`, `generate_link_preview`). These perform no writes.
+- **Write tools always carry explicit `destructiveHint` and `idempotentHint`**
+  (per the MCP spec, clients must assume the worst for omitted hints on
+  non-read-only tools, so nothing is left implicit):
+  - `destructiveHint: false` on purely additive, reversible writes
+    (`create_post`, `like_post`, `follow_user`, `upload_image`, ...).
+  - `destructiveHint: true` on tools that delete or overwrite existing
+    data/state (`delete_post`, `unfollow_user`, `block_user`/`unblock_user`,
+    `update_profile`, `report_content`/`report_user`, ...).
+  - `idempotentHint: true` is claimed only where the implementation verifiably
+    dedups or the underlying endpoint has set/clear semantics (e.g.
+    `like_post`, `follow_user`, `mute_user`/`unmute_user`, `batch_action`,
+    `update_profile`). Tools that create a new record on every call (e.g.
+    `create_post`, `repost` with quote text, `report_content`) advertise
+    `idempotentHint: false`.
+
+A `destructiveHint: true` tool is a good candidate for a client-side
+confirmation step; `readOnlyHint: true` tools are safe to auto-approve.
+
 ## Resources
 
-Resources provide context data that LLMs can read. The server provides 4
-resources. Resource contents are returned as stringified JSON text; the shapes
-below are illustrative.
+Resources provide context data that LLMs can read. The server provides 3
+resources; all of them require authentication. Resource contents are returned
+as stringified JSON text; the shapes below are illustrative. Reading an unknown
+resource URI returns JSON-RPC error `-32002` (Resource not found).
 
 ### atproto://timeline
 
@@ -308,54 +338,21 @@ Your recent notifications and mentions. **Requires authentication.**
 "Who liked my recent posts?"
 ```
 
-### atproto://conversation-context
+::: info Removed
 
-A scratchpad for conversation state. **Always available (no authentication
-required).**
-
-::: warning Placeholder
-
-This resource is **registered and readable, but the server does not
-auto-populate it** during tool calls. It exists as a placeholder/scratchpad:
-unless a client explicitly writes to it, every array is empty. Treat empty
-arrays as "not tracked", not "nothing happened".
+Earlier releases also registered a placeholder
+`atproto://conversation-context` resource. It has been unregistered: MCP has no
+client-write mechanism for resources and no tool populated it, so it could only
+ever return empty data. Do not rely on it to recall posts, threads, users,
+searches, or actions from earlier in a conversation.
 
 :::
-
-The resource always returns the structure below. The `context` arrays
-(`recentlyDiscussedPosts`, `activeThreads`, `mentionedUsers`, `searchHistory`,
-`recentActions`) are present but empty by default, and the `summary` counts are
-all `0`:
-
-```json
-{
-  "uri": "atproto://conversation-context",
-  "timestamp": "2026-06-06T12:00:00Z",
-  "context": {
-    "recentlyDiscussedPosts": [],
-    "activeThreads": [],
-    "mentionedUsers": [],
-    "searchHistory": [],
-    "recentActions": []
-  },
-  "summary": {
-    "discussedPostsCount": 0,
-    "activeThreadsCount": 0,
-    "mentionedUsersCount": 0,
-    "searchHistoryCount": 0,
-    "recentActionsCount": 0
-  }
-}
-```
-
-Because the server never writes to this resource on your behalf, do not rely on
-it to recall posts, threads, users, searches, or actions from earlier in a
-conversation.
 
 ## Prompts
 
 Prompts help LLMs perform common tasks with better context. The server provides
-2 prompts. Both **require authentication** to be available.
+2 prompts. They are pure text templates that never touch the AT Protocol
+client, so they **work without authentication**.
 
 ### content_composition
 

@@ -52,8 +52,8 @@ features:
 
   - title: Resources & Prompts
     details:
-      Four MCP resources (timeline, profile, notifications, plus a placeholder
-      conversation context) and two content-composition prompts.
+      Three MCP resources (timeline, profile, notifications) and two
+      content-composition prompts.
 
   - title: App Password Authentication
     details:
