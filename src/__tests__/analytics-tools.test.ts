@@ -321,4 +321,13 @@ describe('FindInfluentialUsersTool', () => {
   it('should require either topic or searchQuery', async () => {
     await expect(tool.handler({ maxResults: 10 })).rejects.toThrow();
   });
+
+  it('reports a missing topic/searchQuery as a zod ValidationError, not a runtime error', async () => {
+    // Enforced via the schema (.refine) so MCP clients receive a proper
+    // parameter-validation error instead of a generic tool-execution failure.
+    await expect(tool.handler({ maxResults: 10 })).rejects.toMatchObject({
+      name: 'ValidationError',
+      message: expect.stringContaining('Either topic or searchQuery must be provided'),
+    });
+  });
 });

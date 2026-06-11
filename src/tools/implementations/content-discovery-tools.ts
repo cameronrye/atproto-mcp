@@ -38,7 +38,7 @@ const FindSimilarUsersSchema = z.object({
     .optional()
     .default(true)
     .describe(
-      'When true, includes a metrics object on each result with mutualFollowers and followerRatioSimilarity values (default true).'
+      'When true, includes a metrics object on each result with followsBaseUser and followerRatioSimilarity values (default true).'
     ),
 });
 
@@ -85,7 +85,7 @@ export class FindSimilarUsersTool extends BaseTool {
   public readonly schema = {
     method: 'find_similar_users',
     description:
-      'Find users similar to a given user based on shared follow-graph connections (second-degree follows and mutual followers) and follower/following-ratio similarity. ' +
+      'Find users similar to a given user based on shared follow-graph connections (second-degree follows and accounts that follow the base user) and follower/following-ratio similarity. ' +
       'Content-topic similarity is NOT analyzed. ' +
       'Works without authentication; richer with auth. ' +
       'Use this instead of search_actors when you want accounts structurally similar to a known user rather than keyword matches. ' +
@@ -125,9 +125,10 @@ export class FindSimilarUsersTool extends BaseTool {
                 type: 'object',
                 description: 'Optional metrics object; present when includeMetrics is true.',
                 properties: {
-                  mutualFollowers: {
-                    type: 'number',
-                    description: 'Number of mutual followers with the base user.',
+                  followsBaseUser: {
+                    type: 'boolean',
+                    description:
+                      "True when this candidate appears in a sample of the base user's followers, i.e. the candidate follows the base user. Sample-based: false does not prove absence.",
                   },
                   followerRatioSimilarity: {
                     type: 'number',
@@ -186,7 +187,7 @@ export class FindSimilarUsersTool extends BaseTool {
       similarityScore: number;
       similarityReasons: string[];
       metrics?: {
-        mutualFollowers: number;
+        followsBaseUser: boolean;
         followerRatioSimilarity: number;
       };
     }>;
@@ -205,12 +206,25 @@ export class FindSimilarUsersTool extends BaseTool {
 
       const agent = this.atpClient.getAgent();
 
-      // Get the base user's profile
-      const profileResponse = await this.executeAtpOperation(
-        async () => agent.getProfile({ actor: params.actor }),
-        'getProfile',
-        { actor: params.actor }
-      );
+      // The base user's profile, follower sample, and follow sample are three
+      // independent reads — issue them concurrently.
+      const [profileResponse, followersResponse, followsResponse] = await Promise.all([
+        this.executeAtpOperation(
+          async () => agent.getProfile({ actor: params.actor }),
+          'getProfile',
+          { actor: params.actor }
+        ),
+        this.executeAtpOperation(
+          async () => agent.getFollowers({ actor: params.actor, limit: 50 }),
+          'getFollowers',
+          { actor: params.actor, limit: 50 }
+        ),
+        this.executeAtpOperation(
+          async () => agent.getFollows({ actor: params.actor, limit: 50 }),
+          'getFollows',
+          { actor: params.actor, limit: 50 }
+        ),
+      ]);
 
       const baseProfile = profileResponse.data;
       const baseUser = {
@@ -224,22 +238,8 @@ export class FindSimilarUsersTool extends BaseTool {
         followersCount: (baseProfile as any).followersCount,
       });
 
-      // Get base user's followers (sample)
-      const followersResponse = await this.executeAtpOperation(
-        async () => agent.getFollowers({ actor: params.actor, limit: 50 }),
-        'getFollowers',
-        { actor: params.actor, limit: 50 }
-      );
-
       const baseFollowers = new Set(
         (followersResponse.data.followers as any[]).map((f: any) => f.did)
-      );
-
-      // Get base user's follows (sample)
-      const followsResponse = await this.executeAtpOperation(
-        async () => agent.getFollows({ actor: params.actor, limit: 50 }),
-        'getFollows',
-        { actor: params.actor, limit: 50 }
       );
 
       const baseFollows = followsResponse.data.follows as any[];
@@ -256,59 +256,72 @@ export class FindSimilarUsersTool extends BaseTool {
       // Analyze follows to find similar users
       const candidateUsers = new Map<string, any>();
 
-      // Strategy 1: Check who the base user's follows also follow (2nd degree connections)
-      for (const follow of baseFollows.slice(0, 10)) {
-        try {
-          const theirFollowsResponse = await this.executeAtpOperation(
-            async () => agent.getFollows({ actor: follow.did, limit: 20 }),
-            'getFollows',
-            { actor: follow.did, limit: 20 }
-          );
-
-          for (const candidate of theirFollowsResponse.data.follows as any[]) {
-            if (candidate.did === baseProfile.did) continue; // Skip self
-            // NOTE: minFollowerCount is applied AFTER hydration (below) — these
-            // ProfileView candidates have no followersCount, so filtering here
-            // would drop everyone whenever minFollowerCount > 0.
-
-            if (!candidateUsers.has(candidate.did)) {
-              candidateUsers.set(candidate.did, {
-                profile: candidate,
-                mutualFollowConnections: 0,
-                sharedFollowers: 0,
-              });
-            }
-            candidateUsers.get(candidate.did).mutualFollowConnections++;
+      // Both second-degree scans are independent reads: fetch them with bounded
+      // parallelism (failures degrade to an empty list, as before), then fold
+      // the responses into candidateUsers in the original deterministic order
+      // so the result content is identical to the sequential implementation.
+      const [followsOfFollows, followersOfFollows] = await Promise.all([
+        // Strategy 1: Check who the base user's follows also follow (2nd degree connections)
+        this.mapWithConcurrency(baseFollows.slice(0, 10), 5, async follow => {
+          try {
+            const theirFollowsResponse = await this.executeAtpOperation(
+              async () => agent.getFollows({ actor: follow.did, limit: 20 }),
+              'getFollows',
+              { actor: follow.did, limit: 20 }
+            );
+            return theirFollowsResponse.data.follows as any[];
+          } catch {
+            this.logger.warn('Failed to get follows for user', { did: follow.did });
+            return [] as any[];
           }
-        } catch {
-          this.logger.warn('Failed to get follows for user', { did: follow.did });
+        }),
+        // Strategy 2: Check followers of the base user's follows
+        this.mapWithConcurrency(baseFollows.slice(0, 5), 5, async follow => {
+          try {
+            const theirFollowersResponse = await this.executeAtpOperation(
+              async () => agent.getFollowers({ actor: follow.did, limit: 20 }),
+              'getFollowers',
+              { actor: follow.did, limit: 20 }
+            );
+            return theirFollowersResponse.data.followers as any[];
+          } catch {
+            this.logger.warn('Failed to get followers for user', { did: follow.did });
+            return [] as any[];
+          }
+        }),
+      ]);
+
+      for (const follows of followsOfFollows) {
+        for (const candidate of follows) {
+          if (candidate.did === baseProfile.did) continue; // Skip self
+          // NOTE: minFollowerCount is applied AFTER hydration (below) — these
+          // ProfileView candidates have no followersCount, so filtering here
+          // would drop everyone whenever minFollowerCount > 0.
+
+          if (!candidateUsers.has(candidate.did)) {
+            candidateUsers.set(candidate.did, {
+              profile: candidate,
+              mutualFollowConnections: 0,
+              sharedFollowers: 0,
+            });
+          }
+          candidateUsers.get(candidate.did).mutualFollowConnections++;
         }
       }
 
-      // Strategy 2: Check followers of the base user's follows
-      for (const follow of baseFollows.slice(0, 5)) {
-        try {
-          const theirFollowersResponse = await this.executeAtpOperation(
-            async () => agent.getFollowers({ actor: follow.did, limit: 20 }),
-            'getFollowers',
-            { actor: follow.did, limit: 20 }
-          );
+      for (const followers of followersOfFollows) {
+        for (const candidate of followers) {
+          if (candidate.did === baseProfile.did) continue;
+          // minFollowerCount is applied after hydration (see below).
 
-          for (const candidate of theirFollowersResponse.data.followers as any[]) {
-            if (candidate.did === baseProfile.did) continue;
-            // minFollowerCount is applied after hydration (see below).
-
-            if (!candidateUsers.has(candidate.did)) {
-              candidateUsers.set(candidate.did, {
-                profile: candidate,
-                mutualFollowConnections: 0,
-                sharedFollowers: 0,
-              });
-            }
-            candidateUsers.get(candidate.did).sharedFollowers++;
+          if (!candidateUsers.has(candidate.did)) {
+            candidateUsers.set(candidate.did, {
+              profile: candidate,
+              mutualFollowConnections: 0,
+              sharedFollowers: 0,
+            });
           }
-        } catch {
-          this.logger.warn('Failed to get followers for user', { did: follow.did });
+          candidateUsers.get(candidate.did).sharedFollowers++;
         }
       }
 
@@ -333,13 +346,11 @@ export class FindSimilarUsersTool extends BaseTool {
           continue;
         }
 
-        // Calculate mutual followers
-        let mutualFollowers = 0;
-        if (baseFollowers.has(did)) {
-          mutualFollowers = 1;
-        }
+        // The candidate appears in the base user's follower SAMPLE — all the
+        // fetched data can truthfully say is "this account follows the base user".
+        const followsBaseUser = baseFollowers.has(did);
 
-        // Calculate similarity score
+        // Calculate similarity score (followsBaseUser carries a flat +15 bonus)
         const connectionScore = data.mutualFollowConnections * 2 + data.sharedFollowers;
         const followerRatioSimilarity = this.calculateFollowerRatioSimilarity(
           baseProfile as any,
@@ -347,7 +358,7 @@ export class FindSimilarUsersTool extends BaseTool {
         );
 
         const similarityScore =
-          connectionScore * 10 + followerRatioSimilarity * 5 + mutualFollowers * 15;
+          connectionScore * 10 + followerRatioSimilarity * 5 + (followsBaseUser ? 15 : 0);
 
         // Determine similarity reasons
         const reasons: string[] = [];
@@ -357,8 +368,8 @@ export class FindSimilarUsersTool extends BaseTool {
         if (data.sharedFollowers > 0) {
           reasons.push(`Follows ${data.sharedFollowers} accounts you follow`);
         }
-        if (mutualFollowers > 0) {
-          reasons.push('Mutual follower');
+        if (followsBaseUser) {
+          reasons.push('Follows the base user');
         }
         if (followerRatioSimilarity > 0.7) {
           reasons.push('Similar follower/following ratio');
@@ -381,7 +392,7 @@ export class FindSimilarUsersTool extends BaseTool {
           // contentSimilarity intentionally omitted — post-content topics are not
           // analyzed, so reporting a value (previously hardcoded 0) would mislead.
           user.metrics = {
-            mutualFollowers,
+            followsBaseUser,
             followerRatioSimilarity,
           };
         }
@@ -402,11 +413,11 @@ export class FindSimilarUsersTool extends BaseTool {
           `Found ${topSimilarUsers.length} similar users with average similarity score of ${avgSimilarity.toFixed(1)}`
         );
 
-        const withMutualFollowers = topSimilarUsers.filter(
-          u => u.metrics?.mutualFollowers > 0
+        const followingBaseUser = topSimilarUsers.filter(
+          u => u.metrics?.followsBaseUser === true
         ).length;
-        if (withMutualFollowers > 0) {
-          insights.push(`${withMutualFollowers} users have mutual follower connections`);
+        if (followingBaseUser > 0) {
+          insights.push(`${followingBaseUser} of these users follow the base user`);
         }
 
         const avgFollowers =
@@ -431,6 +442,27 @@ export class FindSimilarUsersTool extends BaseTool {
       this.logger.error('Failed to find similar users', error);
       this.formatError(error);
     }
+  }
+
+  /**
+   * Map `items` through an async `fn` with at most `limit` calls in flight,
+   * preserving input order in the returned array. Used to overlap independent
+   * network reads without flooding the PDS.
+   */
+  private async mapWithConcurrency<T, R>(
+    items: T[],
+    limit: number,
+    fn: (item: T) => Promise<R>
+  ): Promise<R[]> {
+    const results: R[] = new Array(items.length);
+    const queue = items.map((item, index) => ({ item, index }));
+    const workers = Array.from({ length: Math.min(limit, items.length) }, async () => {
+      for (let entry = queue.shift(); entry; entry = queue.shift()) {
+        results[entry.index] = await fn(entry.item);
+      }
+    });
+    await Promise.all(workers);
+    return results;
   }
 
   private calculateFollowerRatioSimilarity(profile1: any, profile2: any): number {
@@ -459,8 +491,13 @@ export class FindSimilarUsersTool extends BaseTool {
       return;
     }
     const dids = Array.from(candidateUsers.keys());
+    const chunks: string[][] = [];
     for (let i = 0; i < dids.length; i += 25) {
-      const chunk = dids.slice(i, i + 25);
+      chunks.push(dids.slice(i, i + 25));
+    }
+    // Chunks are independent reads keyed by DID — fetch them with bounded
+    // parallelism rather than strictly one after another.
+    await this.mapWithConcurrency(chunks, 4, async chunk => {
       try {
         const resp = await this.executeAtpOperation(
           async () => agent.getProfiles({ actors: chunk }),
@@ -476,7 +513,7 @@ export class FindSimilarUsersTool extends BaseTool {
       } catch (error) {
         this.logger.warn('Candidate profile hydration failed for a chunk', error as Error);
       }
-    }
+    });
   }
 }
 

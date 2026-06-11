@@ -5,40 +5,46 @@ import type { AtpClient } from '../../utils/atp-client.js';
 /**
  * Zod schema for find influential users parameters
  */
-const FindInfluentialUsersSchema = z.object({
-  topic: z
-    .string()
-    .optional()
-    .describe(
-      'Topic keyword(s) to search for (e.g. "climate change"). Used as the search query when searchQuery is not provided.'
-    ),
-  searchQuery: z
-    .string()
-    .optional()
-    .describe(
-      'Explicit search query string. When provided, takes precedence over topic. At least one of topic or searchQuery must be supplied.'
-    ),
-  minFollowers: z
-    .number()
-    .min(0)
-    .optional()
-    .default(100)
-    .describe('Minimum follower count a user must have to be included in results (default 100).'),
-  maxResults: z
-    .number()
-    .min(1)
-    .max(50)
-    .optional()
-    .default(20)
-    .describe('Maximum number of users to return (1–50, default 20).'),
-  sortBy: z
-    .enum(['followers', 'engagement', 'relevance'])
-    .optional()
-    .default('followers')
-    .describe(
-      'Sort order for results: "followers" (by follower count), "engagement" (by computed influence score), or "relevance" (by how many matched posts are from that user). Default "followers".'
-    ),
-});
+const FindInfluentialUsersSchema = z
+  .object({
+    topic: z
+      .string()
+      .optional()
+      .describe(
+        'Topic keyword(s) to search for (e.g. "climate change"). Used as the search query when searchQuery is not provided.'
+      ),
+    searchQuery: z
+      .string()
+      .optional()
+      .describe(
+        'Explicit search query string. When provided, takes precedence over topic. At least one of topic or searchQuery must be supplied.'
+      ),
+    minFollowers: z
+      .number()
+      .min(0)
+      .optional()
+      .default(100)
+      .describe('Minimum follower count a user must have to be included in results (default 100).'),
+    maxResults: z
+      .number()
+      .min(1)
+      .max(50)
+      .optional()
+      .default(20)
+      .describe('Maximum number of users to return (1–50, default 20).'),
+    sortBy: z
+      .enum(['followers', 'engagement', 'relevance'])
+      .optional()
+      .default('followers')
+      .describe(
+        'Sort order for results: "followers" (by follower count), "engagement" (by computed influence score), or "relevance" (by how many matched posts are from that user). Default "followers".'
+      ),
+  })
+  // Truthiness (not just presence) on purpose: an empty string is as useless a
+  // query as an omitted one.
+  .refine(value => Boolean(value.topic) || Boolean(value.searchQuery), {
+    message: 'Either topic or searchQuery must be provided',
+  });
 
 /**
  * Find Influential Users Tool - Find influential users in a topic or network
@@ -161,11 +167,8 @@ export class FindInfluentialUsersTool extends BaseTool {
     insights: string[];
   }> {
     try {
+      // The schema's .refine() guarantees at least one of topic/searchQuery.
       const query = params.searchQuery || params.topic || '';
-
-      if (!query) {
-        throw new Error('Either topic or searchQuery must be provided');
-      }
 
       this.logger.info('Finding influential users', {
         query,
@@ -200,9 +203,10 @@ export class FindInfluentialUsersTool extends BaseTool {
         };
       }
 
-      // Hydrate author profiles in batches via getProfiles (up to 25 actors per
-      // call) instead of one sequential getProfile round-trip per author.
-      const targetDids = Array.from(authorDids).slice(0, params.maxResults! * 2);
+      // Hydrate ALL unique authors in batches via getProfiles (up to 25 actors
+      // per call); minFollowers filtering, sorting, and the maxResults cut all
+      // happen AFTER hydration so no candidate is dropped in arbitrary order.
+      const targetDids = Array.from(authorDids);
       const profiles: any[] = [];
       for (let i = 0; i < targetDids.length; i += 25) {
         const chunk = targetDids.slice(i, i + 25);

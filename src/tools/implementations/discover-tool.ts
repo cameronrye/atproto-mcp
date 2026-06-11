@@ -37,7 +37,12 @@ const DiscoverSchema = z.object({
     .min(1)
     .max(100)
     .optional()
-    .describe('How many items to return (1–100, default per mode).'),
+    .describe(
+      'How many items to return. mode=trending: items returned PER category ' +
+        '(hashtags/topics/posts), default 10, values above 25 are capped at 25; a fixed sample ' +
+        'of 100 timeline posts is analyzed regardless. mode=recommended: number of recommended ' +
+        'posts returned (1–100, default 20).'
+    ),
   // --- mode=trending knobs ---
   timeWindow: z
     .enum(['1h', '6h', '12h', '24h', '7d'])
@@ -60,8 +65,10 @@ const DiscoverSchema = z.object({
     .string()
     .optional()
     .describe(
-      'Optional account to tailor recommendations to. Only used when mode=recommended; ' +
-        'defaults to the authenticated user.'
+      'Optional account (handle or DID) to tailor recommendations to: its recent author feed ' +
+        'seeds the interest profile (topics and authors) used for scoring. Only used when ' +
+        'mode=recommended; defaults to inferring interests from the authenticated user’s own ' +
+        'timeline engagement.'
     ),
   topics: z
     .array(z.string())
@@ -143,14 +150,215 @@ export class DiscoverTool extends BaseTool {
     outputSchema: {
       type: 'object',
       properties: {
-        success: { type: 'boolean' },
+        success: {
+          type: 'boolean',
+          description: 'Whether the discovery run completed successfully.',
+        },
         mode: {
           type: 'string',
           enum: ['trending', 'recommended'],
-          description: 'Which discovery mode was run.',
+          description: 'Which discovery mode was run; determines which other fields are present.',
+        },
+        // --- mode=trending fields ---
+        timeWindow: {
+          type: 'string',
+          enum: ['1h', '6h', '12h', '24h', '7d'],
+          description: 'Lookback window that was analyzed. Present when mode=trending.',
+        },
+        trendingHashtags: {
+          type: 'array',
+          description:
+            'Trending hashtags ranked by count and recent growth (empty when includeHashtags is false). Present when mode=trending.',
+          items: {
+            type: 'object',
+            properties: {
+              tag: { type: 'string', description: 'The hashtag, including the leading #.' },
+              count: {
+                type: 'number',
+                description: 'Number of analyzed posts using this hashtag.',
+              },
+              recentPosts: {
+                type: 'number',
+                description: 'How many of those posts are from the last 6 hours.',
+              },
+              growth: {
+                type: 'number',
+                description: 'Share of uses that are recent (recentPosts / count, 0–1).',
+              },
+            },
+            required: ['tag', 'count', 'recentPosts', 'growth'],
+          },
+        },
+        trendingTopics: {
+          type: 'array',
+          description:
+            'Trending topic keywords ranked by engagement (empty when includeTopics is false). Present when mode=trending.',
+          items: {
+            type: 'object',
+            properties: {
+              topic: { type: 'string', description: 'The extracted topic keyword.' },
+              keywords: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Up to 3 post-text snippets where the topic appeared.',
+              },
+              postCount: {
+                type: 'number',
+                description: 'Number of analyzed posts mentioning the topic.',
+              },
+              engagementScore: {
+                type: 'number',
+                description: 'Total likes+reposts+replies across posts mentioning the topic.',
+              },
+            },
+            required: ['topic', 'keywords', 'postCount', 'engagementScore'],
+          },
+        },
+        trendingPosts: {
+          type: 'array',
+          description:
+            'Notable posts ranked by engagement with a recency boost (empty when includePosts is false). Present when mode=trending.',
+          items: {
+            type: 'object',
+            properties: {
+              uri: { type: 'string', description: 'AT-URI of the post.' },
+              cid: { type: 'string', description: 'CID of the post record.' },
+              author: {
+                type: 'object',
+                description: 'Author of the post.',
+                properties: {
+                  did: { type: 'string', description: 'DID of the author.' },
+                  handle: { type: 'string', description: 'Handle of the author.' },
+                  displayName: {
+                    type: 'string',
+                    description: 'Display name of the author, if set.',
+                  },
+                },
+                required: ['did', 'handle'],
+              },
+              text: {
+                type: 'string',
+                description: 'Post text, truncated to 200 characters with a trailing ellipsis.',
+              },
+              createdAt: {
+                type: 'string',
+                description: 'ISO 8601 creation time of the post.',
+              },
+              likeCount: { type: 'number', description: 'Number of likes.' },
+              repostCount: { type: 'number', description: 'Number of reposts.' },
+              replyCount: { type: 'number', description: 'Number of replies.' },
+              trendingScore: {
+                type: 'number',
+                description: 'Engagement multiplied by a recency boost (higher trends more).',
+              },
+            },
+            required: [
+              'uri',
+              'cid',
+              'author',
+              'text',
+              'createdAt',
+              'likeCount',
+              'repostCount',
+              'replyCount',
+              'trendingScore',
+            ],
+          },
+        },
+        summary: {
+          type: 'object',
+          description: 'Summary of the analyzed timeline sample. Present when mode=trending.',
+          properties: {
+            totalPostsAnalyzed: {
+              type: 'number',
+              description: 'Number of timeline posts inside the time window that were analyzed.',
+            },
+            uniqueAuthors: {
+              type: 'number',
+              description: 'Number of distinct authors among the analyzed posts.',
+            },
+            timeRange: {
+              type: 'object',
+              description: 'The analyzed time range.',
+              properties: {
+                start: { type: 'string', description: 'ISO 8601 start of the window.' },
+                end: { type: 'string', description: 'ISO 8601 end of the window (now).' },
+              },
+              required: ['start', 'end'],
+            },
+          },
+          required: ['totalPostsAnalyzed', 'uniqueAuthors', 'timeRange'],
+        },
+        // --- mode=recommended fields ---
+        recommendations: {
+          type: 'array',
+          description:
+            'Recommended posts sorted by descending recommendationScore. Present when mode=recommended.',
+          items: {
+            type: 'object',
+            properties: {
+              uri: { type: 'string', description: 'AT-URI of the post.' },
+              cid: { type: 'string', description: 'CID of the post record.' },
+              author: {
+                type: 'object',
+                description: 'Author of the post.',
+                properties: {
+                  did: { type: 'string', description: 'DID of the author.' },
+                  handle: { type: 'string', description: 'Handle of the author.' },
+                  displayName: {
+                    type: 'string',
+                    description: 'Display name of the author, if set.',
+                  },
+                  avatar: {
+                    type: 'string',
+                    description: "URL of the author's avatar image, if set.",
+                  },
+                },
+                required: ['did', 'handle'],
+              },
+              text: { type: 'string', description: 'Full post text.' },
+              likeCount: { type: 'number', description: 'Number of likes.' },
+              replyCount: { type: 'number', description: 'Number of replies.' },
+              repostCount: { type: 'number', description: 'Number of reposts.' },
+              indexedAt: {
+                type: 'string',
+                description: 'ISO 8601 time the post was indexed.',
+              },
+              recommendationScore: {
+                type: 'number',
+                description:
+                  'Composite score from engagement, author/topic preference matches, recency, and discussion activity (higher is better).',
+              },
+              recommendationReasons: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Human-readable reasons this post was recommended.',
+              },
+              topics: {
+                type: 'array',
+                items: { type: 'string' },
+                description: 'Hashtag topics found in the post; omitted when none.',
+              },
+            },
+            required: [
+              'uri',
+              'cid',
+              'author',
+              'text',
+              'likeCount',
+              'replyCount',
+              'repostCount',
+              'indexedAt',
+              'recommendationScore',
+              'recommendationReasons',
+            ],
+          },
         },
         insights: {
-          description: 'Discovery insights (shape varies by mode).',
+          type: 'array',
+          items: { type: 'string' },
+          description:
+            'Human-readable observations about the recommendations (or advice when none matched). Present when mode=recommended.',
         },
       },
       required: ['success', 'mode'],
@@ -206,6 +414,9 @@ export class DiscoverTool extends BaseTool {
     const includeHashtags = params.includeHashtags ?? true;
     const includeTopics = params.includeTopics ?? true;
     const includePosts = params.includePosts ?? true;
+    // `limit` governs items RETURNED per category (capped at 25); the timeline
+    // sample analyzed is a fixed 100 posts regardless.
+    const perCategory = Math.min(params.limit ?? 10, 25);
     try {
       this.logger.info('Discovering trending content', {
         limit: params.limit,
@@ -221,10 +432,10 @@ export class DiscoverTool extends BaseTool {
       const timelineResponse = await this.executeAtpOperation(
         async () =>
           await agent.getTimeline({
-            limit: params.limit || 50,
+            limit: 100,
           }),
         'getTimeline',
-        { limit: params.limit }
+        { limit: 100 }
       );
 
       // Filter posts by time window
@@ -327,7 +538,7 @@ export class DiscoverTool extends BaseTool {
           const scoreB = b.count * (1 + b.growth);
           return scoreB - scoreA;
         })
-        .slice(0, 10);
+        .slice(0, perCategory);
 
       // Process trending topics
       const trendingTopics: ITrendingTopic[] = Array.from(topicKeywords.entries())
@@ -339,12 +550,12 @@ export class DiscoverTool extends BaseTool {
           engagementScore: topicEngagement.get(topic) || 0,
         }))
         .sort((a, b) => b.engagementScore - a.engagementScore)
-        .slice(0, 10);
+        .slice(0, perCategory);
 
       // Process trending posts
       const trendingPosts = postsWithScores
         .sort((a, b) => b.trendingScore - a.trendingScore)
-        .slice(0, 10);
+        .slice(0, perCategory);
 
       const summary = {
         totalPostsAnalyzed: posts.length,
@@ -544,24 +755,39 @@ export class DiscoverTool extends BaseTool {
         __isRepost: item.reason?.$type === 'app.bsky.feed.defs#reasonRepost',
       }));
 
-      // Get user's recent likes to understand preferences
+      // Build the preference profile (likedTopics/likedAuthors) used for scoring.
       const likedTopics = new Set<string>();
       const likedAuthors = new Set<string>();
 
-      try {
-        await this.executeAtpOperation(
-          async () => agent.getProfile({ actor: params.actor || agent.session?.did || '' }),
-          'getProfile',
-          {}
-        );
+      // When a different actor is given, tailor to THAT account: seed
+      // preferences from its recent author feed instead of the session
+      // user's timeline engagement.
+      const session = agent.session;
+      const seedActor =
+        params.actor && params.actor !== session?.did && params.actor !== session?.handle
+          ? params.actor
+          : undefined;
 
-        // Note: AT Protocol doesn't have a direct "get my likes" endpoint
-        // We'll infer from timeline engagement instead
-        for (const post of timelinePosts) {
-          if (post.viewer?.like) {
-            likedAuthors.add(post.author.did);
-            const topics = this.extractTopics([post]);
-            topics.forEach(t => likedTopics.add(t));
+      try {
+        if (seedActor) {
+          const authorFeedResponse = await this.executeAtpOperation(
+            async () => agent.getAuthorFeed({ actor: seedActor, limit: 50 }),
+            'getAuthorFeed',
+            { actor: seedActor }
+          );
+          for (const item of authorFeedResponse.data.feed as any[]) {
+            likedAuthors.add(item.post.author.did);
+            this.extractTopics([item.post]).forEach(t => likedTopics.add(t));
+          }
+        } else {
+          // Note: AT Protocol doesn't have a direct "get my likes" endpoint
+          // We'll infer from timeline engagement instead
+          for (const post of timelinePosts) {
+            if (post.viewer?.like) {
+              likedAuthors.add(post.author.did);
+              const topics = this.extractTopics([post]);
+              topics.forEach(t => likedTopics.add(t));
+            }
           }
         }
       } catch (error) {
