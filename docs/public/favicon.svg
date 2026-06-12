@@ -1,22 +1,16 @@
-<svg width="32" height="32" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-labelledby="hvFavTitle">
+  <title id="hvFavTitle">AT Protocol MCP Server</title>
   <defs>
-    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1e40af;stop-opacity:1" />
-      <stop offset="100%" style="stop-color:#3b82f6;stop-opacity:1" />
+    <linearGradient id="hvFavGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#1185fe"/>
     </linearGradient>
   </defs>
-  
-  <!-- Background circle -->
-  <circle cx="16" cy="16" r="15" fill="url(#bgGradient)"/>
-  
-  <!-- @ symbol -->
-  <g fill="none" stroke="#ffffff" stroke-width="2.5">
-    <!-- Outer circle -->
-    <circle cx="16" cy="16" r="8"/>
-    <!-- Inner circle -->
-    <circle cx="16" cy="16" r="3.5"/>
-    <!-- Tail -->
-    <path d="M 24 16 L 24 20 Q 24 22 22 22 Q 20 22 20 20" stroke-linecap="round"/>
+  <path d="M16 2 L27.3 8.5 V21.5 L16 28 L4.7 21.5 V8.5 Z" fill="url(#hvFavGrad)" stroke="#60a5fa" stroke-width="1.4" stroke-linejoin="round"/>
+  <g fill="none" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="16" cy="14" r="3.3"/>
+    <path d="M19.3 10.7 V14.85 A2.5 2.5 0 0 0 24.3 14.85 V14 A8.3 8.3 0 1 0 20.98 20.64"/>
   </g>
+  <circle cx="16" cy="28" r="2.8" fill="#ffffff" stroke="#60a5fa" stroke-width="1.2"/>
+  <path d="M16 22.3 V28" fill="none" stroke="#ffffff" stroke-width="2"/>
 </svg>
-

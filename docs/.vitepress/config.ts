@@ -11,11 +11,11 @@ export default withMermaid(
     head: [
       // Favicons
       ['link', { rel: 'icon', type: 'image/svg+xml', href: '/atproto-mcp/favicon.svg' }],
-      ['link', { rel: 'icon', type: 'image/png', href: '/atproto-mcp/logo.svg' }],
-      ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/atproto-mcp/logo.svg' }],
+      ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: '/atproto-mcp/favicon-32.png' }],
+      ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: '/atproto-mcp/apple-touch-icon.png' }],
 
       // Theme and viewport
-      ['meta', { name: 'theme-color', content: '#1d4ed8' }],
+      ['meta', { name: 'theme-color', content: '#1185fe' }],
       ['meta', { name: 'viewport', content: 'width=device-width, initial-scale=1.0' }],
 
       // SEO Meta Tags
