@@ -17,6 +17,30 @@ and this project adheres to
 - Custom feed generator integration
 - Multi-account management
 
+## [0.6.1] - 2026-06-22
+
+A maintenance and security release. The tool surface and public API are
+unchanged; this clears a transitive advisory and moves the toolchain to the
+current major versions.
+
+### Security
+
+- Force `hono >= 4.12.25` via a pnpm override to resolve advisory
+  GHSA-88fw-hqm2-52qc, pulled in transitively through
+  `@modelcontextprotocol/sdk` and `@hono/node-server`.
+
+### Changed
+
+- Upgrade to **zod 4**. Tool input schemas are now generated with zod's native
+  `z.toJSONSchema` (draft-7, input shape) instead of the `zod-to-json-schema`
+  library, which is removed.
+- Upgrade to **TypeScript 6** and **ESLint 10** (with `@eslint/js` 10). Errors
+  caught and rethrown are now chained via `cause` (ESLint 10
+  `preserve-caught-error`).
+- Bump pinned GitHub Actions: `actions/checkout` v6, `pnpm/action-setup` v6,
+  `actions/deploy-pages` v5, `softprops/action-gh-release` v3.
+- Refresh remaining dependencies to their latest in-range versions.
+
 ## [0.6.0] - 2026-06-11
 
 This release expands the server's surface: direct messages, bookmarks,

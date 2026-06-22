@@ -490,7 +490,8 @@ export abstract class BaseTool implements IMcpTool {
       throw new Error(
         `Could not resolve CID from URI ${uri}: ${
           error instanceof Error ? error.message : 'Unknown error'
-        }`
+        }`,
+        { cause: error }
       );
     }
   }

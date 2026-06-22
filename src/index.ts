@@ -26,7 +26,6 @@ import {
   isInitializeRequest,
 } from '@modelcontextprotocol/sdk/types.js';
 import { z } from 'zod';
-import { zodToJsonSchema } from 'zod-to-json-schema';
 import { ConfigurationError, type IMcpServerConfig, ValidationError } from './types/index.js';
 import { AtpClient } from './utils/atp-client.js';
 import { Logger } from './utils/logger.js';
@@ -625,7 +624,7 @@ export class AtpMcpServer {
         method: z.literal('prompts/get'),
         params: z.object({
           name: z.string(),
-          arguments: z.record(z.any()).optional(),
+          arguments: z.record(z.string(), z.any()).optional(),
         }),
       }),
       async request => {
@@ -719,13 +718,21 @@ export class AtpMcpServer {
   /**
    * Convert Zod schema to JSON Schema for MCP compatibility
    *
-   * Uses the well-tested zod-to-json-schema library to ensure comprehensive
-   * support for all Zod schema types and proper JSON Schema conversion.
+   * Uses zod v4's native `z.toJSONSchema`, which replaced the external
+   * zod-to-json-schema library (its v3 line reads zod's internal `_def`, which
+   * zod v4 restructured, so it silently emitted schemas without a `type` and
+   * the MCP SDK rejected every tool's inputSchema). Options:
+   * - `target: 'draft-7'` reproduces the prior 'jsonSchema7' output.
+   * - `io: 'input'` emits the client-facing input shape, so params with
+   *   `.default()` stay optional (out of `required`) rather than being forced.
+   * - `unrepresentable: 'any'` degrades unrepresentable types (e.g. `z.any()`)
+   *   to `{}` instead of throwing, matching the old library's lenient behavior.
    */
-  private zodToJsonSchema(schema: z.ZodSchema): Record<string, unknown> {
-    const json = zodToJsonSchema(schema, {
-      target: 'jsonSchema7',
-      $refStrategy: 'none',
+  private zodToJsonSchema(schema: z.ZodType): Record<string, unknown> {
+    const json = z.toJSONSchema(schema, {
+      target: 'draft-7',
+      io: 'input',
+      unrepresentable: 'any',
     }) as Record<string, unknown>;
     // The `$schema` meta key is not part of an MCP inputSchema and some clients
     // are strict about it; drop it so we emit a clean JSON Schema object.
