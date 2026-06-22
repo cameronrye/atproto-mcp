@@ -235,7 +235,8 @@ export class ReplyToPostTool extends BaseTool {
       throw new Error(
         `Could not resolve the CID for ${uri}: ${
           error instanceof Error ? error.message : 'Unknown error'
-        }. A reply requires the real CID of the parent and root posts.`
+        }. A reply requires the real CID of the parent and root posts.`,
+        { cause: error }
       );
     }
   }

@@ -45,51 +45,21 @@ export function createSchemaSniffingMockServer(): {
       // Extract method from Zod schema structure
       let method: string | undefined;
 
-      // Try to parse the schema to extract the method
+      // Recover the MCP method name from the request schema. MCP request
+      // schemas are `z.object({ method: z.literal('<method>'), ... })` (or, for
+      // a few SDK schemas, the method literal directly). Read the literal via
+      // zod's public accessors `.shape` and `.value` instead of the private
+      // `_def` internals the previous sniffer used: zod v4 restructured those
+      // internals (`_def.shape()` / `_def.value` no longer exist), but the
+      // public `.shape`/`.value` accessors are stable across zod v3 and v4.
       try {
-        // For z.object({ method: z.literal('method_name') })
-        if (schema._def?.shape && typeof schema._def.shape === 'function') {
-          const shape = schema._def.shape();
-          if (shape.method?._def?.value) {
-            method = shape.method._def.value;
-          }
+        const methodSchema = schema?.shape?.method ?? schema;
+        const value: unknown = methodSchema?.value;
+        if (typeof value === 'string' && value.length > 0) {
+          method = value;
         }
-        // For z.literal('method_name')
-        else if (schema._def?.value) {
-          method = schema._def.value;
-        }
-        // Try to parse the schema by calling it with test data
-        else {
-          const testData = { method: 'test' };
-          try {
-            schema.parse(testData);
-            // If it parses successfully, it might be expecting a method field
-            // Let's try common MCP methods
-            const mcpMethods = [
-              'initialize',
-              'ping',
-              'tools/list',
-              'tools/call',
-              'resources/list',
-              'resources/read',
-              'prompts/list',
-              'prompts/get',
-            ];
-            for (const mcpMethod of mcpMethods) {
-              try {
-                schema.parse({ method: mcpMethod });
-                method = mcpMethod;
-                break;
-              } catch {
-                // Continue trying
-              }
-            }
-          } catch {
-            // Schema doesn't accept our test data
-          }
-        }
-      } catch (error) {
-        console.log('Error parsing schema:', error);
+      } catch {
+        // Unknown schema shape — leave the handler unregistered.
       }
 
       if (method) {

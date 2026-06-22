@@ -139,7 +139,8 @@ export async function expectToThrow<T extends Error>(
   } catch (error) {
     if (!(error instanceof errorClass)) {
       throw new Error(
-        `Expected error to be instance of ${errorClass.name}, but got ${error?.constructor.name}`
+        `Expected error to be instance of ${errorClass.name}, but got ${error?.constructor.name}`,
+        { cause: error }
       );
     }
 
@@ -147,11 +148,15 @@ export async function expectToThrow<T extends Error>(
       const errorMessage = error.message;
       if (typeof message === 'string') {
         if (errorMessage !== message) {
-          throw new Error(`Expected error message "${message}", but got "${errorMessage}"`);
+          throw new Error(`Expected error message "${message}", but got "${errorMessage}"`, {
+            cause: error,
+          });
         }
       } else if (message instanceof RegExp) {
         if (!message.test(errorMessage)) {
-          throw new Error(`Expected error message to match ${message}, but got "${errorMessage}"`);
+          throw new Error(`Expected error message to match ${message}, but got "${errorMessage}"`, {
+            cause: error,
+          });
         }
       }
     }

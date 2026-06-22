@@ -31,7 +31,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    "baseUrl": "./src"
+    "types": ["node"]
   },
   "include": ["src/**/*"],
   "exclude": [
