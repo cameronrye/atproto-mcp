@@ -17,6 +17,26 @@ and this project adheres to
 - Custom feed generator integration
 - Multi-account management
 
+## [0.6.2] - 2026-06-22
+
+A bug-fix and maintenance release.
+
+### Fixed
+
+- **Windows: the CLI exited silently** (#13). The entry-point guard
+  (`isMainModule`) realpath-resolved only `argv[1]` and compared `file://` URLs
+  by exact string, so on Windows a drive-letter case mismatch (`file:///c:/…`
+  vs `file:///C:/…`) made the guard return `false` and `main()` never ran — the
+  `atproto-mcp` binary produced no output and 25 spawn-based tests failed. Both
+  the module URL and the invoked path are now realpath-resolved and compared
+  case-insensitively on Windows.
+
+### Changed
+
+- Refresh dependencies to their latest in-range versions (`@atproto/api`
+  0.20.16, `typescript-eslint` 8.61.1, `vitest` 4.1.9, `lint-staged` 17.0.8,
+  `@types/node` 25.9.4).
+
 ## [0.6.1] - 2026-06-22
 
 A maintenance and security release. The tool surface and public API are
