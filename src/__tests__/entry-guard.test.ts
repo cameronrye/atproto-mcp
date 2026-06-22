@@ -14,7 +14,7 @@ import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { isMainModule } from '../cli.js';
+import { entryPathsEqual, isMainModule } from '../cli.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(__dirname, '..', '..');
@@ -70,6 +70,37 @@ describe('isMainModule', () => {
     writeFileSync(otherPath, 'export {};\n');
 
     expect(isMainModule(targetUrl, otherPath)).toBe(false);
+  });
+});
+
+describe('entryPathsEqual (cross-platform entry comparison)', () => {
+  it('is case-sensitive on POSIX', () => {
+    expect(entryPathsEqual('/home/me/app/dist/cli.js', '/home/me/app/dist/cli.js', 'linux')).toBe(
+      true
+    );
+    expect(entryPathsEqual('/home/Me/app/dist/cli.js', '/home/me/app/dist/cli.js', 'linux')).toBe(
+      false
+    );
+  });
+
+  it('is case-insensitive on Windows so a drive-letter/path case mismatch still matches (issue #13)', () => {
+    expect(
+      entryPathsEqual(
+        'C:\\Users\\Me\\app\\dist\\cli.js',
+        'c:\\users\\me\\app\\dist\\cli.js',
+        'win32'
+      )
+    ).toBe(true);
+  });
+
+  it('still distinguishes genuinely different entry paths on Windows', () => {
+    expect(
+      entryPathsEqual(
+        'C:\\Users\\Me\\app\\dist\\cli.js',
+        'C:\\Users\\Me\\app\\dist\\health-check.js',
+        'win32'
+      )
+    ).toBe(false);
   });
 });
 

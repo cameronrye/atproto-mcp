@@ -7,7 +7,7 @@
 import { parseArgs } from 'node:util';
 import { existsSync, readFileSync, realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { fileURLToPath } from 'node:url';
 import { ConfigurationError, type IMcpServerConfig } from './types/index.js';
 import { AtpMcpServer, type McpTransportKind } from './index.js';
 import { LogLevel, Logger } from './utils/logger.js';
@@ -389,18 +389,38 @@ async function main(): Promise<void> {
 }
 
 /**
+ * Compare two already-realpath-resolved filesystem paths for entry-point
+ * equality. Windows filesystems are case-insensitive and Node can report the
+ * drive letter in either case (`c:\…` vs `C:\…`), so paths are compared
+ * case-insensitively there; POSIX stays case-sensitive. Exported so the
+ * platform branch can be unit-tested directly (issue #13).
+ */
+export function entryPathsEqual(
+  a: string,
+  b: string,
+  platform: NodeJS.Platform = process.platform
+): boolean {
+  return platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+/**
  * Detect whether a module is the process entry point. Node realpath-resolves
  * import.meta.url for the main module, but argv[1] stays the literal invoked
  * path — and npm installs bins as symlinks — so a naive string comparison
  * against `file://${argv[1]}` breaks symlinked, relative, and space-containing
- * paths. Compare realpath-resolved file URLs instead.
+ * paths. Realpath-resolve BOTH sides to the OS's canonical form before
+ * comparing: the previous version resolved only argv[1] and compared file://
+ * URLs by exact string, leaving import.meta.url's casing/separators
+ * unnormalized — so on Windows the drive-letter case differed, the guard
+ * returned false, `main()` never ran, and the CLI exited silently with no
+ * output (issue #13).
  */
 export function isMainModule(importMetaUrl: string, argv1: string | undefined): boolean {
   if (argv1 == null || argv1 === '') {
     return false;
   }
   try {
-    return importMetaUrl === pathToFileURL(realpathSync(argv1)).href;
+    return entryPathsEqual(realpathSync(fileURLToPath(importMetaUrl)), realpathSync(argv1));
   } catch {
     return false;
   }
