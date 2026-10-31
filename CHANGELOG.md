@@ -9,6 +9,30 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Security
+
+- `@modelcontextprotocol/sdk` floored at 1.32.2 (GHSA-6qxp-vccf-f47h,
+  GHSA-46jr-4wx8-v453, GHSA-f897-62hf-6gxq and others), which also pulls patched
+  `proxy-addr`, `body-parser`, `qs`, `ip-address`, `hono` and
+  `@hono/node-server`. The HTTP transport already caps request bodies at 4 MiB
+  and the low-level `Server` validates tool input with our own zod, so no
+  `maxToolInputElements` opt-in is needed.
+- `zod` floored at 4.6.7 (GHSA-mrhx-c7xc-m3w5). The zod 3 copy under
+  `@atproto/api` has no fixed release and is waived in `pnpm.auditConfig` — see
+  the note on the CI audit step.
+- The `ajv>fast-uri` override was open-ended (`>=3.1.2`) and had resolved to
+  fast-uri 4.0.0 — outside ajv's `^3` range and on the line every current
+  fast-uri advisory affects. It is now `^3.1.2`; `path-to-regexp`, `glob` and
+  `preact` overrides are likewise capped to their dependents' majors.
+
+### Changed
+
+- Dependency refresh: latest in-range versions (`@atproto/api` 0.20.44,
+  `typescript-eslint` 8.72.1, `eslint` 10.14.0, `vitest` 4.1.12, `prettier`
+  3.9.10, …) and `@types/node` 26. Pinned actions bumped: `actions/checkout`
+  v7.0.1, `actions/setup-node` v7.1.0, `pnpm/action-setup` v6.1.0,
+  `softprops/action-gh-release` v3.0.3, `codecov/codecov-action` v7.1.1.
+
 ### Planned
 
 - OAuth token exchange (the `oauth-client` scaffolding is in place)

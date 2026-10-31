@@ -870,7 +870,7 @@ export class AtpMcpServer {
     this.httpServer = httpServer;
 
     // The SDK's DNS-rebinding protection matches the raw Host header against
-    // allowedHosts verbatim (host:port, verified against SDK 1.29), so the
+    // allowedHosts verbatim (host:port, verified against SDK 1.32), so the
     // allowlist must use the ACTUAL bound port (the requested port may be 0 =
     // ephemeral) and cover the loopback aliases a local client may dial.
     const address = httpServer.address();
@@ -977,7 +977,7 @@ export class AtpMcpServer {
 
     // Drop the session when the transport closes for any reason. Safe to set
     // before connect(): Protocol.connect chains a pre-existing onclose handler
-    // (verified against SDK 1.29) instead of replacing it.
+    // (verified against SDK 1.32) instead of replacing it.
     transport.onclose = (): void => {
       const closedSessionId = transport.sessionId;
       if (closedSessionId !== undefined) {
