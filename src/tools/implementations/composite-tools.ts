@@ -639,8 +639,7 @@ export class GetPostContextTool extends BaseTool {
       // extract_media_from_post tool). Operates on the raw thread post view so
       // the embed `#view` shapes are available.
       let media:
-        | { images: any[]; videos: any[]; externalLinks: any[]; quotePosts: any[] }
-        | undefined;
+        { images: any[]; videos: any[]; externalLinks: any[]; quotePosts: any[] } | undefined;
       if (params.includeMedia) {
         media = extractMediaFromPost(threadData.post);
       }

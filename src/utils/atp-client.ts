@@ -356,8 +356,7 @@ export class AtpClient {
       // meaningful here). On success it fires the 'update' session event,
       // which re-marks our session as active.
       const sessionManager = this.agent.sessionManager as
-        | { refreshSession?: () => Promise<unknown> }
-        | undefined;
+        { refreshSession?: () => Promise<unknown> } | undefined;
       if (typeof sessionManager?.refreshSession === 'function') {
         await sessionManager.refreshSession();
         this.logger.info('Session refreshed successfully');
