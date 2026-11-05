@@ -104,7 +104,7 @@
     "@vitest/ui": "^4.1.12",
     "chalk": "^6.0.1",
     "command-exists": "^1.2.9",
-    "dotenv": "^17.4.2",
+    "dotenv": "^18.0.9",
     "dotenv-cli": "^11.1.0",
     "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
