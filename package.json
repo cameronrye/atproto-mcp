@@ -91,7 +91,7 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@atproto/api": "^0.20.44",
+    "@atproto/api": "^0.30.0",
     "@modelcontextprotocol/sdk": "^1.32.2",
     "zod": "^4.6.7"
   },
